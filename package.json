@@ -1,0 +1,14 @@
+{
+  "name": "template-ai",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @template-ai/web dev",
+    "dev:api": "pnpm --filter @template-ai/api start:dev",
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck"
+  }
+}

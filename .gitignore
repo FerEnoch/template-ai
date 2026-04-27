@@ -1,0 +1,78 @@
+# ============================================
+# Environment files (NEVER commit real secrets)
+# ============================================
+.env
+.env.local
+.env.production
+.env.dev.local
+.env.test.local
+.env.*.local
+
+# Real environment files (contain secrets — DO NOT COMMIT)
+.env.dev
+.env.test
+
+# Keep example templates — they're meant to be committed
+# (users copy these as their starting point)
+!.env.dev.example
+!.env.test.example
+
+# ============================================
+# Build outputs
+# ============================================
+dist/
+.pnp/
+.pnp.js
+.next/
+.output/
+
+# ============================================
+# Dependencies
+# ============================================
+node_modules/
+.pnpm-store/
+
+# ============================================
+# Testing
+# ============================================
+coverage/
+.nyc_output/
+
+# ============================================
+# Logs
+# ============================================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============================================
+# OS files
+# ============================================
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Editor directories and files
+# ============================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# ============================================
+# AI Agent local config (don't pollute repos)
+# ============================================
+.atl/
+
+# ============================================
+# Temporary files
+# ============================================
+*.tmp
+*.temp
+.env.test.tmp*

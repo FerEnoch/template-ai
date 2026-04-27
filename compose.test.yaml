@@ -1,0 +1,11 @@
+services:
+  postgres:
+    env_file:
+      - .env.test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_test_data:
