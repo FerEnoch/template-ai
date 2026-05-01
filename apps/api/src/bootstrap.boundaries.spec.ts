@@ -15,14 +15,32 @@ async function pathExists(path: string) {
 }
 
 describe("bootstrap boundaries", () => {
-  it("keeps PostgreSQL wiring technical-only", async () => {
+  it("keeps PostgreSQL bootstrap + approved migration slice only", async () => {
     await expect(
       pathExists(resolve(workspaceRoot, "apps/api/src/infrastructure/postgres/postgres.service.ts")),
+    ).resolves.toBe(true);
+    await expect(
+      pathExists(resolve(workspaceRoot, "apps/api/src/infrastructure/postgres/migrate.ts")),
+    ).resolves.toBe(true);
+    await expect(
+      pathExists(
+        resolve(
+          workspaceRoot,
+          "apps/api/src/infrastructure/postgres/migrations/0001_domain_schema_first.sql",
+        ),
+      ),
     ).resolves.toBe(true);
 
     await expect(pathExists(resolve(workspaceRoot, "apps/api/src/repositories"))).resolves.toBe(false);
     await expect(pathExists(resolve(workspaceRoot, "apps/api/src/migrations"))).resolves.toBe(false);
     await expect(pathExists(resolve(workspaceRoot, "apps/api/src/seeds"))).resolves.toBe(false);
+  });
+
+  it("keeps migrations explicit and out of bootstrap startup", async () => {
+    const mainSource = await readFile(resolve(workspaceRoot, "apps/api/src/main.ts"), "utf8");
+
+    expect(mainSource).not.toContain("runMigrations");
+    expect(mainSource).not.toContain("infrastructure/postgres/migrate");
   });
 
   it("keeps scope bootstrap-only without app container assets", async () => {

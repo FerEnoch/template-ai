@@ -5,6 +5,8 @@
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "build": "nest build",
+    "db:migrate": "node --experimental-strip-types ./src/infrastructure/postgres/migrate.ts",
+    "db:migrate:validate": "node --experimental-strip-types ./src/infrastructure/postgres/validate-domain-schema-first.ts",
     "test": "vitest run",
     "lint": "pnpm run typecheck",
     "typecheck": "tsc --noEmit -p tsconfig.json"
