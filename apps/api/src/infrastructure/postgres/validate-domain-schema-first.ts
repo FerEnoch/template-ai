@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Pool } from "pg";
-import { runMigrations } from "./migrate.ts";
+import { runMigrations } from "./migrate.js";
 
 type DbCheck = {
   description: string;
@@ -122,6 +122,54 @@ async function assertValidation(connectionString: string): Promise<void> {
       {
         description: "usage_ledger append-only trigger",
         sql: "SELECT 1 FROM pg_trigger WHERE tgname = 'usage_ledger_append_only'",
+      },
+      {
+        description: "users_insert RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_insert'",
+      },
+      {
+        description: "users_select RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_select'",
+      },
+      {
+        description: "users_update RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_update'",
+      },
+      {
+        description: "users_delete RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_delete'",
+      },
+      {
+        description: "subscriptions_insert RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'subscriptions' AND policyname = 'subscriptions_insert'",
+      },
+      {
+        description: "subscriptions_select RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'subscriptions' AND policyname = 'subscriptions_select'",
+      },
+      {
+        description: "subscriptions_update RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'subscriptions' AND policyname = 'subscriptions_update'",
+      },
+      {
+        description: "subscriptions_delete RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'subscriptions' AND policyname = 'subscriptions_delete'",
+      },
+      {
+        description: "usage_ledger_insert RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'usage_ledger' AND policyname = 'usage_ledger_insert'",
+      },
+      {
+        description: "usage_ledger_select RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'usage_ledger' AND policyname = 'usage_ledger_select'",
+      },
+      {
+        description: "usage_ledger_update RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'usage_ledger' AND policyname = 'usage_ledger_update'",
+      },
+      {
+        description: "usage_ledger_delete RLS policy",
+        sql: "SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'usage_ledger' AND policyname = 'usage_ledger_delete'",
       },
     ];
 

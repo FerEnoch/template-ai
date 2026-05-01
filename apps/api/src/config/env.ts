@@ -73,3 +73,17 @@ export function getApiEnv(): ApiEnv {
 
   return cachedApiEnv;
 }
+
+// Ensure process exits on critical env validation failure
+function handleFatalError(message: string): never {
+  process.stderr.write(`[api env] ${message}\n`);
+  process.exit(1);
+}
+
+// Trap startup errors to guarantee non-zero exit
+process.on("uncaughtException", (err) => {
+  if (err.message.includes("[api env]")) {
+    handleFatalError(err.message.replace("[api env] ", ""));
+  }
+  process.exit(1);
+});

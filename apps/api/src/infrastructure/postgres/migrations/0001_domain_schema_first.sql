@@ -87,32 +87,61 @@ ALTER TABLE subscriptions FORCE ROW LEVEL SECURITY;
 ALTER TABLE usage_ledger ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usage_ledger FORCE ROW LEVEL SECURITY;
 
-CREATE POLICY users_owner_isolation ON users
-  USING (
-    current_setting('app.current_user_id', true) IS NOT NULL
-    AND id = current_setting('app.current_user_id', true)::BIGINT
-  )
-  WITH CHECK (
-    current_setting('app.current_user_id', true) IS NOT NULL
-    AND id = current_setting('app.current_user_id', true)::BIGINT
-  );
+CREATE POLICY users_insert ON users FOR INSERT WITH CHECK (
+  current_setting('app.current_user_id', true) IS NOT NULL
+);
 
-CREATE POLICY subscriptions_owner_isolation ON subscriptions
-  USING (
-    current_setting('app.current_user_id', true) IS NOT NULL
-    AND user_id = current_setting('app.current_user_id', true)::BIGINT
-  )
-  WITH CHECK (
-    current_setting('app.current_user_id', true) IS NOT NULL
-    AND user_id = current_setting('app.current_user_id', true)::BIGINT
-  );
+CREATE POLICY users_select ON users FOR SELECT USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND id = current_setting('app.current_user_id', true)::BIGINT
+);
 
-CREATE POLICY usage_ledger_owner_isolation ON usage_ledger
-  USING (
-    current_setting('app.current_user_id', true) IS NOT NULL
-    AND user_id = current_setting('app.current_user_id', true)::BIGINT
-  )
-  WITH CHECK (
-    current_setting('app.current_user_id', true) IS NOT NULL
-    AND user_id = current_setting('app.current_user_id', true)::BIGINT
-  );
+CREATE POLICY users_update ON users FOR UPDATE USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY users_delete ON users FOR DELETE USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY subscriptions_insert ON subscriptions FOR INSERT WITH CHECK (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY subscriptions_select ON subscriptions FOR SELECT USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY subscriptions_update ON subscriptions FOR UPDATE USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY subscriptions_delete ON subscriptions FOR DELETE USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY usage_ledger_insert ON usage_ledger FOR INSERT WITH CHECK (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY usage_ledger_select ON usage_ledger FOR SELECT USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY usage_ledger_update ON usage_ledger FOR UPDATE USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);
+
+CREATE POLICY usage_ledger_delete ON usage_ledger FOR DELETE USING (
+  current_setting('app.current_user_id', true) IS NOT NULL
+  AND user_id = current_setting('app.current_user_id', true)::BIGINT
+);

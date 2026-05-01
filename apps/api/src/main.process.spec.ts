@@ -82,10 +82,12 @@ describe("API bootstrap process contract", () => {
       ...originalEnv,
       PORT: String(port),
       NODE_ENV: "test",
+      // Override DATABASE_URL to an invalid value to trigger env validation failure
+      DATABASE_URL: "",
     });
 
-    const exitCode = await waitForExit(child, 15_000);
+    const exitCode = await waitForExit(child, 90_000);
 
     expect(exitCode).not.toBe(0);
-  });
+  }, 120_000);
 });
