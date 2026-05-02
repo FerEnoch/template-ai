@@ -66,9 +66,12 @@ Thumbs.db
 .settings/
 
 # ============================================
-# AI Agent local config (don't pollute repos)
+# AI Agent config (public project guidance)
 # ============================================
-.atl/
+# .atl/ directory is PUBLIC — committed for team sharing
+# Keep private subdirectories only
+.atl/private/
+.atl/private/**
 
 # ============================================
 # Temporary files
