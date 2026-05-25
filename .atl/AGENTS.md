@@ -163,7 +163,6 @@ Expected private files:
 | Private file                          | Purpose                                      |
 | ------------------------------------- | -------------------------------------------- |
 | `.atl/private/expert-agents.md`       | Expert agent routing table (when to invoke specialized agents by domain) |
-| `.atl/private/skill-registry.md`      | Extended or custom skill mappings for this project |
 | *(add your own as needed)*            | Any project-specific agent configuration     |
 
 **To set up**: copy the template structure from public docs or create your own `private/` files to customize expert routing and skill behavior for your team.
@@ -175,6 +174,6 @@ Expected private files:
 - Stack ADR: `docs/stack-technological-adr.md`
 - PRD MVP: `docs/prd-mvp-template-ai.md`
 - Domain model: `docs/domain-conceptual-model.md`
-- Skill registry: `.atl/private/skill-registry.md`
+- Skill registry: `.atl/skill-registry.md`
 
 ---
