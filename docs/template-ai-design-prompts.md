@@ -1,424 +1,439 @@
-# template-ai — Design Prompts (Nano Banana Pro)
+# template-ai — Design Prompts (Stitch)
 
-**Versión:** 1.4  
-**Fecha:** Abril 2026  
-**Herramienta:** Google Flow (Nano Banana Pro)  
-**Producto:** template-ai
+**Versión:** 2.0  
+**Fecha:** Mayo 2026  
+**Herramienta:** Google Stitch (figaro_agent / HatterAgent)  
+**Proyecto Stitch:** `13244395666194572658`  
+**Design System:** `assets/5621834681417054068` ("template-ai — Editorial Legal")
 
 ---
 
 ## 🎯 Objetivo
 
-Este documento define prompts de alta calidad para explorar UI del MVP de **template-ai** en Google Flow con dos metas simultáneas:
+Este documento contiene los prompts optimizados para **Google Stitch** usados para generar los 21 mockups del MVP de **template-ai**. Reemplaza al pack original v1.4 diseñado para Google Flow / Nano Banana Pro.
 
-1. generar mockups consistentes y realistas (no “pantallas lindas sueltas”);
-2. dejar handoff frontend con baja ambigüedad estructural.
+Dirección de producto:
 
-Los prompts están en **inglés** (mejor rendimiento del modelo), mientras que la guía y criterios de calidad están en **español**.
-
-Dirección de producto obligatoria:
-- serio, legal, calmado, accountable;
-- desktop-first;
-- revisión humana obligatoria;
-- límites y fallbacks honestos;
-- sin estética startup-consumer;
-- sin complejidad técnica innecesaria para el usuario.
+- serio, legal, calmado, accountable
+- desktop-first
+- revisión humana obligatoria
+- límites y fallbacks honestos
+- sin estética startup-consumer
 
 ---
 
-## 🧭 Guía rápida de uso (Google Flow)
+## 🎨 Design System
 
-1. Abrí [flow.google](https://flow.google) y creá proyecto nuevo.
-2. Modelo: **Nano Banana Pro**.
-3. Aspect ratio por defecto: **16:9**.
-4. Pegá un prompt completo de este pack.
-5. Generá 4 variantes, elegí 1 dirección base.
-6. Iterá con follow-ups de precisión (layout, estados, densidad, consistencia).
+Stitch maneja los tokens visuales (colores, tipografía, redondez) vía el design system del proyecto. **Los prompts NO incluyen colores, fuentes ni tokens.** Solo estructura, layout, contenido y estados.
 
----
-
-## 🧱 Framework v1.4 (aplica a TODOS los prompts)
-
-### A) Prompt anatomy / Rendering contract
-
-Cada prompt de pantalla debe incluir explícitamente:
-
-1. **Screen intent**: para qué tarea existe.
-2. **Layout contract**: regiones visibles + proporciones aproximadas.
-3. **Visible data contract**: qué datos mínimos se ven por fila/tarjeta/módulo.
-4. **Interaction contract**: qué es clickeable, estados hover/focus/disabled, bloqueos.
-5. **State contract**: loading / empty / error / success / overflow.
-6. **Consistency contract**: qué componentes se reutilizan idénticos del shell/sistema.
-
-### B) Screen-spec checklist (rápida)
-
-Antes de considerar “buena” una imagen, validar:
-
-- ¿Se entienden zonas de layout sin adivinar?  
-- ¿Cada tabla/form tiene columnas/campos con contrato visible?  
-- ¿Hay estado por defecto y estado límite (vacío/error/overflow)?  
-- ¿Los CTA tienen criterio de habilitación claro?  
-- ¿Se ve reusable o parece composición one-off?  
-- ¿Se sostiene en escala de texto largo e i18n?
-
-### C) Reusable shell rules
-
-- Shell base consistente: **top bar + sidebar + page header + content**.
-- Grilla desktop fija (1440px): gutters consistentes, alineación estricta.
-- Sidebar siempre secundaria; contenido de tarea siempre dominante.
-- Evitar héroes, métricas de marketing y ruido ornamental.
-
-### D) Component extraction hints (handoff frontend)
-
-Diseñar cada pantalla como ensamblaje de piezas reusables:
-
-- `AppShell`, `PageHeader`, `SectionCard`
-- `DataTable`, `TableRowActions`, `StatusChip`
-- `ConfidenceBadge`, `TraceBadge`, `VariationBadge`
-- `InlineWarningBar`, `ErrorSummaryBar`
-- `Stepper`, `SkeletonBlock`
-- `EmptyState`, `FailPanel`, `ConfirmModal`
-
-Si un bloque no podría convertirse en componente sin rediseñarlo, el prompt está débil.
-
-### E) Interaction/state fidelity rules
-
-- Estados mínimos obligatorios por flujo: `idle`, `hover/focus`, `loading`, `disabled`, `error`, `success`, `blocked-by-limit`.
-- Toda acción bloqueada debe explicar **por qué** y **qué hacer**.
-- Toda incertidumbre (BAJA confianza, sin traza, análisis fallido) debe ser explícita y no maquillada.
-- No inventar acciones que no existan en el contrato del producto.
+| Token         | Valor               |
+| ------------- | ------------------- |
+| Color mode    | `LIGHT`             |
+| Color variant | `NEUTRAL`           |
+| Primary       | `#3d6b8f`           |
+| Headline font | `LITERATA`          |
+| Body font     | `SOURCE_SERIF_FOUR` |
+| Label font    | `INTER`             |
+| Roundness     | `ROUND_FOUR`        |
 
 ---
 
-## 🔩 Reglas obligatorias de alineación UI ↔ dominio
+## 🔩 Reglas de Stitch prompting
 
-Aplican a todos los prompts, variantes y follow-ups.
-
-1. **Entidades dinámicas, no taxonomía fija**
-   - “Partes”, “Inmueble”, “Fechas” son ejemplos.
-   - Soportar `N` grupos, editable/reordenable, potencialmente vacío.
-
-2. **Contrato visible por fila de campo**
-   - Cada fila variable debe poder mostrar: `label`, `required`, `group`, `confidence`, `trace_state`, `variation_rule`, `actions`.
-   - `trace_state`: `con_traza` (página + extracto) / `sin_traza` (agregado manual).
-   - `variation_rule`: `none`, `optional_block`, `repeatable_simple`, `boolean_toggle`.
-
-3. **Confianza de dominio**
-   - Persistencia conceptual binaria: **ALTA / BAJA**.
-   - Si hay gradaciones visuales, deben ser subestado de incertidumbre, no nuevo estado de negocio.
-
-4. **Trazabilidad obligatoria en revisión**
-   - Campo detectado: vínculo a evidencia (página + extracto).
-   - Campo manual: “Sin traza (agregado manualmente)”.
-
-5. **Estados de ejecución consistentes**
-   - `pendiente`, `en_proceso`, `completado`, `fallido`.
-   - `fallido` siempre con motivo claro + acción requerida.
-
-6. **Plan único, dos tipos de operación**
-   - Mostrar análisis y generación como filas separadas de un mismo plan.
-   - Copy obligatorio: “Cada análisis consume 1 unidad. Cada generación consume 1 unidad.”
-
-7. **Borrado con lenguaje operativo**
-   - Diferenciar `eliminado en UI` vs `purga física en 30 días`.
-   - Mostrar trazabilidad de actividad cuando aporte claridad.
-
-8. **Densidad profesional desktop-first**
-   - Tablas y formularios compactos; jerarquía fuerte; cero look “hero”.
+1. **NO incluir colores, fuentes ni tokens** — el design system los aplica automáticamente.
+2. **Foco en estructura**: layout, proporciones, contratos de datos visibles, estados.
+3. **Variantes como `edit_screens`**: partir de una pantalla base existente para maximizar reutilización.
+4. **Modelos**: `GEMINI_3_FLASH` para primeras generaciones, default (HatterAgent/figaro_agent) para ediciones.
+5. **Siempre incluir `deviceType: DESKTOP` y `designSystem` ID**.
 
 ---
 
-## 🎨 Prompt 1 — Visual System / Design System
+## ✅ Orden de generación seguido
 
-**Objetivo:** definir base visual, tokens y componentes transversales listos para reutilización.
-
-**Prompt completo (EN):**
-
-> Create a production-grade desktop UI design system board for a Spanish legal document templating product called template-ai. Tone: serious, calm, accountable, precise, trustworthy. Not a startup dashboard, not consumer SaaS. Light theme only. Canvas 1440px. Color tokens: background #f5f1e8, elevated surfaces #fdfcf9, primary text #1a1714, secondary text #5a544c, accent #3d6b8f, success #2d7a4f, warning #b07d2a, danger #c0392b, neutral #7a7570. Typography system: refined serif for legal content and legal headings; neutral geometric sans-serif for controls/data UI. Show reusable component families with explicit states and density variants: AppShell (top bar + sidebar + page header), DataTable (default/hover/selected/overflow row), compact FormRow, Inputs (default/focus/error/disabled), Select, Tabs, UploadDropzone (idle/uploading/ready/fail), Status chips (BORRADOR/VALIDADA/ARCHIVADA distinguishable beyond color), Confidence badges (ALTA/BAJA distinguishable in grayscale), Trace badges (Con traza/Sin traza), Variation badges (Opcional/Repetible/Sí-No), Inline warning bar, Error summary bar with anchors, Stepper states (pendiente/en_proceso/completado/fallido), Empty state card, Skeleton blocks, Fail panel (reason + action), Destructive modal. Include spacing scale, border radius scale, 1px hairline borders, no drop shadows, strict alignment and column rhythm.
-
-**Aspect ratio:** `16:9`
+```
+P2  → P16           Revisión del template (base + variante BAJA confianza)
+P8  → P17           Formulario dinámico (normal + errores de validación)
+P3  · P9  · P4      Home · Vista previa · Subida
+P10 · P12 · P11     Plan y uso · Fallback · Bienvenida
+P13                 Límite alcanzado (edit P10)
+P21 · P18 · P14     Export · Guardado éxito · Cómo tratamos
+P20 · P6            Confirmar elim. · Guardar plantilla
+P5                  Análisis del documento (edit P4)
+P7                  Biblioteca (7 intentos — el más problemático)
+P15                 Loading skeleton (edit P5)
+P19                 Biblioteca vacía (edit P7)
+```
 
 ---
 
-## 🧩 Prompt 2 — Revisión del template *(pantalla más crítica del MVP)*
+## 🧩 Prompt 2 — Revisión del template
 
-**Objetivo:** revisión humana obligatoria con trazabilidad verificable y estructura implementable.
+**Asset:** `.stitch/designs/p2-human-review-v1.html` (v1), `p2-human-review-v2.html` (v2 refinada)
 
-**Prompt completo (EN):**
+```
+Create the core template review screen for template-ai (mandatory human review gate).
+Desktop, split layout: A) left document viewer 62%, B) right review panel 38%,
+C) persistent bottom action bar. Region A: original legal document in serif,
+highlighted variable spans, click-to-focus interaction. Region B title:
+"Entidades y datos detectados". Dynamic entity groups with field rows showing:
+label, required marker, confidence (ALTA/BAJA), trace state, variation badge,
+actions. Trace contract: detected → "Ver origen", manual → "Sin traza (agregado
+manualmente)". Include empty group state, overflow with sticky headers,
+prioritized "Revisión prioritaria" section with BAJA rows first, "Dudas del
+análisis" cards with yes/no disambiguation. Bottom bar: "Revisión humana
+obligatoria", CTA "Confirmar estructura" disabled until all BAJA resolved,
+secondary "Seguir revisando". Show hover, selected, disabled states with
+microcopy. Professional calm editorial tone.
+```
 
-> Create the core template review screen for template-ai (mandatory human review gate). Desktop 1440px, split layout with explicit regions: A) left document viewer 62%, B) right review panel 38%, C) persistent bottom action bar. Region A: original legal document in serif, highlighted variable spans, click-to-focus interaction; selecting a highlight syncs to one row on the right. Region B title: “Entidades y datos detectados”. Entity groups are dynamic and editable (show example names only). Each field row must expose this visible data contract in one compact line: label (truncates with tooltip), required marker, confidence (ALTA/BAJA), trace state, variation badge, actions menu. Trace behavior contract: detected field → “Ver origen” opens page+excerpt context; manual field → explicit “Sin traza (agregado manualmente)”. Include one empty group state (“Sin campos todavía” + “Agregar campo”), and overflow handling with sticky section headers while scrolling. Add a prioritized block “Revisión prioritaria” listing BAJA rows first with per-row action “Revisar ahora”. Include “Dudas del análisis” cards (2 yes/no disambiguation questions). Bottom bar contract: text “Revisión humana obligatoria — confirmá la estructura antes de guardar”, primary CTA “Confirmar estructura” disabled until all BAJA rows are resolved/accepted, secondary “Seguir revisando”. Interaction fidelity: show hover on row, selected row state, disabled CTA state with reason microcopy.
+---
 
-**Aspect ratio:** `16:9`
+## ⚠️ Prompt 16 — Revisión con baja confianza activa (edit P2)
+
+**Asset:** `.stitch/designs/p16-low-confidence-review.html`
+
+```
+Transform into strict low-confidence review variant. Keep same shell and core
+regions as base review screen. Enhance "Revisión prioritaria" section with
+explicit resolution state badges: "Pendiente" (amber outline), "Resuelta" (green
+check), "Aceptada" (gray). Each BAJA row: field label, short uncertainty reason,
+trace badge, "Revisar ahora" action. Include at least one manual field with
+"Sin traza (agregado manualmente)". Resolved row shows reduced opacity and
+strikethrough. Bottom CTA "Confirmar estructura" disabled until all BAJA rows
+move out of pending. Show disabled-state helper copy with pending count.
+```
+
+---
+
+## 🧾 Prompt 8 — Formulario del caso nuevo
+
+**Asset:** `.stitch/designs/p8-nuevo-caso.html`
+
+```
+Create "Nuevo caso" form screen from template "Contrato de locación". Desktop
+with app shell. Layout: narrow left context rail (template info + completion
+tracker "Progreso: 8/11"), main dynamic form area with accordions, sticky bottom
+action bar. Dynamic groups are examples only (Partes, Inmueble, Fechas). Field
+row contract: label, required asterisk, input control, validation slot, metadata
+line with trace info. Variation rules: optional block ("¿Incluir cláusula de
+garante?" with conditional children), repeatable block ("Agregar firmante" adds
+name+DNI+role rows), boolean toggle. Collapsed accordion shows amber error
+badge. Bottom CTA "Generar documento" disabled with reason microcopy:
+"Completá los 3 campos obligatorios pendientes antes de generar". "Guardar
+borrador" remains active. Show validation error on one field with red border
+and compact error message. Professional calm editorial.
+```
+
+---
+
+## 🧪 Prompt 17 — Errores de validación (edit P8)
+
+**Asset:** `.stitch/designs/p17-validation-errors.html`
+
+```
+Transform into validation-error state. Add compact error summary bar at top
+with amber background: "Hay 4 campos que requieren tu atención" with numbered
+anchor links. Validation errors: "Dirección completa" (required), "Fecha de
+inicio" (invalid format), "Duración del contrato" (must be > 0), "Nombre del
+Garante" (conditional required). Collapsed "Fechas" accordion with prominent
+error badge "3 errores". Bottom CTA disabled with microcopy: "Corregí los 4
+errores antes de generar el documento". Calm amber/light warning colors,
+no red backgrounds or alarmist overload.
+```
 
 ---
 
 ## 🎨 Prompt 3 — Inicio / Escritorio de trabajo
 
-**Objetivo:** entrada operativa del producto, sin estética de startup dashboard.
+**Asset:** `.stitch/designs/p3-inicio.html`
 
-**Prompt completo (EN):**
-
-> Design the home workspace screen for template-ai (desktop 1440px). Reuse app shell. Sidebar: “Inicio”, “Biblioteca”, “Plan y uso”. Main region contract: compact greeting header, two action cards (“Crear nueva plantilla”, “Generar documento”), and a dense “Plantillas recientes” list with columns: nombre, estado, último uso, acción rápida. Add a right-side plan snippet card with one-plan language: “Plan único — 8 análisis disponibles este mes”. Keep low noise, high structure, no hero metrics, no decorative charts.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 📤 Prompt 4 — Subida de documento
-
-**Objetivo:** subir archivo con expectativas y límites claros.
-
-**Prompt completo (EN):**
-
-> Create “Crear plantilla — paso 1 de 3” upload screen for template-ai, desktop 1440px. Layout regions: central dropzone, right guidance panel, bottom mandatory review notice. Dropzone contract: accepted formats badges (PDF/DOCX/JPG), and three thumbnail states (idle/uploading/ready). Guidance panel: practical file quality tips in Spanish. Add trust note with “Cómo lo tratamos” link. Bottom non-dismissible notice: “Vas a revisar todo lo que detectamos antes de guardar.” Include edge state: file rejected row with plain reason and corrective action.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 🔎 Prompt 5 — Análisis del documento (progreso + confianza)
-
-**Objetivo:** progreso honesto + fallback accionable.
-
-**Prompt completo (EN):**
-
-> Design “Analizando tu contrato” screen for template-ai with a strict execution-state contract. Desktop 1440px. Left: vertical stepper with 4 steps (Validando archivo, Extrayendo texto, Detectando estructura, Identificando datos del caso), each rendered as pendiente / en_proceso / completado / fallido. Main region: skeleton preview while in progress. Completion region: confidence summary split ALTA vs BAJA with operational copy. Failure region: compact fail panel with reason and exact next actions (“Reintentar”, “Subir otro archivo”, “Volver”). Include timeout-safe microcopy: “Si algo no se puede analizar con claridad, te lo decimos antes de continuar.”
-
-**Aspect ratio:** `16:9`
-
----
-
-## 💾 Prompt 6 — Guardar plantilla
-
-**Objetivo:** cierre de flujo con confirmación concreta y estado claro.
-
-**Prompt completo (EN):**
-
-> Design “Guardar plantilla” screen for template-ai. Include summary card (source filename, total fields, BAJA fields manually resolved, review completed). Form contract: required “Nombre de la plantilla”, optional “Descripción breve”. Show default status VALIDADA with short explanation. Primary CTA “Guardar en mi biblioteca”, secondary “Seguir editando”, and disabled primary state when required name is empty.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 📚 Prompt 7 — Biblioteca personal *(alta palanca para reutilización de componentes)*
-
-**Objetivo:** tabla densa, filtros claros, acciones rápidas y plan visible sin ambigüedad.
-
-**Prompt completo (EN):**
-
-> Create a production-ready “Biblioteca” screen for template-ai, desktop 1440px, using the same shell as other screens. Layout contract: top filter toolbar, central table, right “Tu plan” panel. Table visible data contract per row: Nombre (truncated with tooltip), Estado chip (BORRADOR/VALIDADA/ARCHIVADA), Tipo de documento, Último uso, Acciones inline. Interaction contract: row hover reveals quick actions (“Usar”, “Revisar”, “Archivar”), keyboard-focus row style, sticky header, sortable columns (Nombre, Último uso). Empty contract: when no results for filters, show compact “Sin resultados” state with “Limpiar filtros”. Overflow contract: long names never push actions off-grid; actions remain clickable. Plan panel contract: one plan card, two operation rows (“Análisis de documentos”, “Generaciones de documentos”), count + thin bar each, explicit rule copy “Cada análisis consume 1 unidad. Cada generación consume 1 unidad.” plus reset date and limit behavior note. Keep dense, calm, implementation-ready spacing.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 🧾 Prompt 8 — Formulario del caso nuevo *(alta palanca para handoff frontend)*
-
-**Objetivo:** formulario dinámico por entidades con reglas de variación, validación y bloqueo de CTA.
-
-**Prompt completo (EN):**
-
-> Design “Nuevo caso” screen for template-ai from template “Contrato de locación”, desktop 1440px. Layout contract: left context rail (template info + completion), main dynamic form area with accordions, bottom action bar. Dynamic groups are examples only (Partes/Inmueble/Fechas), not fixed taxonomy. Visible field-row contract: label, helper text, required marker, current value control, validation slot, optional metadata line (including “Sin traza (agregado manualmente)” when applicable). Include explicit variation-rule UI examples: optional block, repeatable simple block (“Agregar firmante”), and boolean toggle with conditional children (“¿Incluir cláusula de garante?”). Interaction contract: collapsed section can show error badge count; clicking error summary anchors to first invalid field. CTA contract: “Generar documento” disabled until required fields are valid, with blocking reason copy. Edge contract: long labels, long helper text, and malformed user input should preserve alignment and row height rhythm.
-
-**Aspect ratio:** `16:9`
+```
+Create "Inicio" home workspace. Desktop with app shell, sidebar (Inicio active).
+Compact greeting header. Two action cards side by side: "Crear nueva plantilla"
+(subtitle + primary "Comenzar") and "Generar documento" (subtitle +
+"Seleccionar plantilla"). Dense "Plantillas recientes" list with 4 rows:
+Nombre, Estado chip, Último uso, quick action on hover. Right plan snippet card:
+"Plan único — 8 análisis disponibles este mes" with thin usage bar and
+"Ver plan completo" link. Low noise, high structure, no hero metrics or charts.
+Professional calm editorial.
+```
 
 ---
 
 ## 👁️ Prompt 9 — Vista previa + edición final
 
-**Objetivo:** control editorial final con edición paragraph-level y exportación clara.
+**Asset:** `.stitch/designs/p9-vista-previa.html`
 
-**Prompt completo (EN):**
-
-> Create “Vista previa final — Contrato de locación” screen for template-ai, desktop 1440px. Layout contract: main legal document viewer (serif, readable but dense), right validation/export sidebar, persistent top helper line. Paragraph interaction contract: each paragraph reveals edit affordance on hover; click enters inline edit mode for that paragraph only; no rich-text toolbar. Sidebar contract: verification checklist, export module with “Descargar PDF” and “Descargar DOCX”, and legal disclaimer. Include edge state for long paragraphs and a pending-export inline state placeholder that does not collapse layout.
-
-**Aspect ratio:** `16:9`
+```
+Create "Vista previa final — Contrato de locación". Desktop with shell. Layout:
+main legal document viewer (serif, dense), right validation/export sidebar,
+persistent top helper line. Document: full contract text in serif, paragraph-level.
+Each paragraph reveals edit icon on hover; one paragraph shown in inline edit
+mode with subtle border and Save/Cancel buttons. Sidebar: verification checklist
+with 3 green checkmarks (Estructura, Datos, Fechas), export module with
+"Descargar PDF" (primary) and "Descargar DOCX", legal disclaimer. Top helper:
+"Revisá el documento final antes de exportar. Podés editar cualquier párrafo."
+Professional calm editorial, warm off-white sidebar background.
+```
 
 ---
 
-## 📊 Prompt 10 — Plan y uso *(alta palanca de confianza y límites)*
+## 📤 Prompt 4 — Subida de documento
 
-**Objetivo:** comunicar límites de forma predecible, sin upsell ni marketing.
+**Asset:** `.stitch/designs/p4-subida-documento.html`
 
-**Prompt completo (EN):**
+```
+Create "Crear plantilla — paso 1 de 3" upload screen. Desktop with shell.
+Layout: central dropzone, right guidance panel. Dropzone: large dashed-border
+area with "Arrastrá tu archivo aquí o hacé clic para buscar", format badges
+(PDF/DOCX/JPG). Show uploaded state: filename "CONTRATO_ARRENDAMIENTO_V2.pdf",
+file size, green "Listo" status chip. Guidance panel: file quality tips in
+Spanish (texto seleccionable, evitar escaneados, máximo 25MB), trust link
+"Cómo tratamos tus documentos". Bottom non-dismissible notice: "Vas a revisar
+todo lo que detectamos antes de guardar." CTA "Continuar al análisis" enabled,
+"Cancelar" secondary. Professional calm editorial.
+```
 
-> Design “Plan y uso” screen for template-ai with strict plain-language usage transparency. Desktop 1440px. Single plan card “Plan único”. For each operation row (“Análisis de documentos”, “Generaciones de documentos”), show: count text, thin usage bar, and contextual message by threshold (normal / near limit / limit reached). Add mandatory explanatory block “¿Qué pasa si llego al límite?” with bullets for blocked actions vs still available actions. Include reset date and “Ver historial de uso” link. No upgrade CTA, no pricing upsell, no marketing copy.
+---
 
-**Aspect ratio:** `16:9`
+## 🔎 Prompt 5 — Análisis del documento (edit P4)
+
+**Asset:** `.stitch/designs/p5-analisis-documento.html`
+
+```
+Transform into "Analizando tu contrato" analysis progress screen. Keep shell.
+LEFT: vertical stepper with 4 steps (Validando archivo, Extrayendo texto,
+Detectando estructura, Identificando datos del caso). Show first 2 as
+completado (green check), third as en proceso (spinner), fourth as pendiente
+(gray). MAIN: skeleton placeholder blocks (gray pulse rectangles) for document
+preview and entity list. COMPLETION PREVIEW: small confidence summary card
+"ALTA: 8 campos — BAJA: 3 campos". BOTTOM microcopy: "Si algo no se puede
+analizar con claridad, te lo decimos antes de continuar." Professional calm
+editorial.
+```
+
+---
+
+## 💾 Prompt 6 — Guardar plantilla (edit P8)
+
+**Asset:** `.stitch/designs/p6-guardar-plantilla.html`
+
+```
+Transform into "Guardar plantilla" save screen. Summary card:
+"CONTRATO_ARRENDAMIENTO_V2.pdf — 11 campos, 3 BAJA revisados manualmente,
+Revisión completada". Form: required "Nombre de la plantilla" (pre-filled
+"Contrato de Arrendamiento"), optional "Descripción breve" (pre-filled).
+Status badge VALIDADA with green check and explanation. Primary CTA
+"Guardar en mi biblioteca" (enabled), secondary "Seguir editando" (outline).
+Keep left context rail. Professional calm editorial.
+```
+
+---
+
+## 📚 Prompt 7 — Biblioteca personal
+
+**Asset:** `.stitch/designs/p7-biblioteca.html`
+
+```
+Create "Biblioteca" screen. Desktop with app shell, sidebar (Biblioteca active).
+Layout: filter toolbar (search + status dropdown BORRADOR/VALIDADA/ARCHIVADA +
+type filter), dense data table, right plan usage panel. Table: 5 rows, columns
+Nombre, Estado chip, Tipo, Último uso, Acciones (icons on hover). Sticky header
+with sort on Nombre. Plan panel: two usage bars (Análisis 3/8, Generaciones
+1/8), rule text "Cada análisis consume 1 unidad. Cada generación consume 1
+unidad.", reset date, "Ver historial de uso" link. Professional calm editorial.
+```
+
+---
+
+## 📊 Prompt 10 — Plan y uso
+
+**Asset:** `.stitch/designs/p10-plan-uso.html`
+
+```
+Create "Plan y uso" screen. Desktop with shell. Single plan card "Plan único".
+Two operation rows: "Análisis de documentos" (3 de 8, bar ~40%, "Normal — te
+quedan 5"), "Generaciones de documentos" (1 de 8, bar ~12%, "Normal — te quedan
+7"). Explanatory block "¿Qué pasa si llego al límite?" with bullets: no new
+analysis, but editing/generating/library access remain. Reset date
+"1 de junio de 2026". "Ver historial de uso" link. NO upgrade CTA, no pricing,
+no marketing. Professional calm transparent tone.
+```
 
 ---
 
 ## 🌱 Prompt 11 — Bienvenida / Biblioteca vacía (primera vez)
 
-**Objetivo:** onboarding breve y realista.
+**Asset:** `.stitch/designs/p11-bienvenida.html`
 
-**Prompt completo (EN):**
-
-> Create first-time empty state for template-ai with title “Bienvenido a template-ai”. Show 3-step strip (subir contrato, revisar detecciones, guardar y reutilizar), recommendation card for better file quality, CTA “Crear mi primera plantilla”, secondary “Ver un ejemplo”, and trust note “Nada se guarda sin tu aprobación”. Calm, professional, non-marketing.
-
-**Aspect ratio:** `16:9`
+```
+Create "Bienvenido a template-ai" first-time onboarding. Desktop with shell,
+sidebar (Inicio active). 3-step onboarding strip: 1) "Subí tu contrato" (cargá
+PDF/DOCX/JPG), 2) "Revisá las detecciones" (IA detecta, vos validás),
+3) "Guardá y reutilizá" (creá documentos desde plantillas). Recommendation card:
+usá texto digital, secciones bien definidas. Primary CTA "Crear mi primera
+plantilla", secondary "Ver un ejemplo de plantilla". Trust note: "Nada se
+guarda sin tu aprobación. Revisás todo antes de confirmar." Calm, professional,
+non-marketing.
+```
 
 ---
 
 ## 🚫 Prompt 12 — Documento no apto / análisis fallido
 
-**Objetivo:** fallback honesto, respetuoso y accionable.
+**Asset:** `.stitch/designs/p12-no-apto.html`
 
-**Prompt completo (EN):**
-
-> Design recoverable failure screen titled “No pudimos analizar este archivo”. Include short reason rows (non-selectable text, low resolution, unrecognizable structure), “Qué podés hacer ahora” action panel (Subir otro archivo / Reintentar / Volver), and practical quality tip card. Amber warning style, no blame, no drama.
-
-**Aspect ratio:** `16:9`
-
----
-
-## ⛔ Prompt 13 — Límite alcanzado
-
-**Objetivo:** bloqueo contextual firme, sin romper acceso general.
-
-**Prompt completo (EN):**
-
-> Create limit-reached state shown as inline banner plus blocking modal. Banner message: “Alcanzaste el límite de análisis de tu plan este mes.” Modal headline “Acción no disponible”, explicit reset-date explanation, and “Lo que sí podés hacer ahora” list. Actions: “Ver mi uso” and “Entendido”. No upsell elements.
-
-**Aspect ratio:** `16:9`
+```
+Create "No pudimos analizar este archivo" failure screen. Failure reason rows:
+texto no seleccionable (imagen escaneada), resolución baja, estructura no
+reconocida. Action panel "¿Qué podés hacer ahora?" with "Subir otro archivo"
+(primary), "Reintentar con este archivo" (secondary), "Volver al inicio" (link).
+Practical tip card: usar PDF con texto digital, legible y nítido, evitar
+documentos con contraseña. Amber warning style, no blame, respectful.
+Professional editorial.
+```
 
 ---
 
-## 🔐 Prompt 14 — Cómo tratamos tus documentos
+## ⛔ Prompt 13 — Límite alcanzado (edit P10)
 
-**Objetivo:** confianza operativa con estructura tipo informe.
+**Asset:** `.stitch/designs/p13-limite-alcanzado.html`
 
-**Prompt completo (EN):**
-
-> Design “Cómo tratamos tus documentos” as a formal trust report screen (not FAQ). Sections: Qué guardamos, Qué no guardamos, Retención y borrado, Cómo borrar tu contenido, Actividad reciente. Make soft delete vs physical purge in 30 days explicit, include deletion traceability example row, and keep accountable non-marketing tone.
-
-**Aspect ratio:** `16:9`
-
----
-
-## ⏳ Prompt 15 — Estado de análisis en curso (loading / skeleton)
-
-**Objetivo:** loading realista sin sensación de congelamiento.
-
-**Prompt completo (EN):**
-
-> Create dedicated loading-state screen “Analizando tu contrato” with same shell. Show stepper in en_proceso, skeleton placeholders for future document and entity list, and explicit fallback clause to fail panel with reason + required action when state changes to fallido.
-
-**Aspect ratio:** `16:9`
+```
+Transform into limit-reached state. Add prominent amber warning banner:
+"Alcanzaste el límite de análisis de tu plan este mes." Analysis bar at 100%
+(8/8) in red/warning color. Keep generaciones bar normal. Explanatory card
+"Acción no disponible" with reset date, "Lo que sí podés hacer ahora" list
+(ver plantillas, generar docs, descargar archivos). Buttons: "Ver mi uso" and
+"Entendido". No upsell, no upgrade. Professional calm editorial.
+```
 
 ---
 
-## ⚠️ Prompt 16 — Revisión del template con baja confianza activa *(variante crítica)*
+## 🔐 Prompt 14 — Cómo tratamos tus documentos (edit P10)
 
-**Objetivo:** reforzar resolución de BAJA confianza sin romper consistencia con la pantalla base.
+**Asset:** `.stitch/designs/p14-como-tratamos.html`
 
-**Prompt completo (EN):**
-
-> Create a strict low-confidence variant of the template review screen for template-ai. Keep exactly the same shell and core regions as the base review screen to maximize component reuse. Add a high-priority right-panel section “Revisión prioritaria” with BAJA rows pinned first. Each BAJA row visible contract: field label, short uncertainty reason, trace badge, action “Revisar ahora”, and explicit resolution state (pending/resolved/accepted). Include at least one manual field with “Sin traza (agregado manualmente)”. Bottom CTA “Confirmar estructura” remains disabled until all BAJA rows move out of pending. Show disabled-state helper copy listing pending count.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 🧪 Prompt 17 — Formulario incompleto con errores de validación
-
-**Objetivo:** mostrar bloqueo de generación con guía precisa para corregir.
-
-**Prompt completo (EN):**
-
-> Design validation-error state for “Nuevo caso” form. Add top error summary bar with anchor links, invalid required fields with compact error messages, collapsed accordion with pending badge, and blocked/disabled “Generar documento” with reason copy. Keep visual calm: precise guidance, not alarmist red overload.
-
-**Aspect ratio:** `16:9`
+```
+Transform into formal trust report "Cómo tratamos tus documentos" (not FAQ).
+Sections: 1) "Qué guardamos" (estructura de plantilla, nombres de entidades,
+mapeo de campos — no contenido original), 2) "Qué no guardamos" (archivos
+originales post-análisis, datos personales no mapeados, datos temporales
+24h), 3) "Retención y borrado" (soft delete inmediato + purga física 30 días),
+4) "Cómo borrar tu contenido" (pasos accionables), 5) "Actividad reciente"
+(tabla de trazabilidad con fecha, acción, detalle, estado). Accountable,
+non-marketing. Professional calm editorial.
+```
 
 ---
 
-## ✅ Prompt 18 — Plantilla guardada con éxito
+## ⏳ Prompt 15 — Loading / Skeleton (edit P5)
 
-**Objetivo:** transición post-guardado sobria y útil.
+**Asset:** `.stitch/designs/p15-loading-skeleton.html`
 
-**Prompt completo (EN):**
-
-> Create restrained success screen “Plantilla guardada” with compact confirmation card (template name, VALIDADA status, reuse summary), next-steps info block, actions “Ir a mi biblioteca” and “Generar un documento con esta plantilla”, plus trust-link footer. No celebratory SaaS patterns.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 🗂️ Prompt 19 — Biblioteca vacía después de limpiar todo
-
-**Objetivo:** estado vacío post-uso (no onboarding).
-
-**Prompt completo (EN):**
-
-> Design post-cleanup empty library state (not first-time). Message: “No tenés plantillas activas en este momento.” Provide actions “Crear plantilla” and “Ver archivadas”, and keep right usage card visible with neutral note that plan remains available.
-
-**Aspect ratio:** `16:9`
+```
+Transform into dedicated loading/skeleton state "Analizando tu contrato". Stepper
+step 3 as en proceso (spinner). Replace all main content with ONLY skeleton
+pulse blocks (gray rectangles). Add explicit fallback text: "Si el análisis
+falla, verás el motivo exacto y qué hacer." Add fail panel placeholder:
+"Si algo falla" with reason slot and "Reintentar" button area. Professional
+calm editorial.
+```
 
 ---
 
-## 🗑️ Prompt 20 — Confirmación de borrado / acción destructiva
+## ✅ Prompt 18 — Plantilla guardada con éxito (edit P11)
 
-**Objetivo:** acción sensible explícita, sin dramatización.
+**Asset:** `.stitch/designs/p18-guardado-exito.html`
 
-**Prompt completo (EN):**
-
-> Create destructive confirmation modal titled “Confirmar eliminación” with explicit scope, optional checkboxes (delete source file / generated docs), mandatory retention note (immediate UI removal + physical purge in 30 days), and traceability line. Buttons: “Eliminar” (destructive) and “Cancelar”.
-
-**Aspect ratio:** `16:9`
-
----
-
-## 📥 Prompt 21 — Descarga en progreso / exportación en curso
-
-**Objetivo:** evitar incertidumbre entre clic y archivo final.
-
-**Prompt completo (EN):**
-
-> Design export-in-progress state on top of final preview screen. Show compact inline panel “Preparando tu PDF/DOCX”, thin progress indicator, short wait copy, and disable repeated same-format export clicks while preserving layout stability.
-
-**Aspect ratio:** `16:9`
+```
+Transform into restrained success screen "Plantilla guardada". Compact
+confirmation card: template name "Contrato de Arrendamiento", VALIDADA status
+badge with green check, summary "11 campos detectados, 3 revisados manualmente,
+estructura confirmada". Info block: "Ya podés usar esta plantilla para generar
+documentos." Actions: "Ir a mi biblioteca" (primary), "Generar un documento con
+esta plantilla" (secondary). Trust footer: "Podés revisar o editar la plantilla
+cuando quieras desde tu biblioteca." No celebratory patterns.
+```
 
 ---
 
-## 🔁 Follow-up prompts v1.4 (iteración de calidad)
+## 🗂️ Prompt 19 — Biblioteca vacía post-uso (edit P7)
 
-Usar después de elegir una variante base para forzar consistencia reusable.
+**Asset:** `.stitch/designs/p19-biblioteca-vacia.html`
 
-### 1) Layout/spec hardening
-- “Keep exactly the same app shell and spacing rhythm; only refine content density inside the main region.”
-- “Lock the region proportions and align all interactive controls to a strict column grid.”
-- “Preserve component positions while improving readability of long legal labels.”
-
-### 2) Data-contract clarity
-- “Make the visible data contract explicit in every field/table row; avoid decorative placeholders.”
-- “Show one realistic overflow case and one empty case without breaking alignment.”
-
-### 3) Interaction/state fidelity
-- “Increase distinction between hover, selected, focus, disabled, and blocked states without increasing visual noise.”
-- “For every disabled primary CTA, show exact reason microcopy near the action.”
-- “Emphasize BAJA confidence with shape/weight treatment that still works in grayscale.”
-
-### 4) Reuse/front-end handoff
-- “Make this screen look like it is built from reusable components, not unique one-off cards.”
-- “Unify badges, row actions, and status chips with consistent sizing and spacing tokens across regions.”
-- “Reduce style entropy: fewer visual patterns, stronger component repeatability.”
+```
+Transform into empty-post-cleanup library state (not first-time onboarding).
+Empty state with icon and text "No tenés plantillas activas en este momento."
+Two actions: "Crear plantilla" (primary) and "Ver archivadas" (secondary).
+Keep filter toolbar visible with "Sin resultados" indicator. Keep right plan
+panel with neutral note "Tu plan sigue disponible." Professional calm editorial.
+```
 
 ---
 
-## ✅ Orden recomendado para explorar
+## 🗑️ Prompt 20 — Confirmación de borrado (edit P12)
 
-1. **Prompt 2** — Revisión del template (base crítica)
-2. **Prompt 16** — Variante BAJA confianza (misma arquitectura)
-3. **Prompt 1** — Visual system (con pantalla crítica ya definida)
-4. **Prompt 8 + 17** — Formulario normal + validación
-5. **Prompt 7 + 19 + 20** — Biblioteca + vacío post-uso + destructivo
-6. **Prompt 9 + 21** — Vista final + export en curso
-7. **Prompt 4 + 15 + 5 + 6 + 18** — Flujo de creación completo
-8. **Prompt 10 + 13** — Plan y límites
-9. **Prompt 12 + 14** — Fallback + confianza
-10. **Prompt 3 + 11** — Home + primera vez
+**Asset:** `.stitch/designs/p20-confirmar-eliminacion.html`
+
+```
+Transform into destructive confirmation modal "Confirmar eliminación". Explicit
+scope: "Vas a eliminar 'Contrato de Arrendamiento' de tu biblioteca." Optional
+checkboxes: "Eliminar también el archivo fuente", "Eliminar documentos generados
+con esta plantilla". Mandatory amber retention note: retiro inmediato + purga
+física 30 días + restauración posible durante ese período. Traceability line:
+"Actividad registrada para tu trazabilidad." Buttons: "Eliminar" (destructive
+red outline) and "Cancelar" (neutral). No drama, professional tone.
+```
 
 ---
 
-*template-ai MVP — Design Prompt Pack for Nano Banana Pro*  
-*v1.4 — rendering contract + reusable component fidelity + stronger frontend handoff*
+## 📥 Prompt 21 — Export en curso (edit P9)
+
+**Asset:** `.stitch/designs/p21-export-en-curso.html`
+
+```
+Transform into export-in-progress overlay on final preview screen. Keep document
+viewer and sidebar intact. Add compact inline panel at top: "Preparando tu
+descarga" with thin progress indicator bar and wait copy "Estamos generando tu
+archivo. Esto puede tardar unos segundos." Disable PDF/DOCX download buttons
+(grayed out with "Generando..." label). Keep layout stable, no layout shift.
+Professional calm editorial.
+```
+
+---
+
+## 📁 Assets
+
+Todos los archivos en `.stitch/designs/`. Screenshots solo disponibles para las pantallas que tuvieron tiempo de cacheo en CDN (marcadas con 📸).
+
+| Prompt | HTML                             |
+| ------ | -------------------------------- |
+| P2 v1  | `p2-human-review-v1.html`        |
+| P2 v2  | `p2-human-review-v2.html`        |
+| P16    | `p16-low-confidence-review.html` |
+| P8     | `p8-nuevo-caso.html`             |
+| P17    | `p17-validation-errors.html`     |
+| P3     | `p3-inicio.html`                 |
+| P9     | `p9-vista-previa.html`           |
+| P4     | `p4-subida-documento.html`       |
+| P10    | `p10-plan-uso.html`              |
+| P12    | `p12-no-apto.html`               |
+| P11    | `p11-bienvenida.html`            |
+| P13    | `p13-limite-alcanzado.html`      |
+| P21    | `p21-export-en-curso.html`       |
+| P18    | `p18-guardado-exito.html`        |
+| P14    | `p14-como-tratamos.html`         |
+| P20    | `p20-confirmar-eliminacion.html` |
+| P6     | `p6-guardar-plantilla.html`      |
+| P5     | `p5-analisis-documento.html`     |
+| P7     | `p7-biblioteca.html`             |
+| P15    | `p15-loading-skeleton.html`      |
+| P19    | `p19-biblioteca-vacia.html`      |
+
+Metadatos completos con Stitch IDs, modelos y dependencias en `.stitch/metadata.json`.
+
+---
+
+_template-ai MVP — Design Prompt Pack for Google Stitch_  
+_v2.0 — prompts optimizados, assets renombrados, Google Flow descartado_
