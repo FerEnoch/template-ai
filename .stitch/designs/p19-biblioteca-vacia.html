@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&amp;family=Source+Serif+Four:ital,opsz,wght@0,200..900;1,200..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#2C3E50",
+              "on-primary": "#FFFFFF",
+              secondary: "#95A5A6",
+              "on-secondary": "#FFFFFF",
+              surface: "#FAFAFA",
+              "on-surface": "#1A1A1A",
+              "on-surface-variant": "#546E7A",
+              "outline-variant": "#E0E0E0",
+              "secondary-container": "#F1F4F8",
+              "on-secondary-container": "#2C3E50",
+              "surface-container-low": "#FFFFFF",
+              "surface-container": "#F5F5F5",
+              warning: "#B45309",
+              "warning-container": "#FFFBEB",
+              success: "#15803d",
+              "success-container": "#f0fdf4"
+            },
+            borderRadius: {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            fontFamily: {
+              headline: ["Literata", "serif"],
+              display: ["Literata", "serif"],
+              body: ["Source Serif Four", "serif"],
+              label: ["Inter", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      body {
+        background-color: #FAFAFA;
+      }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+      }
+      .high-density-table tr:hover .row-actions {
+        opacity: 1;
+      }
+    </style>
+</head>
+<body class="font-body text-on-surface min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="flex justify-between items-center px-6 h-16 w-full sticky top-0 z-50 bg-surface dark:bg-surface border-b border-outline-variant dark:border-outline-variant font-body text-body-md">
+<div class="font-headline text-2xl font-black text-primary dark:text-primary">template-ai</div>
+<div class="hidden md:flex items-center gap-8">
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80">Dashboard</a>
+<a class="text-primary dark:text-primary font-bold border-b-2 border-primary pb-1 hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80">Documents</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80">Templates</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80">Archive</a>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary cursor-pointer">notifications</span>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAvz-JIFcrmP8hL0c1zJaS2hmxJhXUdqIhG5rcX8sW-Biu4AQR5H1MbUtTzpq-kWFUV5J_26q1Hvg_TqFwvalpilOKd2X1bcpT1g22sBna_b9PUaJIyilaNVInKkFTvNwLsjwisRjetdQO7c2pfSFho2XWsHSptfN_c7WroMCpsXMdlqdZFGe0dpW3AtiSD7vIhcTVW6LkCsDHeeuEQt14BgsO0nwVw8ygQyUliyTWXxyzCowmeFSWPQjMB5xqe5sgOM0J65CRHqDn-"/>
+</div>
+</nav>
+<div class="flex flex-1">
+<!-- SideNavBar -->
+<aside class="h-screen w-64 fixed left-0 top-16 bg-surface dark:bg-surface border-r border-outline-variant dark:border-outline-variant flex flex-col gap-4 p-4 font-label text-label-lg">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-10 h-10 bg-primary flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-white">gavel</span>
+</div>
+<div>
+<h2 class="font-headline text-xl font-bold text-on-surface">Legal Workspace</h2>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-wider">Professional Tier</p>
+</div>
+</div>
+<button class="bg-primary text-white py-2.5 px-4 rounded-lg font-bold flex items-center justify-center gap-2 mb-4 hover:opacity-90 transition-all">
+<span class="material-symbols-outlined">add</span>
+                New Document
+            </button>
+<nav class="flex flex-col gap-1">
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 ease-in-out cursor-pointer rounded-lg">
+<span class="material-symbols-outlined">home</span>
+<span>Home</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 bg-secondary-container dark:bg-secondary-container text-on-secondary-container dark:text-on-secondary-container rounded-lg font-bold transition-all duration-200 ease-in-out cursor-pointer">
+<span class="material-symbols-outlined">folder_open</span>
+<span>Library</span>
+</div>
+<div class="flex items-center gap-3 px-3 py-2 text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-low transition-all duration-200 ease-in-out cursor-pointer rounded-lg">
+<span class="material-symbols-outlined">description</span>
+<span>Plan</span>
+</div>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-64 flex-1 flex flex-row gap-8 py-8 px-10 bg-surface">
+<!-- Left Side: Table & Filters -->
+<div class="flex-1 flex flex-col gap-6">
+<header>
+<h1 class="font-display text-3xl font-semibold text-primary mb-1">Biblioteca</h1>
+<p class="text-on-surface-variant text-sm">Gestioná tus documentos legales y expedientes activos.</p>
+</header>
+<!-- Filter Toolbar -->
+<div class="flex items-center gap-3 bg-surface-container-low p-2 border border-outline-variant rounded-lg shadow-sm">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface border border-outline-variant rounded text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-label" placeholder="Buscar por nombre o expediente..." type="text"/>
+</div>
+<select class="bg-surface border border-outline-variant rounded px-3 py-2 text-sm font-label text-on-surface focus:ring-1 focus:ring-primary outline-none appearance-none pr-8 relative bg-no-repeat bg-[right_0.5rem_center] cursor-pointer">
+<option>Estado</option>
+<option>Borrador</option>
+<option>Validada</option>
+<option>Archivada</option>
+</select>
+<select class="bg-surface border border-outline-variant rounded px-3 py-2 text-sm font-label text-on-surface focus:ring-1 focus:ring-primary outline-none cursor-pointer">
+<option>Tipo de documento</option>
+<option>Contrato</option>
+<option>Poder</option>
+<option>Escritura</option>
+</select>
+<button class="p-2 hover:bg-surface-container rounded border border-outline-variant transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">filter_list</span>
+</button>
+</div><div class="flex items-center gap-2 px-1">
+<span class="w-1.5 h-1.5 rounded-full bg-on-surface-variant/30"></span>
+<span class="text-[11px] font-label font-bold text-on-surface-variant uppercase tracking-wider">0 resultados</span>
+</div>
+<!-- Data Table -->
+<div class="flex-1 flex flex-col items-center justify-center py-20 px-6 text-center bg-surface-container-low border border-outline-variant rounded-xl border-dashed">
+<span class="material-symbols-outlined text-6xl text-on-surface-variant/30 mb-4">folder_off</span>
+<h3 class="font-display text-xl font-medium text-on-surface mb-2">No ten s plantillas activas en este momento.</h3>
+<p class="text-on-surface-variant text-sm mb-8 max-w-sm mx-auto">Organiz tu flujo de trabajo creando nuevas plantillas o recuperando documentos archivados.</p>
+<div class="flex items-center gap-3">
+<button class="bg-primary text-white py-2 px-6 rounded-lg font-bold hover:opacity-90 transition-all text-sm">Crear plantilla</button>
+<button class="bg-transparent border border-outline-variant text-on-surface-variant py-2 px-6 rounded-lg font-bold hover:bg-surface-container transition-all text-sm">Ver archivadas</button>
+</div>
+</div>
+</div>
+<!-- Right Panel: Usage & Aesthetics -->
+<aside class="w-80 flex flex-col gap-6">
+<!-- Plan Status Card -->
+<div class="bg-surface-container-low p-6 rounded-xl border border-outline-variant shadow-sm flex flex-col gap-5">
+<div class="flex items-center justify-between">
+<h3 class="font-label text-sm font-bold text-primary uppercase tracking-widest">Tu plan</h3>
+<span class="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded">PROFESSIONAL</span>
+</div>
+<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between text-[11px] font-bold font-label text-on-surface-variant uppercase tracking-tighter">
+<span>Análisis de documentos</span>
+<span>3 de 8</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[37.5%] rounded-full"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between text-[11px] font-bold font-label text-on-surface-variant uppercase tracking-tighter">
+<span>Generaciones</span>
+<span>1 de 8</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[12.5%] rounded-full"></div>
+</div>
+</div>
+</div><p class="text-[11px] text-on-surface-variant/60 font-medium italic px-1">Tu plan sigue disponible.</p>
+<div class="pt-2 flex flex-col gap-1">
+<p class="text-[11px] text-on-surface-variant font-label">El ciclo se reinicia el <span class="font-bold">25 de Octubre</span>.</p>
+<a class="text-[11px] text-primary font-bold font-label hover:underline" href="#">Ver historial de uso</a>
+</div>
+</div>
+<!-- Aesthetic Quote Card -->
+<div class="relative overflow-hidden rounded-xl border border-outline-variant bg-primary p-8 min-h-[160px] flex items-center justify-center text-center">
+<div class="absolute inset-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&amp;fit=crop&amp;q=80&amp;w=400')] bg-cover bg-center"></div>
+<p class="relative z-10 font-display italic text-white text-lg leading-relaxed">
+                        "La precisión legal es el arte de lo invisible."
+                    </p>
+</div>
+</aside>
+</main>
+</div>
+<!-- Footer Component -->
+<footer class="flex justify-between items-center px-8 py-6 w-full ml-64 bg-surface dark:bg-surface border-t border-outline-variant dark:border-outline-variant font-label text-label-sm text-primary dark:text-primary">
+<div class="font-headline text-lg font-semibold text-on-surface-variant">template-ai</div>
+<p class="text-on-surface-variant">© 2024 template-ai. All rights reserved.</p>
+<div class="flex gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Terms of Service</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Privacy Policy</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Security</a>
+</div>
+</footer>
+</body></html>

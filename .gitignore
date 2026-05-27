@@ -79,3 +79,5 @@ Thumbs.db
 *.tmp
 *.temp
 .env.test.tmp*
+
+docs/mockups-google-flow

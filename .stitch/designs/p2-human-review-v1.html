@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&amp;family=Source+Serif+4:ital,opsz,wght@0,200..900;1,200..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#3d6b8f",
+              "on-primary": "#ffffff",
+              "primary-container": "#d1e4ff",
+              "on-primary-container": "#001d36",
+              secondary: "#535f70",
+              "on-secondary": "#ffffff",
+              "secondary-container": "#d7e3f7",
+              "on-secondary-container": "#101c2b",
+              surface: "#f8fafc",
+              "on-surface": "#191c20",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#f1f5f9",
+              "surface-container-high": "#e2e8f0",
+              "on-surface-variant": "#43474e",
+              "outline-variant": "#c3c7cf",
+              error: "#ba1a1a",
+              "error-container": "#ffdad6",
+              "on-error-container": "#410002"
+            },
+            borderRadius: {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            fontFamily: {
+              headline: ["Literata", "serif"],
+              display: ["Literata", "serif"],
+              body: ["Source Serif 4", "serif"],
+              label: ["Inter", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        vertical-align: middle;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .highlight-green {
+        background-color: rgba(34, 197, 94, 0.1);
+        border-bottom: 2px solid rgba(34, 197, 94, 0.4);
+      }
+      .highlight-amber {
+        background-color: rgba(245, 158, 11, 0.1);
+        border-bottom: 2px solid rgba(245, 158, 11, 0.4);
+      }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-hidden h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface text-primary dark:text-primary font-body text-body-md docked full-width top-0 border-b border-outline-variant dark:border-outline-variant flat no shadows flex justify-between items-center w-full px-6 h-16 shrink-0 z-50">
+<div class="flex items-center gap-8">
+<span class="font-headline text-xl font-bold text-primary dark:text-primary tracking-tight">template-ai</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80" href="#">Dashboard</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer active:opacity-80" href="#">Documents</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80" href="#">Templates</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-lg">search</span>
+<input class="bg-surface-container-low border-none rounded-full pl-10 pr-4 py-1.5 text-sm focus:ring-2 focus:ring-primary w-64" placeholder="Buscar..." type="text"/>
+</div>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-all p-2 rounded-full cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-low transition-all p-2 rounded-full cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a person in business attire against a neutral gray background. The lighting is soft and corporate, fitting for a legal professional. The overall tone is serious and trustworthy, with high-definition details on the skin and clothing textures." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCfSKI0sgUioHVNOnCT-uuZHyeqz02dOta32SchZrcWYyd1caARjPqJFaB8iyHJIPSxbP7Ufz-Nmb7E0-hidxEcQ2ILNsWl9SVL_b2ahqstS_aSf3nEJR9Hx_FbO7XorWyeqXs_4NU4R3998TZus_uvDVSxaImi3eKXOuwqrI6a3492K6xxbrdOK9JYDPeAqqM8W-LhqxHj2RcU4QOujKNqE8mYRiyUnqWI-5ij9D10MJBvcTEU6UrykWC4aUS7TRg8P9FS5yLpej_T"/>
+</div>
+</div>
+</header>
+<!-- Main Content Split Layout -->
+<main class="flex flex-1 overflow-hidden">
+<!-- Left Panel: Document Viewer (62%) -->
+<section class="w-[62%] flex flex-col bg-white border-r border-outline-variant overflow-hidden">
+<div class="flex items-center justify-between px-6 py-3 bg-surface-container-lowest border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">description</span>
+<h2 class="font-headline font-bold text-sm">CONTRATO_ARRENDAMIENTO_V2.pdf</h2>
+</div>
+<div class="flex gap-2">
+<button class="p-1.5 hover:bg-surface-container-high rounded transition-colors"><span class="material-symbols-outlined">zoom_in</span></button>
+<button class="p-1.5 hover:bg-surface-container-high rounded transition-colors"><span class="material-symbols-outlined">zoom_out</span></button>
+<button class="p-1.5 hover:bg-surface-container-high rounded transition-colors"><span class="material-symbols-outlined">print</span></button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-12 bg-slate-100 flex justify-center">
+<!-- Document Canvas -->
+<article class="w-full max-w-3xl bg-white shadow-sm p-16 font-body text-on-surface leading-relaxed relative min-h-[1200px]">
+<h1 class="text-center font-bold text-xl mb-12 uppercase tracking-widest">Contrato de Arrendamiento de Vivienda</h1>
+<p class="mb-6">
+                        En Madrid, a 15 de Octubre de 2023.
+                    </p>
+<p class="mb-6 font-bold">REUNIDOS</p>
+<p class="mb-6">
+                        De una parte, como <span class="highlight-green px-1 rounded-sm" title="Entidad: Arrendador">ARRENDADOR</span>, el Sr. Don Julián Ruiz de Azúa, mayor de edad, con DNI 12345678X y domicilio en <span class="highlight-amber px-1 rounded-sm" title="Entidad: Dirección">Calle Mayor 12</span>, 2º Izquierda, 28013, Madrid.
+                    </p>
+<p class="mb-6">
+                        De otra parte, como ARRENDATARIO, la Sra. Doña Elena Blanco Marín, con DNI 87654321Y, y con domicilio a efectos de notificaciones en la propia vivienda objeto del presente contrato.
+                    </p>
+<p class="mb-6 font-bold">ESTIPULACIONES</p>
+<p class="mb-6">
+<span class="font-bold">PRIMERA. Objeto.</span> El Arrendador cede en arrendamiento al Arrendatario la vivienda sita en la <span class="highlight-amber px-1 rounded-sm">Calle Mayor 12</span> de Madrid, para ser destinada exclusivamente a vivienda permanente del Arrendatario y su familia.
+                    </p>
+<p class="mb-6">
+<span class="font-bold">SEGUNDA. Renta.</span> La renta mensual acordada por las partes es de <span class="highlight-amber px-1 rounded-sm font-bold">2.500€</span> (dos mil quinientos euros), pagaderos dentro de los cinco primeros días de cada mes mediante transferencia bancaria.
+                    </p>
+<p class="mb-12">
+<span class="font-bold">TERCERA. Duración.</span> El presente contrato tendrá una duración de un (1) año, prorrogable según los plazos establecidos en la Ley de Arrendamientos Urbanos vigente.
+                    </p>
+<!-- Decorative footer for doc -->
+<div class="border-t border-slate-200 mt-20 pt-4 text-xs text-slate-400 flex justify-between">
+<span>Página 1 de 12</span>
+<span>template-ai legal review mode</span>
+</div>
+</article>
+</div>
+</section>
+<!-- Right Panel: Review Panel (38%) -->
+<section class="w-[38%] bg-surface flex flex-col overflow-hidden">
+<header class="sticky top-0 bg-surface border-b border-outline-variant px-6 py-4 z-10 flex justify-between items-center">
+<h3 class="font-headline font-bold text-lg text-on-surface">Entidades y datos detectados</h3>
+<span class="bg-primary-container text-on-primary-container px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider">85% IA Confidence</span>
+</header>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+<!-- Revisión Prioritaria -->
+<section>
+<div class="flex items-center gap-2 mb-4 text-error font-semibold text-xs uppercase tracking-wider">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">priority_high</span>
+<span>Revisión prioritaria (2)</span>
+</div>
+<div class="space-y-3">
+<!-- BAJA row 1 -->
+<div class="bg-white border-l-4 border-error p-4 rounded-r-lg shadow-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label text-xs font-bold text-on-surface-variant uppercase">Renta Mensual *</span>
+<span class="flex items-center gap-1 text-[10px] font-bold text-error bg-error-container px-1.5 py-0.5 rounded">
+<span class="material-symbols-outlined text-xs">warning</span> BAJA
+                                </span>
+</div>
+<p class="text-sm font-bold mb-1">2.500€</p>
+<p class="text-[11px] text-on-surface-variant mb-3 italic">Ambigüedad en el importe detectada en la cláusula segunda.</p>
+<button class="w-full py-2 bg-primary text-white text-xs font-bold rounded hover:bg-primary/90 transition-colors">Revisar ahora</button>
+</div>
+<!-- BAJA row 2 -->
+<div class="bg-white border-l-4 border-error p-4 rounded-r-lg shadow-sm">
+<div class="flex justify-between items-start mb-1">
+<span class="font-label text-xs font-bold text-on-surface-variant uppercase">Fecha Inicio *</span>
+<span class="flex items-center gap-1 text-[10px] font-bold text-error bg-error-container px-1.5 py-0.5 rounded">
+<span class="material-symbols-outlined text-xs">warning</span> BAJA
+                                </span>
+</div>
+<p class="text-sm font-bold mb-1">15/10/2023</p>
+<p class="text-[11px] text-on-surface-variant mb-3 italic">Múltiples fechas detectadas en el encabezado.</p>
+<button class="w-full py-2 bg-primary text-white text-xs font-bold rounded hover:bg-primary/90 transition-colors">Revisar ahora</button>
+</div>
+</div>
+</section>
+<!-- Dudas del análisis -->
+<section>
+<h4 class="font-label text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-4">Dudas del análisis</h4>
+<div class="space-y-4">
+<!-- Question Card 1 -->
+<div class="bg-secondary-container/30 border border-secondary-container p-4 rounded-lg">
+<p class="text-sm font-medium mb-4 text-on-secondary-container">¿El arrendador actúa como persona física o jurídica?</p>
+<div class="grid grid-cols-2 gap-3">
+<button class="py-1.5 border border-primary text-primary text-xs font-bold rounded hover:bg-primary/5">Física</button>
+<button class="py-1.5 border border-primary text-primary text-xs font-bold rounded hover:bg-primary/5">Jurídica</button>
+</div>
+</div>
+<!-- Question Card 2 -->
+<div class="bg-secondary-container/30 border border-secondary-container p-4 rounded-lg">
+<p class="text-sm font-medium mb-4 text-on-secondary-container">¿Existe fianza complementaria?</p>
+<div class="grid grid-cols-2 gap-3">
+<button class="py-1.5 border border-primary text-primary text-xs font-bold rounded hover:bg-primary/5">Sí, 2 meses</button>
+<button class="py-1.5 border border-primary text-primary text-xs font-bold rounded hover:bg-primary/5">No detectada</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Accordions for groups -->
+<section class="space-y-2">
+<!-- Group: Partes -->
+<div class="border border-outline-variant rounded-lg overflow-hidden">
+<button class="w-full px-4 py-3 flex items-center justify-between bg-surface-container-low" onclick="this.nextElementSibling.classList.toggle('hidden')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">groups</span>
+<span class="font-bold text-sm">Partes (3)</span>
+</div>
+<span class="material-symbols-outlined">expand_less</span>
+</button>
+<div class="divide-y divide-outline-variant">
+<div class="p-3 bg-white flex items-center justify-between hover:bg-surface-container-lowest transition-colors group">
+<div class="flex-1 flex items-center gap-3">
+<span class="text-xs font-medium text-on-surface-variant w-24 truncate">Arrendador</span>
+<span class="text-sm font-bold">Julián Ruiz de Azúa</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">ALTA</span>
+<span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">CON TRAZA</span>
+<button class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">more_vert</button>
+</div>
+</div>
+<div class="p-3 bg-white flex items-center justify-between hover:bg-surface-container-lowest transition-colors group">
+<div class="flex-1 flex items-center gap-3">
+<span class="text-xs font-medium text-on-surface-variant w-24 truncate">Arrendatario</span>
+<span class="text-sm font-bold">Elena Blanco Marín</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">ALTA</span>
+<span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">CON TRAZA</span>
+<button class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">more_vert</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Group: Inmueble -->
+<div class="border border-outline-variant rounded-lg overflow-hidden">
+<button class="w-full px-4 py-3 flex items-center justify-between bg-surface-container-low" onclick="this.nextElementSibling.classList.toggle('hidden')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">home_work</span>
+<span class="font-bold text-sm">Inmueble (1)</span>
+</div>
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+<div class="divide-y divide-outline-variant hidden">
+<div class="p-3 bg-white flex items-center justify-between hover:bg-surface-container-lowest transition-colors group">
+<div class="flex-1 flex items-center gap-3">
+<span class="text-xs font-medium text-on-surface-variant w-24 truncate">Dirección</span>
+<span class="text-sm font-bold">Calle Mayor 12</span>
+</div>
+<div class="flex items-center gap-2">
+<a class="text-[10px] text-primary font-bold hover:underline" href="#">Ver origen</a>
+<button class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">more_vert</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Group: Fechas -->
+<div class="border border-outline-variant rounded-lg overflow-hidden">
+<button class="w-full px-4 py-3 flex items-center justify-between bg-surface-container-low" onclick="this.nextElementSibling.classList.toggle('hidden')">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">calendar_today</span>
+<span class="font-bold text-sm">Fechas (2)</span>
+</div>
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+<div class="divide-y divide-outline-variant hidden">
+<div class="p-3 bg-white flex items-center justify-between hover:bg-surface-container-lowest transition-colors group">
+<div class="flex-1 flex items-center gap-3">
+<span class="text-xs font-medium text-on-surface-variant w-24 truncate">Fecha Firma</span>
+<span class="text-sm font-bold">15/10/2023</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-[10px] font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">ALTA</span>
+<button class="material-symbols-outlined text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">more_vert</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Group: Anexos (Empty) -->
+<div class="border border-dashed border-outline-variant rounded-lg overflow-hidden bg-surface-container-low/30">
+<div class="px-4 py-3 flex items-center justify-between">
+<div class="flex items-center gap-2 opacity-50">
+<span class="material-symbols-outlined text-xl">attachment</span>
+<span class="font-bold text-sm">Anexos (0)</span>
+</div>
+<button class="text-[10px] font-bold bg-white border border-outline-variant px-2 py-1 rounded hover:bg-surface-container-low transition-colors">+ AGREGAR CAMPO</button>
+</div>
+<div class="px-4 pb-4 pt-1">
+<p class="text-xs text-on-surface-variant italic">Sin campos todavía</p>
+</div>
+</div>
+</section>
+<!-- Spacer for scrolling comfort -->
+<div class="h-32"></div>
+</div>
+</section>
+</main>
+<!-- Sticky Bottom Action Bar -->
+<footer class="bg-surface-container-lowest border-t border-outline-variant px-8 py-4 flex justify-between items-center z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">security</span>
+<span class="font-label text-sm font-medium tracking-tight">Revisión humana obligatoria — confirmá la estructura antes de guardar</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="text-right">
+<button class="px-6 py-2 border border-primary text-primary font-bold text-sm rounded hover:bg-primary/5 transition-colors">Seguir revisando</button>
+</div>
+<div class="relative group">
+<button class="px-8 py-2 bg-slate-300 text-slate-100 font-bold text-sm rounded cursor-not-allowed flex items-center gap-2" disabled="">
+                    Confirmar estructura
+                </button>
+<div class="absolute bottom-full right-0 mb-2 w-64 bg-on-surface text-white text-[11px] p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none text-center">
+                    Quedan 2 campos de baja confianza por revisar
+                </div>
+</div>
+</div>
+</footer>
+<!-- Global Footer -->
+<footer class="bg-surface-container-lowest dark:bg-surface-container-lowest text-on-surface-variant font-label text-label-sm full-width bottom-0 border-t border-outline-variant flat no shadows flex justify-between items-center w-full px-6 py-4 mt-auto shrink-0 z-50">
+<span class="font-headline text-sm font-semibold">template-ai</span>
+<span class="opacity-100">© 2024 template-ai. Todos los derechos reservados. Jurisdicción: España.</span>
+<div class="flex gap-4">
+<a class="text-on-surface-variant hover:text-on-surface hover:underline transition-colors" href="#">Privacidad</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:underline transition-colors" href="#">Términos</a>
+<a class="text-on-surface-variant hover:text-on-surface hover:underline transition-colors" href="#">Seguridad</a>
+</div>
+</footer>
+<script>
+        // Simple micro-interaction for tooltips and hover effects
+        document.querySelectorAll('.highlight-green, .highlight-amber').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                el.style.boxShadow = '0 0 0 4px rgba(61, 107, 143, 0.1)';
+                el.style.cursor = 'help';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.boxShadow = 'none';
+            });
+        });
+    </script>
+</body></html>

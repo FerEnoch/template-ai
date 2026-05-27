@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&amp;family=Source+Serif+4:ital,opsz,wght@0,200..900;1,200..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+              "primary": "#1A1A1A",
+              "on-primary": "#FFFFFF",
+              "surface": "#FFFFFF",
+              "on-surface": "#1A1A1A",
+              "on-surface-variant": "#666666",
+              "surface-container-low": "#F9F9F9",
+              "surface-variant": "#F0F0F0",
+              "secondary-container": "#E8E8E8",
+              "on-secondary-container": "#1A1A1A",
+              "outline-variant": "#E0E0E0"
+            },
+            "borderRadius": {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "9999px"
+            },
+            "fontFamily": {
+              "headline": ["Literata", "serif"],
+              "display": ["Literata", "serif"],
+              "body": ["Source Serif 4", "serif"],
+              "label": ["Inter", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #FAFAFA;
+        }
+    </style>
+</head>
+<body class="font-body text-on-surface antialiased">
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface text-primary dark:text-primary font-body text-body-sm docked full-width top-0 border-b border-outline-variant dark:border-outline-variant flat no shadows flex justify-between items-center px-6 w-full h-16 fixed z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-headline font-black text-primary dark:text-primary">template-ai</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-primary dark:text-primary border-b-2 border-primary font-bold pb-1 cursor-pointer active:opacity-80 transition-colors" href="#">Dashboard</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80" href="#">Documents</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80" href="#">Templates</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-colors cursor-pointer active:opacity-80" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-on-surface-variant cursor-pointer">notifications</button>
+<div class="w-8 h-8 rounded-full bg-surface-variant flex items-center justify-center overflow-hidden border border-outline-variant">
+<img alt="User profile" data-alt="A professional headshot of a person with a friendly expression, captured in a bright, airy office environment with soft morning light. The style is clean and minimalist, echoing a high-end corporate aesthetic with a neutral color palette and crisp details. The lighting is flattering and natural, emphasizing a sense of professional clarity." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAatcc0d8GmQHhSWbqhTyGoYMa4YE6Eei8DJL71zQROYtsaLVaROWVffWc5JlUUzhfykAFQ36hb9D2PTvzvla_ObshH_33bA766fh7YDQWBF8_a2J9DAsmtyowdDAgy-YXbpOv2kHAdtsHoP2UmT9fVN0RlsDl_Abz2fN-tNY2RLnRgztG8PHpOOShhxmQQQTa3mx_3m3VT4HxyoR-qiwz-lAdPKpSdcAszuvpPothSpgeNpqoyboJnTy6WmvNS8T_4hv89j6jpwZh-"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="bg-surface-container-low dark:bg-surface-container-low text-primary dark:text-primary font-label text-label-md docked left-0 h-full w-64 border-r border-outline-variant dark:border-outline-variant flat no shadows flex flex-col gap-2 p-4 fixed left-0 top-16 h-[calc(100vh-64px)] z-40 hidden md:flex">
+<div class="flex items-center gap-3 mb-6 px-2">
+<div class="w-10 h-10 bg-primary text-on-primary flex items-center justify-center rounded">
+<span class="material-symbols-outlined">folder_special</span>
+</div>
+<div>
+<p class="text-lg font-headline font-bold text-on-surface">Workspace</p>
+<p class="text-xs text-on-surface-variant font-label">Legal Team</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="bg-secondary-container dark:bg-secondary-container text-on-secondary-container dark:text-on-secondary-container rounded-lg font-medium flex items-center gap-3 px-3 py-2 cursor-pointer transition-transform active:scale-95" href="#">
+<span class="material-symbols-outlined">home</span>
+<span>Inicio</span>
+</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-variant rounded-lg flex items-center gap-3 px-3 py-2 cursor-pointer transition-transform active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined">folder_special</span>
+<span>Biblioteca</span>
+</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-variant dark:hover:bg-surface-variant rounded-lg flex items-center gap-3 px-3 py-2 cursor-pointer transition-transform active:scale-95 transition-all" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Plan y uso</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content -->
+<main class="md:pl-64 pt-16 min-h-screen flex flex-col">
+<div class="p-8 lg:p-12 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Content Left Area -->
+<div class="lg:col-span-8 space-y-10">
+<!-- Greeting -->
+<header>
+<h1 class="text-4xl font-headline font-bold text-on-surface tracking-tight">Bienvenido</h1>
+<p class="text-on-surface-variant font-body mt-1">15 de mayo de 2024</p>
+</header>
+<!-- Action Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<div class="border border-outline-variant bg-surface p-6 flex flex-col justify-between hover:shadow-sm transition-shadow">
+<div>
+<span class="material-symbols-outlined text-primary text-3xl mb-4">document_search</span>
+<h3 class="text-xl font-headline font-semibold mb-2">Crear nueva plantilla</h3>
+<p class="text-on-surface-variant text-sm font-body mb-6 leading-relaxed">Subí un contrato y detectamos su estructura automáticamente para agilizar tus procesos legales.</p>
+</div>
+<button class="bg-primary text-on-primary px-6 py-2.5 font-label text-sm font-medium w-fit hover:opacity-90 transition-opacity">Comenzar</button>
+</div>
+<div class="border border-outline-variant bg-surface p-6 flex flex-col justify-between hover:shadow-sm transition-shadow">
+<div>
+<span class="material-symbols-outlined text-primary text-3xl mb-4">files</span>
+<h3 class="text-xl font-headline font-semibold mb-2">Generar documento</h3>
+<p class="text-on-surface-variant text-sm font-body mb-6 leading-relaxed">Usá una plantilla guardada para crear un documento nuevo en segundos con datos variables precisos.</p>
+</div>
+<button class="border border-primary text-primary px-6 py-2.5 font-label text-sm font-medium w-fit hover:bg-surface-variant transition-colors">Seleccionar plantilla</button>
+</div>
+</div>
+<!-- Recent Templates Section -->
+<section class="space-y-4">
+<h2 class="text-2xl font-headline font-bold text-on-surface">Plantillas recientes</h2>
+<div class="border border-outline-variant bg-surface overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container-low text-xs font-label uppercase tracking-wider text-on-surface-variant">
+<th class="px-6 py-3 font-medium">Nombre</th>
+<th class="px-6 py-3 font-medium">Estado</th>
+<th class="px-6 py-3 font-medium">Último uso</th>
+<th class="px-6 py-3 font-medium"></th>
+</tr>
+</thead>
+<tbody class="text-sm font-body divide-y divide-outline-variant">
+<tr class="group hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 font-medium text-on-surface">Contrato de Arrendamiento</td>
+<td class="px-6 py-4">
+<span class="bg-surface-variant text-on-surface-variant text-[10px] px-2 py-0.5 font-label font-bold uppercase rounded">Borrador</span>
+</td>
+<td class="px-6 py-4 text-on-surface-variant">Hoy</td>
+<td class="px-6 py-4 text-right">
+<span class="text-primary font-label text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">Abrir</span>
+</td>
+</tr>
+<tr class="group hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 font-medium text-on-surface">Poder Notarial General</td>
+<td class="px-6 py-4">
+<span class="bg-primary/5 text-primary text-[10px] px-2 py-0.5 font-label font-bold uppercase rounded">Publicado</span>
+</td>
+<td class="px-6 py-4 text-on-surface-variant">Ayer</td>
+<td class="px-6 py-4 text-right">
+<span class="text-primary font-label text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">Abrir</span>
+</td>
+</tr>
+<tr class="group hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 font-medium text-on-surface">Contrato de Compraventa</td>
+<td class="px-6 py-4">
+<span class="bg-primary/5 text-primary text-[10px] px-2 py-0.5 font-label font-bold uppercase rounded">Publicado</span>
+</td>
+<td class="px-6 py-4 text-on-surface-variant">12 May</td>
+<td class="px-6 py-4 text-right">
+<span class="text-primary font-label text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">Abrir</span>
+</td>
+</tr>
+<tr class="group hover:bg-surface-container-low transition-colors cursor-pointer">
+<td class="px-6 py-4 font-medium text-on-surface">Acta de Constitución</td>
+<td class="px-6 py-4">
+<span class="bg-surface-variant text-on-surface-variant text-[10px] px-2 py-0.5 font-label font-bold uppercase rounded">En revisión</span>
+</td>
+<td class="px-6 py-4 text-on-surface-variant">10 May</td>
+<td class="px-6 py-4 text-right">
+<span class="text-primary font-label text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">Abrir</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</div>
+<!-- Right Sidebar -->
+<aside class="lg:col-span-4 space-y-6">
+<!-- Plan Card -->
+<div class="border border-outline-variant bg-surface p-6">
+<h3 class="text-sm font-label font-bold uppercase tracking-widest text-on-surface-variant mb-4">Tu plan</h3>
+<p class="font-headline text-lg font-bold text-on-surface">Plan único</p>
+<p class="text-sm font-body text-on-surface-variant mt-1 mb-6">8 análisis disponibles este mes</p>
+<div class="space-y-2 mb-6">
+<div class="flex justify-between text-xs font-label text-on-surface-variant">
+<span>Uso actual</span>
+<span>12 / 20</span>
+</div>
+<div class="h-1.5 w-full bg-surface-variant overflow-hidden">
+<div class="h-full bg-primary" style="width: 60%;"></div>
+</div>
+</div>
+<a class="text-xs font-label font-bold text-primary hover:underline transition-all" href="#">Ver plan completo</a>
+</div>
+<!-- Secondary Context Card -->
+<div class="border border-outline-variant bg-surface-container-low p-6">
+<p class="font-headline text-base font-semibold mb-2">Consejo del día</p>
+<p class="text-sm font-body text-on-surface-variant leading-relaxed italic">"Podés organizar tus plantillas por etiquetas para encontrarlas más rápido en el buscador global."</p>
+</div>
+</aside>
+</div>
+<!-- Footer -->
+<footer class="bg-surface dark:bg-surface text-primary dark:text-primary font-label text-label-xs full-width bottom-0 border-t border-outline-variant dark:border-outline-variant flat no shadows flex justify-between items-center px-8 py-4 w-full mt-auto">
+<span class="font-headline font-bold text-on-surface-variant">template-ai</span>
+<div class="flex gap-6 items-center">
+<span class="opacity-70">© 2024 template-ai. All rights reserved.</span>
+<nav class="flex gap-4">
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-opacity hover:opacity-100 opacity-70" href="#">Privacy Policy</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-opacity hover:opacity-100 opacity-70" href="#">Terms of Service</a>
+<a class="text-on-surface-variant dark:text-on-surface-variant hover:text-primary dark:hover:text-primary transition-opacity hover:opacity-100 opacity-70" href="#">Legal Notice</a>
+</nav>
+</div>
+</footer>
+</main>
+<script>
+        // Micro-interaction for table rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                row.classList.add('scale-[0.995]');
+                setTimeout(() => row.classList.remove('scale-[0.995]'), 100);
+            });
+        });
+    </script>
+</body></html>

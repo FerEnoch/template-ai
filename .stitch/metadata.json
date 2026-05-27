@@ -1,0 +1,43 @@
+{
+  "project": "template-ai",
+  "stitchProjectId": "13244395666194572658",
+  "designSystemId": "assets/5621834681417054068",
+  "designSystem": "template-ai — Editorial Legal",
+  "designTokens": {
+    "colorMode": "LIGHT",
+    "colorVariant": "NEUTRAL",
+    "customColor": "#3d6b8f",
+    "headlineFont": "LITERATA",
+    "bodyFont": "SOURCE_SERIF_FOUR",
+    "labelFont": "INTER",
+    "roundness": "ROUND_FOUR"
+  },
+  "screens": {
+    "p2": {
+      "title": "Human Review (Prompt 2)",
+      "versions": {
+        "v1": { "html": ".stitch/designs/p2-human-review-v1.html", "screenshot": ".stitch/designs/p2-human-review-v1-screenshot.png", "model": "GEMINI_3_FLASH", "stitchId": "cb46a7bbe0824ed497d015ac0f33a6b6" },
+        "v2": { "html": ".stitch/designs/p2-human-review-v2.html", "screenshot": ".stitch/designs/p2-human-review-v2-screenshot.png", "model": "HatterAgent", "basedOn": "v1", "stitchId": "528497839ea04c19a6b807d4e6b05103" }
+      }
+    },
+    "p16": { "title": "Low Confidence Review (Prompt 16)", "html": ".stitch/designs/p16-low-confidence-review.html", "model": "HatterAgent", "basedOn": "p2-v2", "stitchId": "395f119ad198467e9c8910c961a33764" },
+    "p8":  { "title": "Nuevo caso (Prompt 8)", "html": ".stitch/designs/p8-nuevo-caso.html", "screenshot": ".stitch/designs/p8-nuevo-caso-screenshot.png", "model": "figaro_agent", "stitchId": "93fb79ffe06243f385d981eade27fb10" },
+    "p17": { "title": "Validation Errors (Prompt 17)", "html": ".stitch/designs/p17-validation-errors.html", "screenshot": ".stitch/designs/p17-validation-errors-screenshot.png", "model": "HatterAgent", "basedOn": "p8", "stitchId": "3846b2d7c6764283a2e60ce5f22ad70f" },
+    "p3":  { "title": "Inicio / Home (Prompt 3)", "html": ".stitch/designs/p3-inicio.html", "screenshot": ".stitch/designs/p3-inicio-screenshot.png", "model": "figaro_agent", "stitchId": "5d140ef4b8084cf58d83c26e6bb9a3dd" },
+    "p9":  { "title": "Vista previa final (Prompt 9)", "html": ".stitch/designs/p9-vista-previa.html", "model": "figaro_agent", "stitchId": "e7b9efe9fc8643bd8324a8f1efa30ef6" },
+    "p4":  { "title": "Subida de documento (Prompt 4)", "html": ".stitch/designs/p4-subida-documento.html", "model": "figaro_agent", "stitchId": "4efa6e8527294565b7a1bb82069ed175" },
+    "p10": { "title": "Plan y uso (Prompt 10)", "html": ".stitch/designs/p10-plan-uso.html", "model": "figaro_agent", "stitchId": "c1ff30292925484887488a74d8dd78e7" },
+    "p12": { "title": "No se pudo analizar (Prompt 12)", "html": ".stitch/designs/p12-no-apto.html", "model": "figaro_agent", "stitchId": "09e9b49cb63848959b16895767f47cb3" },
+    "p11": { "title": "Bienvenida (Prompt 11)", "html": ".stitch/designs/p11-bienvenida.html", "model": "figaro_agent", "stitchId": "8977ea8cde0f40bb9f8b94dfed7d2a45" },
+    "p13": { "title": "Límite alcanzado (Prompt 13)", "html": ".stitch/designs/p13-limite-alcanzado.html", "model": "HatterAgent", "basedOn": "p10", "stitchId": "482b17b96de14fbd8edda5d6b2f1ffc3" },
+    "p21": { "title": "Export en curso (Prompt 21)", "html": ".stitch/designs/p21-export-en-curso.html", "model": "HatterAgent", "basedOn": "p9", "stitchId": "3b59bb184aad4dd8832133cb81012119" },
+    "p18": { "title": "Guardado con éxito (Prompt 18)", "html": ".stitch/designs/p18-guardado-exito.html", "model": "figaro_agent", "basedOn": "p11", "stitchId": "ad4674efdc4342dba231f3f43d9071bf" },
+    "p14": { "title": "Cómo tratamos tus documentos (Prompt 14)", "html": ".stitch/designs/p14-como-tratamos.html", "model": "HatterAgent", "basedOn": "p10", "stitchId": "c8bd4b202e20468c9c13d51deb69ef07" },
+    "p20": { "title": "Confirmar eliminación (Prompt 20)", "html": ".stitch/designs/p20-confirmar-eliminacion.html", "model": "HatterAgent", "basedOn": "p12", "stitchId": "8ab7d774845e498f8f8fea71ea783f8b" },
+    "p6":  { "title": "Guardar plantilla (Prompt 6)", "html": ".stitch/designs/p6-guardar-plantilla.html", "model": "HatterAgent", "basedOn": "p8", "stitchId": "1f2693d23e7741c6a625f7c13b23bb84" },
+    "p5":  { "title": "Análisis del documento (Prompt 5)", "html": ".stitch/designs/p5-analisis-documento.html", "model": "figaro_agent", "basedOn": "p4", "stitchId": "68154bc322d14ee3b3b38e881e261590" },
+    "p7":  { "title": "Biblioteca (Prompt 7)", "html": ".stitch/designs/p7-biblioteca.html", "model": "HatterAgent", "basedOn": "p12", "stitchId": "f30b51714ffd4f42b868354159cf91fd" },
+    "p15": { "title": "Loading / Skeleton (Prompt 15)", "html": ".stitch/designs/p15-loading-skeleton.html", "model": "HatterAgent", "basedOn": "p5", "stitchId": "b674999536b6417e84406c537a967edb" },
+    "p19": { "title": "Biblioteca vacía (Prompt 19)", "html": ".stitch/designs/p19-biblioteca-vacia.html", "model": "HatterAgent", "basedOn": "p7", "stitchId": "b41dbff73ff44743b573aa89109be744" }
+  }
+}

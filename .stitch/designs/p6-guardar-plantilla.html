@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&amp;family=Source+Serif+Four:ital,opsz,wght@0,200..900;1,200..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            bg: "#f5f1e8",
+                            error: "#ef4444",
+                            warning: "#f59e0b",
+                            success: "#10b981"
+                        }
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    fontFamily: {
+                        "headline": ["Literata", "serif"],
+                        "display": ["Literata", "serif"],
+                        "body": ["Source Serif Four", "serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .bg-brand-canvas { background-color: #f5f1e8; }
+        .input-focus:focus { outline: none; border-color: #000; ring: 1px solid #000; }
+        .transition-all-200 { transition: all 0.2s ease-in-out; }
+    </style>
+</head>
+<body class="bg-white text-zinc-900 font-body min-h-screen flex flex-col">
+<!-- TopNavBar from JSON -->
+<header class="sticky top-0 z-50 flex justify-between items-center px-6 py-3 w-full bg-white/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800">
+<div class="flex items-center gap-8">
+<span class="text-xl font-headline font-black tracking-tighter text-zinc-950 dark:text-white">template-ai</span>
+<nav class="hidden md:flex items-center space-x-6 font-label text-label-sm">
+<a class="text-zinc-500 dark:text-zinc-400 font-medium hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors duration-200" href="#">Dashboard</a>
+<a class="text-zinc-500 dark:text-zinc-400 font-medium hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors duration-200" href="#">Documents</a>
+<a class="text-zinc-950 dark:text-white font-semibold border-b-2 border-[#3d6b8f] pb-1" href="#">Templates</a>
+<a class="text-zinc-500 dark:text-zinc-400 font-medium hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors duration-200" href="#">Archive</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-zinc-500 hover:bg-zinc-50 p-2 rounded-full transition-colors duration-200">notifications</button>
+<div class="h-8 w-8 rounded-full bg-zinc-200 overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional studio headshot of a middle-aged man with a friendly expression, wearing a clean white shirt. The lighting is soft and directional, typical of a high-end corporate environment. The background is a blurred, minimalist office space with neutral tones of gray and white, maintaining a clean and modern professional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCrjEpxvyLIe3wy5adZA-oeqsWwRUYtmv1FnM7_y-WDsajw063u68HGa9nAZs5HJTtoKjgB0x2ZJdnzfbPlrxtWH_fJA8Mwcr8xfD2qdnKz2IsoE9_L6UQoD8LIXmoR1qAqB56bg8F8J5ERzU4ajE8pbpOr3TaaQrFtB23TBAjMxJPXZhykxz7dc7-gOnXcGFngK7V7Id_2-B0s8BA3RQtfcH_wkbi_PAiOTI1h3O4ICXU2WXCz7m94B2mVJGICL-Hxu9fv5wCfrUM5"/>
+</div>
+<button class="bg-zinc-950 text-white px-4 py-1.5 font-label text-xs font-semibold hover:bg-zinc-800 transition-colors">Nuevo Documento</button>
+</div>
+</header>
+<main class="flex-grow bg-brand-canvas flex flex-col md:flex-row p-6 gap-8">
+<!-- LEFT RAIL (25%) -->
+<aside class="md:w-1/4 space-y-6">
+<div class="bg-white p-6 shadow-sm border border-zinc-200/60 rounded-lg">
+<div class="flex justify-between items-start mb-4">
+<span class="bg-zinc-100 text-zinc-600 text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded">BORRADOR</span>
+<span class="material-symbols-outlined text-zinc-400 text-lg">description</span>
+</div>
+<h1 class="font-headline text-xl font-bold text-zinc-900 leading-tight mb-2">Contrato de locación</h1>
+<div class="space-y-1 mb-6">
+<p class="text-xs font-label text-zinc-500 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">category</span>
+                        Arrendamiento Urbano
+                    </p>
+<p class="text-xs font-label text-zinc-500 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+                        2024-05-15
+                    </p>
+</div>
+<div class="pt-6 border-t border-zinc-100">
+<div class="flex justify-between text-xs font-label font-medium mb-2">
+<span class="text-zinc-500">Progreso: 8 / 11 campos</span>
+<span class="text-zinc-900">72%</span>
+</div>
+<div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden">
+<div class="bg-zinc-900 h-full w-[72%] transition-all duration-500"></div>
+</div>
+</div>
+</div>
+<div class="hidden md:block">
+<img alt="Workspace" class="w-full h-48 object-cover rounded-lg grayscale opacity-40 hover:grayscale-0 transition-all duration-700" data-alt="A clean, minimalist desk setup featuring a legal document resting on a warm oak wood surface. Beside the document, a fountain pen and a pair of reading glasses suggest a focused work environment. The scene is bathed in natural afternoon sunlight coming from a nearby window, creating long, soft shadows and a tranquil, professional atmosphere in a high-key light palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCq6cY-uWk8UPBmrII_NnJbISrNMhTWbQzJEXRgKyGFDBd2nCeT9RuPlszs-4Q6Mc1h73NAv8XYatn6jThAWzb0GOUQkmxiwm_L2ROzk4bHiIZZH5RWgzy7Y8bmUPjhF11QDn2plPeUBPu1HzTigBJUP9aVKdcRJKE6ZwLG1hzqb-u_Bvtolww6EC8s5IsHU6-ftnCigop2tEsyeTAFcYiQjQQRahduwTW9l0EhUOOCzCPXTTyb9e_vCoJk2TvEDWUhJn3cZpPAtE_P"/>
+</div>
+</aside>
+<!-- MAIN FORM (75%) -->
+<section class="md:w-3/4 pb-32"><div class="max-w-3xl mx-auto space-y-8">
+<div class="flex items-center justify-between">
+<h2 class="font-headline text-3xl font-bold text-zinc-900">Guardar plantilla</h2>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+<span class="text-xs font-bold uppercase tracking-wider">VALIDADA</span>
+</div>
+</div>
+<p class="text-zinc-600 font-body text-lg">La estructura fue verificada y está lista para usar. Define los detalles finales para guardarla en tu biblioteca personal.</p>
+<!-- Resumen de Importación Card -->
+<div class="bg-white border border-zinc-200/60 rounded-xl p-6 shadow-sm">
+<h3 class="text-xs font-label font-bold text-zinc-400 uppercase tracking-widest mb-4">Resumen de Importación</h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-zinc-400">picture_as_pdf</span>
+<div>
+<p class="text-xs font-label text-zinc-400 uppercase">Archivo origen</p>
+<p class="text-sm font-semibold text-zinc-800 break-all">CONTRATO_ARRENDAMIENTO_V2.pdf</p>
+</div>
+</div>
+<div>
+<p class="text-xs font-label text-zinc-400 uppercase">Estructura</p>
+<p class="text-sm font-semibold text-zinc-800">11 campos totales</p>
+</div>
+<div>
+<p class="text-xs font-label text-zinc-400 uppercase">Estado</p>
+<div class="flex items-center gap-1.5">
+<p class="text-sm font-semibold text-zinc-800">3 campos revisados</p>
+<span class="bg-blue-50 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">REVISIÓN COMPLETADA</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Template Configuration Form -->
+<div class="bg-white border border-zinc-200/60 rounded-xl p-8 shadow-sm space-y-6">
+<div class="space-y-2">
+<label class="font-label text-sm font-semibold text-zinc-700">Nombre de la plantilla <span class="text-red-500">*</span></label>
+<input class="w-full border-zinc-200 rounded-lg p-3 font-body text-zinc-900 focus:ring-1 focus:ring-[#3d6b8f] focus:border-[#3d6b8f] outline-none transition-all" type="text" value="Contrato de Arrendamiento"/>
+</div>
+<div class="space-y-2">
+<label class="font-label text-sm font-semibold text-zinc-700">Descripción breve</label>
+<textarea class="w-full border-zinc-200 rounded-lg p-3 font-body text-zinc-900 focus:ring-1 focus:ring-[#3d6b8f] focus:border-[#3d6b8f] outline-none transition-all resize-none" rows="4">Modelo base para contratos de alquiler de vivienda</textarea>
+<p class="text-xs text-zinc-400 italic">Visible solo para ti y tu equipo.</p>
+</div>
+</div>
+</div></section>
+</main>
+<!-- Bottom Sticky Bar -->
+<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 py-4 px-8 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] backdrop-blur-md bg-white/95">
+<div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="flex flex-col items-end"><div class="flex items-center gap-4">
+<button class="px-8 py-3 rounded border border-zinc-300 text-zinc-700 font-label text-sm font-semibold hover:bg-zinc-50 transition-colors">Seguir editando</button>
+<button class="px-8 py-3 rounded bg-[#3d6b8f] text-white font-label text-sm font-bold hover:bg-[#345c7a] transition-colors shadow-lg shadow-[#3d6b8f]/20">Guardar en mi biblioteca</button>
+</div></div>
+</div>
+</div>
+<!-- Footer from JSON -->
+<footer class="w-full py-8 px-6 mt-auto flex flex-col md:flex-row justify-between items-center max-w-7xl mx-auto border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 mb-20 md:mb-16">
+<span class="font-headline italic text-zinc-400">template-ai</span>
+<div class="flex flex-col md:flex-row items-center mt-4 md:mt-0">
+<p class="font-body text-xs text-zinc-500 dark:text-zinc-400">© 2024 template-ai. Todos los derechos reservados.</p>
+<div class="mt-2 md:mt-0 md:ml-6 flex items-center">
+<a class="inline-block mx-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors text-xs font-body" href="#">Privacidad</a>
+<a class="inline-block mx-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors text-xs font-body" href="#">Términos</a>
+<a class="inline-block mx-2 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors text-xs font-body" href="#">Seguridad</a>
+</div>
+</div>
+</footer>
+</body></html>

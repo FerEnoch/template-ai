@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Template AI - Crear Plantilla</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,200..900;1,7..72,200..900&amp;family=Source+Serif+4:ital,opsz,wght@0,200..900;1,200..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        zinc: {
+                            100: '#f4f4f5',
+                            200: '#e4e4e7',
+                            400: '#a1a1aa',
+                            800: '#27272a',
+                            900: '#18181b',
+                            950: '#09090b',
+                        }
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    fontFamily: {
+                        "headline": ["Literata", "serif"],
+                        "display": ["Literata", "serif"],
+                        "body": ["Source Serif 4", "serif"],
+                        "label": ["Inter", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    vertical-align: middle
+    }
+body {
+    background-color: #fcfcfc
+    }
+.paper-texture {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuCZN2uZGSzONCw_fC2Ddz5zGxa_wFUCB_vpSIt1KwfInyM-scuht7wECZcZ7g8tpoOSRNuPmSoRVyQ7jFmJGgnHvkH0meshwa945C3sV2GAstkUbwNEe08ht_ZWK95J7i4hNmzKrU3hMr8BHsMf6fqjaMaVsxyND9BpybFpzcHvfpXuzTfKd6JUJO3x03qa8NEuKe_dn2d0XNzd8DM1EX9uGq8Xyzc0fwy2vgAbOU32HCYjfhtn93J_ENcVQ9XfDJ7Spt183tTmDK7j)
+    }</style>
+</head>
+<body class="font-body text-slate-900 bg-slate-50 min-h-screen selection:bg-slate-200">
+<!-- TopNavBar -->
+<header class="bg-white dark:bg-zinc-900 text-slate-900 dark:text-zinc-100 font-body text-label-sm uppercase tracking-wide border-b border-slate-200 dark:border-zinc-800 flex justify-between items-center px-6 h-16 w-full fixed top-0 z-50">
+<div class="font-headline text-xl font-bold text-slate-900 dark:text-zinc-100">Template AI</div>
+<nav class="hidden md:flex gap-8">
+<a class="text-slate-500 dark:text-zinc-400 font-medium hover:text-slate-900 dark:hover:text-zinc-100 transition-colors duration-200 ease-in-out" href="#">Dashboard</a>
+<a class="text-slate-500 dark:text-zinc-400 font-medium hover:text-slate-900 dark:hover:text-zinc-100 transition-colors duration-200 ease-in-out" href="#">Documents</a>
+<a class="text-slate-900 dark:text-zinc-100 border-b-2 border-slate-900 dark:border-zinc-100 pb-1 hover:text-slate-900 dark:hover:text-zinc-100 transition-colors duration-200 ease-in-out" href="#">Templates</a>
+<a class="text-slate-500 dark:text-zinc-400 font-medium hover:text-slate-900 dark:hover:text-zinc-100 transition-colors duration-200 ease-in-out" href="#">Archive</a>
+</nav>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-slate-500 hover:text-slate-900">notifications</button>
+<button class="material-symbols-outlined text-slate-500 hover:text-slate-900">settings</button>
+<div class="w-8 h-8 rounded-full bg-slate-200 overflow-hidden">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A professional headshot of a lawyer in a sharp dark suit against a neutral studio background. Soft cinematic lighting highlights their sophisticated and trustworthy expression. The overall aesthetic is clean, minimalist, and high-end, fitting for a prestigious legal software environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBmhL8ciFYfnVD2Df17dmqlhJyMX1Am1H5NUTjHLkhiHDAGpDOEFlVLDampn52WVBVMwZzkUeLBo0GMEzRkPUnMvFt6Ub7O_sLoN-_E55RRoaJitGMVIeWzAlxwbvxb7ELlTHYa8EUfnGdstiUxFRPYgdWOu2kvuXXYmBAx3niVDwa4D9JNdXEjZhA6ceMn9_DT5UOx0WuO4Mmc0Q_QeV5NdWhqOnc3GdHxKeP1zoRbuxFr7CIiMy3VQHrnue1kUYIZ_VRh63n4tX9q"/>
+</div>
+</div>
+</header>
+<!-- SideNavBar -->
+<aside class="bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-body text-sm h-screen w-64 fixed left-0 top-16 border-r border-slate-200 dark:border-zinc-800 flex flex-col gap-y-4 p-4 z-40 hidden md:flex">
+<div class="mb-6 px-2">
+<div class="font-headline font-semibold text-slate-800 dark:text-zinc-200 text-lg">Law Office</div>
+<div class="text-xs text-slate-500 uppercase tracking-wider">Senior Partner</div>
+</div>
+<button class="w-full bg-slate-900 text-white rounded-lg py-2.5 px-4 mb-4 flex items-center justify-center gap-2 font-label font-medium active:scale-95 transition-all duration-150">
+<span class="material-symbols-outlined text-sm">add</span>
+            New Document
+        </button>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">home</span>
+                Inicio
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+                Biblioteca
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-900 rounded-lg transition-all active:scale-95 duration-150" href="#">
+<span class="material-symbols-outlined">analytics</span>
+                Plan y uso
+            </a>
+</nav>
+</aside>
+<!-- Main Content -->
+<main class="md:ml-64 pt-24 pb-32 px-6 md:px-12 max-w-6xl mx-auto min-h-screen">
+<!-- Header / Stepper -->
+<div class="mb-10">
+<div class="flex items-center gap-2 text-slate-500 font-label text-xs uppercase tracking-widest mb-2">
+<span>Paso 1 de 3</span>
+<span class="w-8 h-px bg-slate-300"></span>
+<span class="text-slate-400">Configuración</span>
+</div>
+<h1 class="font-headline text-4xl font-light text-slate-900">Crear nueva plantilla</h1>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+<!-- CENTRAL AREA: Dropzone & Uploaded State -->
+<div class="lg:col-span-8 space-y-6">
+<!-- Dropzone -->
+<div class="relative group">
+<div class="border-2 border-dashed border-slate-300 hover:border-slate-500 bg-white/50 transition-all duration-300 rounded-xl p-12 text-center flex flex-col items-center justify-center min-h-[320px]">
+<div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-6 text-slate-400 group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-4xl">upload_file</span>
+</div>
+<h3 class="font-headline text-xl text-slate-800 mb-2">Arrastrá tu archivo aquí o hacé clic para buscar</h3>
+<p class="text-slate-500 font-body mb-8 max-w-xs mx-auto">Formatos compatibles para análisis inteligente de contratos.</p>
+<div class="flex gap-2">
+<span class="px-2 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold rounded uppercase">PDF</span>
+<span class="px-2 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold rounded uppercase">DOCX</span>
+<span class="px-2 py-1 bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold rounded uppercase">JPG</span>
+</div>
+</div>
+</div>
+<!-- Uploaded State -->
+<div class="bg-white border border-slate-200 rounded-xl p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-blue-50 text-blue-600 rounded flex items-center justify-center">
+<span class="material-symbols-outlined">description</span>
+</div>
+<div>
+<p class="font-label text-sm font-semibold text-slate-800">CONTRATO_ARRENDAMIENTO_V2.pdf</p>
+<p class="text-xs text-slate-500 font-label">1.2 MB</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="flex items-center gap-1 bg-green-50 text-green-700 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                            Listo
+                        </span>
+<button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+</div>
+</div>
+<!-- RIGHT PANEL: Guidance -->
+<div class="lg:col-span-4">
+<div class="bg-white/70 border border-slate-200 rounded-xl p-6 h-fit sticky top-24">
+<div class="flex items-center gap-2 mb-4 text-slate-800">
+<span class="material-symbols-outlined text-blue-600">info</span>
+<h2 class="font-headline font-semibold text-lg">Recomendaciones para mejores resultados</h2>
+</div>
+<ul class="space-y-4 mb-8">
+<li class="flex gap-3 text-sm text-slate-600 leading-relaxed">
+<span class="material-symbols-outlined text-slate-400 text-base mt-0.5">task_alt</span>
+<span>Usá archivos con <strong>texto seleccionable</strong> para un análisis preciso.</span>
+</li>
+<li class="flex gap-3 text-sm text-slate-600 leading-relaxed">
+<span class="material-symbols-outlined text-slate-400 text-base mt-0.5">warning</span>
+<span>Evitá documentos escaneados de baja calidad o rotados.</span>
+</li>
+<li class="flex gap-3 text-sm text-slate-600 leading-relaxed">
+<span class="material-symbols-outlined text-slate-400 text-base mt-0.5">straighten</span>
+<span>El tamaño máximo permitido por archivo es <strong>25 MB</strong>.</span>
+</li>
+</ul>
+<div class="pt-6 border-t border-slate-100">
+<a class="text-slate-500 hover:text-slate-900 text-xs font-label flex items-center justify-between group" href="#">
+                            Cómo tratamos tus documentos
+                            <span class="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">arrow_forward</span>
+</a>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- BOTTOM BAR: Persistent Notice & Actions -->
+<footer class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 z-50 md:ml-64">
+<div class="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+<div class="flex items-center gap-3 text-slate-600">
+<div class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-500 text-lg" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<p class="text-sm font-label">Vas a revisar todo lo que detectamos antes de guardar.</p>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-6 py-2 text-slate-600 font-label font-medium hover:bg-slate-100 rounded-lg transition-colors duration-200">
+                    Cancelar
+                </button>
+<button class="px-8 py-2.5 bg-slate-900 text-white font-label font-semibold rounded-lg shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0">
+                    Continuar al análisis
+                </button>
+</div>
+</div>
+</footer>
+<script>
+        // Micro-interactions
+        document.querySelector('.group')?.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.currentTarget.classList.add('border-slate-900', 'bg-slate-100/50');
+        });
+
+        document.querySelector('.group')?.addEventListener('dragleave', (e) => {
+            e.currentTarget.classList.remove('border-slate-900', 'bg-slate-100/50');
+        });
+
+        // Simple button active states handled by Tailwind 'active:' utilities
+    </script>
+</body></html>

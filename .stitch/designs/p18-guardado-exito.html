@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,600;0,700;1,400&amp;family=Source+Serif+Four:ital,wght@0,400;0,600;0,700;1,400&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#1a1a1a',
+                light: '#4a4a4a',
+              },
+              neutral: {
+                50: '#f9f9f8',
+                100: '#f2f2f0',
+                200: '#e5e5e0',
+                800: '#2d2d2d',
+                900: '#1a1a1a',
+                950: '#0a0a0a',
+              },
+              success: {
+                DEFAULT: '#2e7d32',
+                container: '#e8f5e9'
+              }
+            },
+            borderRadius: {
+              "DEFAULT": "0.125rem",
+              "lg": "0.25rem",
+              "xl": "0.5rem",
+              "full": "0.75rem"
+            },
+            fontFamily: {
+              "headline": ["Literata", "serif"],
+              "display": ["Literata", "serif"],
+              "body": ["Source Serif Four", "serif"],
+              "label": ["Inter", "sans-serif"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .success-fill {
+        font-variation-settings: 'FILL' 1;
+      }
+      body {
+        background-color: #f9f9f8;
+      }
+    </style>
+</head>
+<body class="antialiased text-neutral-900">
+<!-- TopNavBar -->
+<header class="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-800 flex justify-between items-center w-full px-6 py-3 h-16 sticky top-0 z-50">
+<div class="flex items-center gap-8">
+<span class="text-xl font-headline font-bold text-primary dark:text-primary-light">Template-AI</span>
+<nav class="hidden md:flex gap-6 items-center">
+<a class="text-neutral-600 dark:text-neutral-400 font-medium font-body text-label-md hover:text-primary transition-colors" href="#">Dashboard</a>
+<a class="text-neutral-600 dark:text-neutral-400 font-medium font-body text-label-md hover:text-primary transition-colors" href="#">Documentos</a>
+<a class="text-primary dark:text-primary-light border-b-2 border-primary dark:border-primary-light pb-1 font-bold font-body text-label-md" href="#">Plantillas</a>
+<a class="text-neutral-600 dark:text-neutral-400 font-medium font-body text-label-md hover:text-primary transition-colors" href="#">Archivo</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 text-sm">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-neutral-100 border-none rounded text-sm focus:ring-1 focus:ring-primary w-64" placeholder="Buscar..." type="text"/>
+</div>
+<button class="material-symbols-outlined text-neutral-600 hover:text-primary cursor-pointer">notifications</button>
+<button class="material-symbols-outlined text-neutral-600 hover:text-primary cursor-pointer">settings</button>
+<div class="w-8 h-8 rounded-full bg-neutral-200 overflow-hidden">
+<img alt="Avatar de usuario" class="w-full h-full object-cover" data-alt="A professional, close-up portrait of a corporate professional with a clean-cut aesthetic. The lighting is soft and natural, coming from a side window, creating a subtle editorial look typical of high-end business photography. The background is a blurred office interior with neutral gray tones, maintaining a focused and serious mood consistent with a legal technology platform." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpJDEbee7emL6vXcDQ8nTSR3iQuuAL01MkJyoRMUfYuOiXMJtBdqt5FHRPx_i3KZxVPJgKiYNx3tuc6k4vt-u4XOPfmTk6YkY2XNLT5-DMMt_w3u_OOm0dtih2TAvDsvP-SSxQ1vgaYc9X2UNUJ41JeJucXNz0-uLVYVv5aFaXtPFeHKYv3fXC_v5lSV87xAgT2XNYPLp7NuKqFcJVOxoXKY7LqmFxpFLYB3qa9SiHXI-E1HmFXlzbBXF_y_LoPvWfl7wrlNKdvBFi"/>
+</div>
+</div>
+</header>
+<div class="flex min-h-[calc(100vh-64px)]">
+<!-- SideNavBar -->
+<aside class="bg-neutral-50 dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800 h-screen w-64 fixed left-0 top-16 flex flex-col p-4 gap-y-2 z-40">
+<div class="flex items-center gap-3 px-2 py-4 mb-4 border-b border-neutral-200 dark:border-neutral-800">
+<div class="w-10 h-10 bg-primary flex items-center justify-center rounded-lg">
+<span class="material-symbols-outlined text-white">account_balance</span>
+</div>
+<div>
+<h3 class="text-lg font-headline font-semibold text-primary dark:text-primary-light leading-tight">Workspace Principal</h3>
+<p class="text-xs text-neutral-500 font-body">Edición Profesional</p>
+</div>
+</div>
+<button class="w-full py-2.5 mb-6 bg-primary text-white rounded font-medium flex items-center justify-center gap-2 hover:bg-neutral-800 transition-all cursor-pointer">
+<span class="material-symbols-outlined text-sm">add</span>
+<span class="text-label-sm font-label">Nuevo Documento</span>
+</button>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-all duration-200 ease-in-out font-body text-label-sm" href="#">
+<span class="material-symbols-outlined">home</span>
+<span>Inicio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 bg-white dark:bg-neutral-900 text-primary dark:text-primary-light shadow-sm rounded-lg font-semibold transition-all duration-200 ease-in-out font-body text-label-sm" href="#">
+<span class="material-symbols-outlined">folder_shared</span>
+<span>Biblioteca</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-all duration-200 ease-in-out font-body text-label-sm" href="#">
+<span class="material-symbols-outlined">credit_card</span>
+<span>Plan y uso</span>
+</a>
+</nav>
+<div class="mt-auto flex flex-col gap-1 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+<a class="flex items-center gap-3 px-3 py-2 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-all duration-200 font-body text-label-sm" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+<span>Soporte</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-all duration-200 font-body text-label-sm" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span>Cerrar sesión</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 ml-64 p-8 flex items-center justify-center bg-neutral-50">
+<div class="max-w-2xl w-full">
+<!-- Success Panel -->
+<div class="bg-white border border-neutral-200 rounded-lg shadow-sm p-12 flex flex-col items-center text-center">
+<div class="w-16 h-16 bg-success-container rounded-full flex items-center justify-center mb-8">
+<span class="material-symbols-outlined text-success text-4xl success-fill" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<h1 class="text-4xl font-headline font-bold text-neutral-900 mb-2">Plantilla guardada</h1>
+<div class="flex items-center gap-2 mb-6">
+<span class="text-xl font-body text-neutral-600 italic">Contrato de Arrendamiento</span>
+<div class="flex items-center gap-1 bg-success-container text-success px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase font-label">
+<span class="material-symbols-outlined text-xs" style="font-variation-settings: 'wght' 700">check</span>
+                            VALIDADA
+                        </div>
+</div>
+<div class="text-neutral-500 font-body text-sm mb-10 tracking-wide">
+                        11 campos detectados, 3 revisados manualmente, estructura confirmada
+                    </div>
+<div class="w-full bg-neutral-100 border border-neutral-200 py-4 px-6 rounded mb-10">
+<p class="text-neutral-700 font-body">Ya podés usar esta plantilla para generar documentos.</p>
+</div>
+<div class="flex flex-col sm:flex-row gap-4 w-full justify-center mb-12">
+<button class="px-8 py-3 bg-primary text-white font-label font-medium rounded hover:bg-neutral-800 transition-colors">
+                            Ir a mi biblioteca
+                        </button>
+<button class="px-8 py-3 bg-transparent border border-neutral-300 text-neutral-800 font-label font-medium rounded hover:bg-neutral-50 transition-colors">
+                            Generar un documento con esta plantilla
+                        </button>
+</div>
+<footer class="pt-8 border-t border-neutral-100 w-full">
+<p class="text-neutral-400 font-body text-xs italic">
+                            Podés revisar o editar la plantilla cuando quieras desde tu biblioteca.
+                        </p>
+</footer>
+</div>
+<!-- Footer (Optional in-page context) -->
+<footer class="flex justify-between items-center px-4 py-6 w-full mt-6 bg-transparent">
+<p class="font-body text-label-xs text-neutral-500 dark:text-neutral-400">© 2024 Template-AI. Todos los derechos reservados.</p>
+<div class="flex gap-4">
+<a class="text-neutral-500 dark:text-neutral-400 font-body text-label-xs hover:text-neutral-800 transition-colors" href="#">Privacidad</a>
+<a class="text-neutral-500 dark:text-neutral-400 font-body text-label-xs hover:text-neutral-800 transition-colors" href="#">Términos</a>
+<a class="text-neutral-500 dark:text-neutral-400 font-body text-label-xs hover:text-neutral-800 transition-colors" href="#">Legal</a>
+</div>
+</footer>
+</div>
+</main>
+</div>
+</body></html>
