@@ -8,19 +8,36 @@ Define the minimum pnpm workspace baseline for `apps/web` and `apps/api` while p
 
 ### Requirement: Root workspace foundation
 
-The repository MUST provide a root pnpm workspace limited to `apps/*`. Root tracked workspace files MUST include `package.json`, `pnpm-workspace.yaml`, and `tsconfig.base.json`; a root `tsconfig.json` MAY exist only as a workspace coordination file. Root `.gitignore` MUST ignore Node/pnpm outputs introduced by this capability while continuing to track the existing `*.example` env files. Root configuration MUST remain tooling-only and MUST NOT introduce `packages/*`, Turborepo, Nx, Changesets, or shared runtime source code.
+The repository MUST provide a root pnpm workspace that includes both `apps/*` and `packages/*`. Root tracked workspace files MUST include `package.json`, `pnpm-workspace.yaml`, and `tsconfig.base.json`; a root `tsconfig.json` MAY exist only as a workspace coordination file. Root `.gitignore` MUST ignore Node/pnpm outputs introduced by this capability while continuing to track the existing `*.example` env files. Root configuration MUST remain tooling-only. The `packages/*` scope MUST be limited to shared type/schema packages (e.g., `packages/contracts`). This capability MUST NOT introduce Turborepo, Nx, Changesets, or shared runtime source code beyond type definitions.
 
-#### Scenario: Workspace root is minimal and apps-only
+#### Scenario: Workspace root includes packages scope
+
 - GIVEN a fresh clone of the repository
-- WHEN the operator reviews root workspace files and the workspace package globs
-- THEN the repo exposes the required root files
-- AND the workspace scope includes only `apps/*`
+- WHEN the operator reviews `pnpm-workspace.yaml`
+- THEN the workspace scope includes both `apps/*` and `packages/*`
+
+#### Scenario: Packages scope is limited to contracts
+
+- GIVEN the completed change
+- WHEN the operator inspects `packages/`
+- THEN only `packages/contracts` exists as a shared types package
+- AND no runtime business logic packages are introduced
 
 #### Scenario: Root tooling stays out of runtime sharing
 - GIVEN the completed change
 - WHEN the operator reviews root config and directories
 - THEN root scripts/config are limited to workspace orchestration concerns
-- AND no shared runtime package or `packages/` directory is introduced
+- AND no shared runtime package beyond type definitions is introduced
+
+### Requirement: Contracts package in workspace
+
+The workspace MUST include `packages/contracts` as a resolvable workspace package. The package MUST be importable from `apps/web` using the workspace protocol (`@template-ai/contracts` or equivalent). The package MUST NOT introduce build tooling beyond TypeScript compilation.
+
+#### Scenario: Web app resolves contracts package
+
+- GIVEN `packages/contracts` exists with a valid `package.json`
+- WHEN `apps/web` adds it as a workspace dependency
+- THEN `pnpm install` resolves the dependency correctly
 
 ### Requirement: Web bootstrap root
 
