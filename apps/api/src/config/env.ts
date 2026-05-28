@@ -4,6 +4,7 @@ export type ApiEnv = {
   PORT: number;
   NODE_ENV: NodeEnv;
   DATABASE_URL: string;
+  CORS_ORIGIN: string;
 };
 
 const allowedNodeEnvs: readonly NodeEnv[] = ["development", "test", "production"];
@@ -58,6 +59,15 @@ function parseDatabaseUrl(value: string | undefined): string {
   return value;
 }
 
+function parseCorsOrigin(value: string | undefined): string {
+  // CORS_ORIGIN is optional — default to localhost:3000 for dev
+  if (!value) {
+    return "http://localhost:3000";
+  }
+
+  return value;
+}
+
 let cachedApiEnv: ApiEnv | null = null;
 
 export function getApiEnv(): ApiEnv {
@@ -69,6 +79,7 @@ export function getApiEnv(): ApiEnv {
     PORT: parsePort(process.env.PORT),
     NODE_ENV: parseNodeEnv(process.env.NODE_ENV),
     DATABASE_URL: parseDatabaseUrl(process.env.DATABASE_URL),
+    CORS_ORIGIN: parseCorsOrigin(process.env.CORS_ORIGIN),
   };
 
   return cachedApiEnv;

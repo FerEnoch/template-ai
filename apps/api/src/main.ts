@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { NestFactory } from "@nestjs/core";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { getApiEnv } from "./config/env";
 
@@ -8,7 +9,19 @@ getApiEnv();
 
 async function bootstrap() {
   const env = getApiEnv();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.setGlobalPrefix("api");
+
+  app.enableCors({
+    origin: env.CORS_ORIGIN,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true,
+  });
+
+  // Body parser size limit for file uploads
+  app.useBodyParser("json", { limit: "10mb" });
+  app.useBodyParser("urlencoded", { limit: "10mb", extended: true });
 
   const shutdown = async () => {
     await app.close();

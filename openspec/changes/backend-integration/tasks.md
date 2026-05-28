@@ -77,12 +77,12 @@ Chain strategy: stacked-to-main
 
 ## PR 6: Frontend Wiring
 
-- [ ] 6.1 Add `app.setGlobalPrefix('api')` + CORS (origin from env) to main.ts
-- [ ] 6.2 Import DocumentsModule, AnalysisModule, ReviewModule, TemplatesModule in app.module.ts
-- [ ] 6.3 Add `CORS_ORIGIN` to env.ts config parser
-- [ ] 6.4 Add Next.js rewrites proxy in next.config.ts (`/api/:path*` → `API_BASE_URL`)
-- [ ] 6.5 Set `NEXT_PUBLIC_MSW=false` in apps/web/.env.local
-- [ ] 6.6 Verify all 45 existing tests remain green
+- [x] 6.1 Add `app.setGlobalPrefix('api')` + CORS (origin from env) to main.ts
+- [x] 6.2 Import DocumentsModule, AnalysisModule, ReviewModule, TemplatesModule in app.module.ts
+- [x] 6.3 Add `CORS_ORIGIN` to env.ts config parser
+- [x] 6.4 Add Next.js rewrites proxy in next.config.ts (`/api/:path*` → `API_BASE_URL`)
+- [x] 6.5 Set `NEXT_PUBLIC_MSW=false` in apps/web/.env.local
+- [x] 6.6 Verify all 45 existing tests remain green
 
 ## PR 7: E2E Test Fixes
 

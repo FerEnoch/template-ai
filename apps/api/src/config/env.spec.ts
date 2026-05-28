@@ -52,6 +52,7 @@ describe("getApiEnv", () => {
       PORT: 3001,
       NODE_ENV: "test",
       DATABASE_URL: BASE_ENV.DATABASE_URL,
+      CORS_ORIGIN: "http://localhost:3000",
     });
   });
 
@@ -70,5 +71,25 @@ describe("getApiEnv", () => {
     const getApiEnv = await loadGetApiEnv();
 
     expect(() => getApiEnv()).toThrowError("[api env] DATABASE_URL is required");
+  });
+
+  it("defaults CORS_ORIGIN to http://localhost:3000 when not set", async () => {
+    setEnv();
+    delete process.env.CORS_ORIGIN;
+
+    const getApiEnv = await loadGetApiEnv();
+
+    const env = getApiEnv();
+    expect(env.CORS_ORIGIN).toBe("http://localhost:3000");
+  });
+
+  it("uses explicit CORS_ORIGIN when provided", async () => {
+    setEnv();
+    process.env.CORS_ORIGIN = "https://example.com";
+
+    const getApiEnv = await loadGetApiEnv();
+
+    const env = getApiEnv();
+    expect(env.CORS_ORIGIN).toBe("https://example.com");
   });
 });

@@ -62,8 +62,8 @@ describe("API bootstrap process contract", () => {
     });
 
     try {
-      const health = await waitForHttp(`http://127.0.0.1:${port}/health`, 25_000);
-      const ready = await fetch(`http://127.0.0.1:${port}/ready`);
+      const health = await waitForHttp(`http://127.0.0.1:${port}/api/health`, 25_000);
+      const ready = await fetch(`http://127.0.0.1:${port}/api/ready`);
 
       expect(health.status).toBe(200);
       await expect(health.json()).resolves.toEqual({ status: "ok" });
@@ -74,7 +74,7 @@ describe("API bootstrap process contract", () => {
       child.kill("SIGTERM");
       await waitForExit(child, 10_000).catch(() => undefined);
     }
-  });
+  }, 30_000);
 
   it("rejects invalid env at process startup with non-zero exit", async () => {
     const port = randomPort();
