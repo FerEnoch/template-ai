@@ -41,7 +41,7 @@ function UploadContent() {
   }, [state.file, nextStep]);
 
   return (
-    <AppShell footer={false}>
+    <AppShell footer={false} activeSidebarItem="Nuevo Documento">
       <WizardLayout>
         <div className="mx-auto w-full max-w-6xl px-6 pb-36 pt-8 md:px-12">
           {/* Header */}

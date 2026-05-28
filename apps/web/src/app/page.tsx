@@ -25,7 +25,7 @@ const flowSteps = [
 
 export default function Page() {
   return (
-    <AppShell>
+    <AppShell activeSidebarItem="Inicio">
       {/* Hero */}
       <section className="flex flex-col items-center justify-center px-6 pb-16 pt-20 text-center">
         <span className="mb-4 rounded-full bg-accent/10 px-4 py-1.5 font-label text-xs font-semibold uppercase tracking-wider text-accent">

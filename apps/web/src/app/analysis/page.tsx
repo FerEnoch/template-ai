@@ -152,7 +152,7 @@ function AnalysisContent() {
   const bajaCount = analysisResult?.entities.filter((e) => e.confidence === "BAJA").length ?? 0;
 
   return (
-    <AppShell footer={false}>
+    <AppShell footer={false} activeSidebarItem="Nuevo Documento">
       <WizardLayout>
         <div className="mx-auto w-full max-w-7xl p-8">
           {/* Header */}
