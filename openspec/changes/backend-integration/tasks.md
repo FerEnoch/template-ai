@@ -59,12 +59,12 @@ Chain strategy: stacked-to-main
 
 ## PR 4: Review Module
 
-- [ ] 4.1 **T** review controller spec (POST /:docId/entities/:entityId)
-- [ ] 4.2 **T** review service spec (UPDATE entity row, 404 on missing)
-- [ ] 4.3 Create `review.module.ts`
-- [ ] 4.4 Create `review.service.ts` (entity UPDATE by ID)
-- [ ] 4.5 Create `review.controller.ts` (POST /:documentId/entities/:entityId)
-- [ ] 4.6 **I** supertest: review updates entity fields
+- [x] 4.1 **T** review controller spec (POST /:docId/entities/:entityId)
+- [x] 4.2 **T** review service spec (UPDATE entity row, 404 on missing)
+- [x] 4.3 Create `review.module.ts`
+- [x] 4.4 Create `review.service.ts` (entity UPDATE by ID)
+- [x] 4.5 Create `review.controller.ts` (POST /:documentId/entities/:entityId)
+- [x] 4.6 **I** supertest: review updates entity fields
 
 ## PR 5: Templates Module
 
