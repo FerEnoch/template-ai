@@ -13,6 +13,16 @@ type RunMigrationsOptions = {
   migrationsDir?: string;
 };
 
+function maskConnectionString(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    url.password = "***";
+    return url.toString();
+  } catch {
+    return connectionString.replace(/:([^@]+)@/, ":****@");
+  }
+}
+
 function requiredDatabaseUrl(): string {
   const connectionString = process.env.DATABASE_URL;
 
@@ -27,7 +37,21 @@ function sqlChecksum(sql: string): string {
   return createHash("sha256").update(sql).digest("hex");
 }
 
-async function ensureJournal(pool: Pool): Promise<void> {
+async function ensureJournal(pool: Pool, connectionString: string): Promise<void> {
+  // Connection test with a clear, actionable error message
+  try {
+    await pool.query("SELECT 1");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Cannot connect to database at ${maskConnectionString(connectionString)}\n` +
+        `${message}\n\n` +
+        "Make sure PostgreSQL is running:\n" +
+        "  • Dev:  make dev\n" +
+        "  • Test: make test-db-up",
+    );
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ${JOURNAL_TABLE} (
       version TEXT PRIMARY KEY,
@@ -62,9 +86,17 @@ export async function runMigrations({
   const pool = new Pool({ connectionString });
 
   try {
-    await ensureJournal(pool);
+    await ensureJournal(pool, connectionString);
     const migrationFiles = await readMigrationFiles(migrationsDir);
     const appliedMigrations = await readAppliedMigrations(pool);
+
+    if (migrationFiles.length === 0) {
+      console.log("No migration files found.");
+      return;
+    }
+
+    let applied = 0;
+    let skipped = 0;
 
     for (const fileName of migrationFiles) {
       const filePath = join(migrationsDir, fileName);
@@ -77,6 +109,8 @@ export async function runMigrations({
           throw new Error(`Migration checksum mismatch for ${fileName}`);
         }
 
+        skipped++;
+        console.log(`Skipped (already applied): ${fileName}`);
         continue;
       }
 
@@ -90,7 +124,8 @@ export async function runMigrations({
           [fileName, checksum],
         );
         await client.query("COMMIT");
-        process.stdout.write(`Applied migration ${fileName}\n`);
+        console.log(`Applied: ${fileName}`);
+        applied++;
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -98,13 +133,22 @@ export async function runMigrations({
         client.release();
       }
     }
+
+    const total = applied + skipped;
+    console.log(
+      `\nMigrations complete: ${applied} applied, ${skipped} skipped (${total} total)`,
+    );
   } finally {
     await pool.end();
   }
 }
 
 async function main() {
-  await runMigrations({ connectionString: requiredDatabaseUrl() });
+  const connectionString = requiredDatabaseUrl();
+
+  console.log(`Database: ${maskConnectionString(connectionString)}\n`);
+
+  await runMigrations({ connectionString });
 }
 
 const isDirectExecution = process.argv[1]
@@ -113,7 +157,10 @@ const isDirectExecution = process.argv[1]
 
 if (isDirectExecution) {
   void main().catch((error: unknown) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
+    const message = error instanceof Error ? error.message : String(error);
+
+    console.error(`\nMigration failed: ${message}`);
+    // Force exit — pool.end() may still be pending on a broken connection
+    process.exit(1);
   });
 }
