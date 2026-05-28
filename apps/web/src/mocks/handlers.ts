@@ -185,9 +185,7 @@ export const handlers = [
       await delay(500);
 
       const { entityId } = params;
-      const body = (await request.json()) as Partial<
-        Pick<Entity, "value" | "confidence" | "reviewed" | "excluded">
-      >;
+      const body = (await request.json()) as Record<string, unknown>;
       const entityIndex = storedEntities.findIndex((e) => e.id === entityId);
 
       if (entityIndex === -1) {
