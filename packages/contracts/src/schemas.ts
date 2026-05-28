@@ -28,6 +28,7 @@ export const EntitySchema = z.object({
     })
     .optional(),
   reviewed: z.boolean().default(false),
+  excluded: z.boolean().default(false),
 });
 
 // Analysis result schema: outcome of document analysis job
