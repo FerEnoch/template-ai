@@ -4,5 +4,5 @@ packages:
 allowBuilds:
   "@nestjs/core": true
   esbuild: true
-  msw: set this to true or false
+  msw: true
   sharp: true

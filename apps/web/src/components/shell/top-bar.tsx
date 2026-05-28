@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Search, Bell, Settings, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -6,8 +7,8 @@ interface TopBarProps {
 }
 
 const navItems = [
-  { label: "Dashboard", href: "#" },
-  { label: "Documentos", href: "#" },
+  { label: "Dashboard", href: "/" },
+  { label: "Documentos", href: "/upload?step=upload" },
   { label: "Plantillas", href: "#" },
   { label: "Archivo", href: "#" },
 ] as const;
@@ -16,12 +17,15 @@ export function TopBar({ activeNav }: TopBarProps) {
   return (
     <header className="fixed top-0 z-50 flex h-14 w-full items-center justify-between border-b border-border bg-surface px-6">
       <div className="flex items-center gap-8">
-        <span className="font-headline text-xl font-bold text-accent">
+        <Link
+          href="/"
+          className="font-headline text-xl font-bold text-accent hover:text-accent-hover transition-colors"
+        >
           template-ai
-        </span>
+        </Link>
         <nav className="hidden md:flex md:gap-8">
           {navItems.map((item) => (
-            <a
+            <Link
               key={item.label}
               href={item.href}
               className={cn(
@@ -32,7 +36,7 @@ export function TopBar({ activeNav }: TopBarProps) {
               )}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
       </div>
