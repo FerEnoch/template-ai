@@ -7,8 +7,8 @@ interface TopBarProps {
 }
 
 const navItems = [
-  { label: "Dashboard", href: "/" },
-  { label: "Documentos", href: "/upload?step=upload" },
+  { label: "Inicio", href: "/" },
+  { label: "Biblioteca", href: "/biblioteca" },
   { label: "Plantillas", href: "#" },
   { label: "Archivo", href: "#" },
 ] as const;
