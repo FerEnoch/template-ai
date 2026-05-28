@@ -81,3 +81,6 @@ Thumbs.db
 .env.test.tmp*
 
 docs/mockups-google-flow
+# Playwright CLI snapshots
+.playwright-cli/
+home.yml
