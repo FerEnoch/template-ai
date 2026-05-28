@@ -54,8 +54,14 @@ function createMockPostgresService(setup: {
   entityRecords?: EntityRecord[];
   incrementedRecord?: AnalysisResultRecord;
   statusUpdatedRecord?: AnalysisResultRecord;
+  /** Simulates entities already existing for race-condition guard (FIX 4) */
+  existingEntitiesOnFirstLookup?: EntityRecord[];
 }): PostgresService {
-  const { analysisRecords, entityRecords = [] } = setup;
+  const { analysisRecords, entityRecords = [], existingEntitiesOnFirstLookup } = setup;
+
+  // Track how many times findByAnalysisResultId has been called to simulate
+  // the race condition guard: first call returns existing, second returns inserted
+  let findByAnalysisResultIdCallCount = 0;
 
   const mockClient = {
     query: vi.fn((sql: string, _params?: unknown[]) => {
@@ -123,7 +129,52 @@ function createMockPostgresService(setup: {
         });
       }
 
-      // SELECT entities
+      // SELECT entities (findByAnalysisResultId)
+      if (sql.includes("SELECT") && sql.includes("entities") && sql.includes("analysis_result_id")) {
+        findByAnalysisResultIdCallCount++;
+
+        // First call: return existing entities (for the race guard check)
+        // or empty array if no pre-existing entities
+        if (findByAnalysisResultIdCallCount === 1) {
+          const entities = existingEntitiesOnFirstLookup !== undefined
+            ? existingEntitiesOnFirstLookup
+            : entityRecords;
+          return Promise.resolve({
+            rowCount: entities.length,
+            rows: entities.map((e) => ({
+              id: e.id,
+              analysis_result_id: e.analysisResultId,
+              document_id: e.documentId,
+              label: e.label,
+              value: e.value,
+              group: e.group,
+              confidence: e.confidence,
+              source_span: e.sourceSpan ? JSON.stringify(e.sourceSpan) : null,
+              reviewed: e.reviewed,
+              excluded: e.excluded,
+            })),
+          });
+        }
+
+        // Second+ call: return entity records (the inserted ones or the same)
+        return Promise.resolve({
+          rowCount: entityRecords.length,
+          rows: entityRecords.map((e) => ({
+            id: e.id,
+            analysis_result_id: e.analysisResultId,
+            document_id: e.documentId,
+            label: e.label,
+            value: e.value,
+            group: e.group,
+            confidence: e.confidence,
+            source_span: e.sourceSpan ? JSON.stringify(e.sourceSpan) : null,
+            reviewed: e.reviewed,
+            excluded: e.excluded,
+          })),
+        });
+      }
+
+      // SELECT entities (findById or general) — for findById in review
       if (sql.includes("SELECT") && sql.includes("entities")) {
         return Promise.resolve({
           rowCount: entityRecords.length,
@@ -256,6 +307,8 @@ describe("AnalysisService", () => {
         incrementedRecord,
         statusUpdatedRecord: completedRecord,
         entityRecords,
+        // No existing entities on first lookup (new insertion)
+        existingEntitiesOnFirstLookup: [],
       });
       const service = new AnalysisService(mockPostgres);
 
@@ -388,6 +441,95 @@ describe("AnalysisService", () => {
       // No entities yet since still processing
       expect(result.entities).toEqual([]);
     });
+
+    // --- FIX 1: "failed" status should NOT increment progress ---
+    it("should return failed result immediately without incrementing progress (FIX 1)", async () => {
+      const failedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "failed",
+        progress: 30,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [failedRecord],
+      });
+      const service = new AnalysisService(mockPostgres);
+
+      const result = await service.getFullResult("doc-1");
+
+      expect(result.status).toBe("failed");
+      expect(result.progress).toBe(30);
+      expect(result.entities).toEqual([]);
+
+      // Verify progress was NOT incremented (stayed at 30, the original value)
+      expect(result.progress).toBe(30);
+    });
+
+    it("should return pending result immediately without incrementing progress (FIX 1 triangulation)", async () => {
+      const pendingRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "pending",
+        progress: 0,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [pendingRecord],
+      });
+      const service = new AnalysisService(mockPostgres);
+
+      const result = await service.getFullResult("doc-1");
+
+      expect(result.status).toBe("pending");
+      expect(result.progress).toBe(0);
+      expect(result.entities).toEqual([]);
+    });
+
+    // --- FIX 4: Race condition guard — skip bulkInsert if entities already exist ---
+    it("should skip entity insertion if entities already exist when completing (FIX 4 race guard)", async () => {
+      const initialRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 75,
+      });
+      const incrementedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 100,
+      });
+      const completedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "completed",
+        progress: 100,
+        completedAt: new Date("2026-05-27T10:35:22.000Z"),
+      });
+
+      // Entities already exist (simulating concurrent request that already inserted them)
+      const existingEntities = [
+        makeEntityRecord({ id: "e1", analysisResultId: "analysis-1", documentId: "doc-1" }),
+        makeEntityRecord({ id: "e2", analysisResultId: "analysis-1", documentId: "doc-1" }),
+      ];
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [initialRecord],
+        incrementedRecord,
+        statusUpdatedRecord: completedRecord,
+        entityRecords: existingEntities,
+        // First lookup returns existing entities (race condition scenario)
+        existingEntitiesOnFirstLookup: existingEntities,
+      });
+
+      const service = new AnalysisService(mockPostgres);
+
+      const result = await service.getFullResult("doc-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.entities).toHaveLength(2);
+    });
   });
 
   describe("getStatus", () => {
@@ -398,29 +540,7 @@ describe("AnalysisService", () => {
       await expect(service.getStatus("nonexistent-id")).rejects.toThrow(NotFoundException);
     });
 
-    it("should return lightweight status without entities", async () => {
-      const processingRecord = makeAnalysisResultRecord({
-        id: "analysis-1",
-        documentId: "doc-1",
-        status: "processing",
-        progress: 50,
-      });
-
-      const mockPostgres = createMockPostgresService({
-        analysisRecords: [processingRecord],
-      });
-      const service = new AnalysisService(mockPostgres);
-
-      const result = await service.getStatus("doc-1");
-
-      expect(result).toEqual({
-        documentId: "doc-1",
-        status: "processing",
-        progress: 50,
-      });
-    });
-
-    it("should return completed status with progress 100", async () => {
+    it("should return completed status with progress 100 without incrementing", async () => {
       const completedRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -437,9 +557,10 @@ describe("AnalysisService", () => {
 
       expect(result.status).toBe("completed");
       expect(result.progress).toBe(100);
+      expect(result.documentId).toBe("doc-1");
     });
 
-    it("should return failed status (triangulation — different status value)", async () => {
+    it("should return failed status without incrementing progress (FIX 2 — terminal state)", async () => {
       const failedRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -456,6 +577,93 @@ describe("AnalysisService", () => {
 
       expect(result.status).toBe("failed");
       expect(result.progress).toBe(30);
+    });
+
+    it("should return pending status without incrementing progress (FIX 2 — terminal state triangulation)", async () => {
+      const pendingRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "pending",
+        progress: 0,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [pendingRecord],
+      });
+      const service = new AnalysisService(mockPostgres);
+
+      const result = await service.getStatus("doc-1");
+
+      expect(result.status).toBe("pending");
+      expect(result.progress).toBe(0);
+    });
+
+    // FIX 2: getStatus drives progress for "processing" status
+    it("should increment progress when status is processing (FIX 2)", async () => {
+      const processingRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 50,
+      });
+      const incrementedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 75,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [processingRecord],
+        incrementedRecord,
+      });
+      const service = new AnalysisService(mockPostgres);
+
+      const result = await service.getStatus("doc-1");
+
+      expect(result.status).toBe("processing");
+      expect(result.progress).toBe(75);
+    });
+
+    it("should transition to completed when getStatus increments progress to 100 (FIX 2)", async () => {
+      const processingRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 75,
+      });
+      const incrementedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 100,
+      });
+      const completedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "completed",
+        progress: 100,
+        completedAt: new Date("2026-05-27T10:35:22.000Z"),
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [processingRecord],
+        incrementedRecord,
+        statusUpdatedRecord: completedRecord,
+      });
+      const service = new AnalysisService(mockPostgres);
+
+      const result = await service.getStatus("doc-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.progress).toBe(100);
+      // Lightweight response — no entities field
+      expect(result).not.toHaveProperty("entities");
+      expect(result).toEqual({
+        documentId: "doc-1",
+        status: "completed",
+        progress: 100,
+      });
     });
   });
 });

@@ -3,6 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { getApiEnv } from "./config/env";
+import { HttpExceptionFilter } from "./infrastructure/http/exception.filter";
 
 // Eagerly validate env at startup — fail synchronously before NestJS starts
 getApiEnv();
@@ -11,6 +12,7 @@ async function bootstrap() {
   const env = getApiEnv();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  app.useGlobalFilters(new HttpExceptionFilter());
   app.setGlobalPrefix("api");
 
   app.enableCors({

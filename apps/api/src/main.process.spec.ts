@@ -69,7 +69,7 @@ describe("API bootstrap process contract", () => {
       await expect(health.json()).resolves.toEqual({ status: "ok" });
 
       expect(ready.status).toBe(503);
-      await expect(ready.json()).resolves.toMatchObject({ status: "not_ready" });
+      await expect(ready.json()).resolves.toMatchObject({ error: "not_ready" });
     } finally {
       child.kill("SIGTERM");
       await waitForExit(child, 10_000).catch(() => undefined);

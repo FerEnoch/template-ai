@@ -86,6 +86,11 @@ export class AnalysisService {
         return this.mapToAnalysisResult(result, entities);
       }
 
+      // If terminal (failed/pending) — return without incrementing progress
+      if (result.status === "failed" || result.status === "pending") {
+        return this.mapToAnalysisResult(result, []);
+      }
+
       // Processing path: increment progress
       const incremented = await analysisRepo.incrementProgress(result.id);
 
@@ -101,21 +106,26 @@ export class AnalysisService {
           throw new NotFoundException("Analysis result not found after status update");
         }
 
-        // Insert sample entities
+        // Guard against duplicate insertion from concurrent requests
         const entitiesRepo = new EntitiesRepository(client);
-        const entityInputs = SAMPLE_ENTITIES.map((e) => ({
-          analysisResultId: result.id,
-          documentId,
-          label: e.label,
-          value: e.value,
-          group: e.group,
-          confidence: e.confidence,
-          sourceSpan: e.sourceSpan,
-        }));
+        const existingEntities = await entitiesRepo.findByAnalysisResultId(result.id);
 
-        await entitiesRepo.bulkInsert(entityInputs);
+        if (existingEntities.length === 0) {
+          // Insert sample entities (only if none exist yet)
+          const entityInputs = SAMPLE_ENTITIES.map((e) => ({
+            analysisResultId: result.id,
+            documentId,
+            label: e.label,
+            value: e.value,
+            group: e.group,
+            confidence: e.confidence,
+            sourceSpan: e.sourceSpan,
+          }));
 
-        // Fetch the inserted entities
+          await entitiesRepo.bulkInsert(entityInputs);
+        }
+
+        // Fetch the entities (whether just inserted or from a concurrent request)
         const insertedEntities = await entitiesRepo.findByAnalysisResultId(result.id);
 
         return this.mapToAnalysisResult(completed, insertedEntities);
@@ -128,6 +138,8 @@ export class AnalysisService {
 
   /**
    * GET /:id/status — Lightweight endpoint returning only documentId, status, progress.
+   * Also drives progress: increments on each poll, transitions to "completed" at 100.
+   * This matches the MSW contract where /status also drives progress.
    */
   async getStatus(documentId: string): Promise<AnalysisStatus> {
     return this.postgres.withOwnerTransaction(0, async ({ client }) => {
@@ -141,10 +153,41 @@ export class AnalysisService {
 
       const result = results[0];
 
+      // Terminal states: return immediately without incrementing
+      if (result.status === "completed" || result.status === "failed" || result.status === "pending") {
+        return {
+          documentId: result.documentId,
+          status: result.status,
+          progress: result.progress,
+        };
+      }
+
+      // Processing: increment progress
+      const incremented = await analysisRepo.incrementProgress(result.id);
+
+      if (!incremented) {
+        throw new NotFoundException("Analysis result not found after increment");
+      }
+
+      // Transition to completed if progress reaches 100
+      if (incremented.progress >= 100) {
+        const completed = await analysisRepo.updateStatus(result.id, "completed");
+
+        if (!completed) {
+          throw new NotFoundException("Analysis result not found after status update");
+        }
+
+        return {
+          documentId: completed.documentId,
+          status: "completed",
+          progress: completed.progress,
+        };
+      }
+
       return {
-        documentId: result.documentId,
-        status: result.status,
-        progress: result.progress,
+        documentId: incremented.documentId,
+        status: incremented.status,
+        progress: incremented.progress,
       };
     });
   }

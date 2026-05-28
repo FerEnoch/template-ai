@@ -52,6 +52,11 @@ export class ReviewService {
         throw new NotFoundException("Entity not found");
       }
 
+      // Validate that the entity belongs to the specified document
+      if (entity.documentId !== documentId) {
+        throw new NotFoundException("Entity not found");
+      }
+
       // Merge partial update fields
       const mergedFields: import("../infrastructure/postgres/repositories/entities.repository").UpdateEntityInput = {};
 

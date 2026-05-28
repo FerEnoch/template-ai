@@ -15,8 +15,8 @@
     "@nestjs/common": "^10.4.0",
     "@nestjs/core": "^10.4.0",
     "@nestjs/platform-express": "^10.4.0",
-    "dotenv": "^17.4.2",
     "@template-ai/contracts": "workspace:*",
+    "dotenv": "^17.4.2",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
@@ -24,6 +24,7 @@
   "devDependencies": {
     "@nestjs/cli": "^10.4.0",
     "@nestjs/testing": "^11.1.24",
+    "@types/express": "^5.0.6",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.15.5",

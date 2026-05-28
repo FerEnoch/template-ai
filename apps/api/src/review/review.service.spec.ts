@@ -248,5 +248,59 @@ describe("ReviewService", () => {
 
       expect(result.sourceSpan).toEqual({ start: 100, end: 200 });
     });
+
+    // FIX 3: documentId must match the entity's document — prevents cross-document updates
+    it("should throw NotFoundException when documentId does not match entity's document (FIX 3)", async () => {
+      // Entity belongs to "doc-1" but the request uses "doc-attacker"
+      const existingRecord = makeEntityRecord({
+        id: "entity-1",
+        documentId: "doc-1", // entity is owned by doc-1
+      });
+
+      const updatedRecord = makeEntityRecord({
+        id: "entity-1",
+        documentId: "doc-1",
+        reviewed: true,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        entityRecord: existingRecord,
+        updatedRecord,
+      });
+      const service = new ReviewService(mockPostgres);
+
+      // Attacker tries to update entity-1 via a different documentId
+      await expect(
+        service.updateEntity("doc-attacker", "entity-1", { reviewed: true }),
+      ).rejects.toThrow(NotFoundException);
+
+      await expect(
+        service.updateEntity("doc-attacker", "entity-1", { reviewed: true }),
+      ).rejects.toThrow("Entity not found");
+    });
+
+    it("should allow update when documentId matches entity's document (FIX 3 triangulation)", async () => {
+      const existingRecord = makeEntityRecord({
+        id: "entity-1",
+        documentId: "doc-1",
+        reviewed: false,
+      });
+      const updatedRecord = makeEntityRecord({
+        id: "entity-1",
+        documentId: "doc-1",
+        reviewed: true,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        entityRecord: existingRecord,
+        updatedRecord,
+      });
+      const service = new ReviewService(mockPostgres);
+
+      const result = await service.updateEntity("doc-1", "entity-1", { reviewed: true });
+
+      expect(result.reviewed).toBe(true);
+      expect(result.id).toBe("entity-1");
+    });
   });
 });
