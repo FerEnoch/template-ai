@@ -80,7 +80,11 @@ Thumbs.db
 *.temp
 .env.test.tmp*
 
+# Google Flow mockups
 docs/mockups-google-flow
+
 # Playwright CLI snapshots
 .playwright-cli/
 home.yml
+apps/web/test-results/
+.atl/.skill-registry.cache.json
