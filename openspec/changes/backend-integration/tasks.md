@@ -68,12 +68,12 @@ Chain strategy: stacked-to-main
 
 ## PR 5: Templates Module
 
-- [ ] 5.1 **T** templates controller spec (GET + POST, validation errors)
-- [ ] 5.2 **T** templates service spec (CRUD, 409 on duplicate name)
-- [ ] 5.3 Create `templates.module.ts`
-- [ ] 5.4 Create `templates.service.ts` (list, create with JSONB entities snapshot)
-- [ ] 5.5 Create `templates.controller.ts` (GET / + POST /, Zod parse)
-- [ ] 5.6 **I** supertest: list + create template, 400 + 409 errors
+- [x] 5.1 **T** templates controller spec (GET + POST, validation errors)
+- [x] 5.2 **T** templates service spec (CRUD, 409 on duplicate name)
+- [x] 5.3 Create `templates.module.ts`
+- [x] 5.4 Create `templates.service.ts` (list, create with JSONB entities snapshot)
+- [x] 5.5 Create `templates.controller.ts` (GET / + POST /, Zod parse)
+- [x] 5.6 **I** supertest: list + create template, 400 + 409 errors
 
 ## PR 6: Frontend Wiring
 
