@@ -71,7 +71,11 @@ function ReviewInner() {
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ reviewed: entity.reviewed, value: entity.value }),
+            body: JSON.stringify({
+              reviewed: entity.reviewed,
+              value: entity.value,
+              ...(entity.excluded !== undefined && { excluded: entity.excluded }),
+            }),
           }
         );
       } catch {
