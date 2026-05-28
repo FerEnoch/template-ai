@@ -167,6 +167,145 @@ describe("wizardReducer", () => {
   });
 });
 
+describe("SET_STEP with clearDownstream", () => {
+    it("clears analysisResultId, entities, and templateForm when going back to UPLOAD", () => {
+      const stateWithData: WizardState = {
+        currentStep: WizardStep.REVIEW,
+        file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
+        analysisResultId: "analysis-123",
+        entities: [mockEntity, mockEntity2],
+        templateForm: { name: "Template", description: "Desc", category: "Contratos" },
+      };
+      const action: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.UPLOAD,
+        clearDownstream: true,
+      };
+      const result = wizardReducer(stateWithData, action);
+      expect(result.currentStep).toBe(WizardStep.UPLOAD);
+      expect(result.file).toEqual(stateWithData.file); // file preserved
+      expect(result.analysisResultId).toBeNull();
+      expect(result.entities).toEqual([]);
+      expect(result.templateForm).toBeNull();
+    });
+
+    it("clears templateForm when going back to ANALYSIS", () => {
+      const stateWithData: WizardState = {
+        currentStep: WizardStep.REVIEW,
+        file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
+        analysisResultId: "analysis-123",
+        entities: [mockEntity],
+        templateForm: { name: "Template", description: "Desc", category: "Contratos" },
+      };
+      const action: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.ANALYSIS,
+        clearDownstream: true,
+      };
+      const result = wizardReducer(stateWithData, action);
+      expect(result.currentStep).toBe(WizardStep.ANALYSIS);
+      expect(result.file).toEqual(stateWithData.file); // preserved
+      expect(result.analysisResultId).toBe("analysis-123"); // preserved
+      expect(result.entities).toHaveLength(1); // preserved
+      expect(result.templateForm).toBeNull(); // cleared
+    });
+
+    it("clears templateForm when going back to REVIEW", () => {
+      const stateWithData: WizardState = {
+        currentStep: WizardStep.SAVE,
+        file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
+        analysisResultId: "analysis-123",
+        entities: [mockEntity],
+        templateForm: { name: "Template", description: "Desc", category: "Contratos" },
+      };
+      const action: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.REVIEW,
+        clearDownstream: true,
+      };
+      const result = wizardReducer(stateWithData, action);
+      expect(result.currentStep).toBe(WizardStep.REVIEW);
+      expect(result.analysisResultId).toBe("analysis-123"); // preserved
+      expect(result.entities).toHaveLength(1); // preserved
+      expect(result.templateForm).toBeNull(); // cleared
+    });
+
+    it("keeps all state when navigating to SAVE (last step)", () => {
+      const stateWithData: WizardState = {
+        currentStep: WizardStep.REVIEW,
+        file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
+        analysisResultId: "analysis-123",
+        entities: [mockEntity],
+        templateForm: { name: "Template", description: "Desc", category: "Contratos" },
+      };
+      const action: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.SAVE,
+        clearDownstream: true,
+      };
+      const result = wizardReducer(stateWithData, action);
+      expect(result.currentStep).toBe(WizardStep.SAVE);
+      expect(result.file).toEqual(stateWithData.file);
+      expect(result.analysisResultId).toBe("analysis-123");
+      expect(result.entities).toHaveLength(1);
+      expect(result.templateForm).toEqual(stateWithData.templateForm);
+    });
+
+    it("does NOT clear downstream when clearDownstream is false/undefined (backward compat)", () => {
+      const stateWithData: WizardState = {
+        currentStep: WizardStep.UPLOAD,
+        file: null,
+        analysisResultId: "old-analysis",
+        entities: [mockEntity],
+        templateForm: null,
+      };
+      const action: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.REVIEW,
+        // clearDownstream not set (old behavior)
+      };
+      const result = wizardReducer(stateWithData, action);
+      expect(result.currentStep).toBe(WizardStep.REVIEW);
+      expect(result.analysisResultId).toBe("old-analysis"); // NOT cleared
+      expect(result.entities).toHaveLength(1); // NOT cleared
+    });
+
+    it("going from step 3 back to step 1 clears analysis results preventing skip-ahead", () => {
+      // Simulates the exact bug: user at REVIEW, goes back to UPLOAD
+      // After cleanup, canProceed should be false (no file or analysisId)
+      const step3State: WizardState = {
+        currentStep: WizardStep.REVIEW,
+        file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
+        analysisResultId: "result-abc",
+        entities: [mockEntity, mockEntity2],
+        templateForm: null,
+      };
+
+      // Navigate back to UPLOAD with cleanup
+      const backToUpload: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.UPLOAD,
+        clearDownstream: true,
+      };
+      const afterUpload = wizardReducer(step3State, backToUpload);
+      expect(afterUpload.currentStep).toBe(WizardStep.UPLOAD);
+      expect(afterUpload.file).toEqual(step3State.file); // file preserved
+      expect(afterUpload.analysisResultId).toBeNull(); // cleared — prevents skip
+      expect(afterUpload.entities).toEqual([]); // cleared — prevents skip
+
+      // Now if user goes to ANALYSIS step, canProceed should be false
+      // because analysisResultId is null and file exists but no analysis done yet
+      const toAnalysis: WizardAction = {
+        type: "SET_STEP",
+        step: WizardStep.ANALYSIS,
+        clearDownstream: true,
+      };
+      const atAnalysis = wizardReducer(afterUpload, toAnalysis);
+      expect(atAnalysis.currentStep).toBe(WizardStep.ANALYSIS);
+      expect(atAnalysis.analysisResultId).toBeNull(); // still null — analysis not done
+    });
+  });
+
 describe("getNextStep", () => {
   it("returns next step in order", () => {
     expect(getNextStep(WizardStep.UPLOAD)).toBe(WizardStep.ANALYSIS);

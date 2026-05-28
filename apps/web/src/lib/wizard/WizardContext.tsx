@@ -89,7 +89,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const nextStep = useCallback(() => {
     const next = getNextStep(currentStep);
     if (next) {
-      dispatch({ type: "SET_STEP", step: next });
+      dispatch({ type: "SET_STEP", step: next, clearDownstream: true });
       router.push(stepUrl(next));
     }
   }, [currentStep, router]);
@@ -97,14 +97,14 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const prevStep = useCallback(() => {
     const prev = getPrevStep(currentStep);
     if (prev) {
-      dispatch({ type: "SET_STEP", step: prev });
+      dispatch({ type: "SET_STEP", step: prev, clearDownstream: true });
       router.push(stepUrl(prev));
     }
   }, [currentStep, router]);
 
   const setStep = useCallback(
     (step: WizardStep) => {
-      dispatch({ type: "SET_STEP", step });
+      dispatch({ type: "SET_STEP", step, clearDownstream: true });
       router.push(stepUrl(step));
     },
     [router]

@@ -9,13 +9,51 @@ export const initialWizardState: WizardState = {
   templateForm: null,
 };
 
+/**
+ * Clears state that belongs to steps AFTER the target step.
+ * This prevents stale data from allowing skip-ahead navigation.
+ */
+function clearDownstreamState(state: WizardState, targetStep: WizardStep): Partial<WizardState> {
+  const targetIndex = WIZARD_STEP_ORDER.indexOf(targetStep);
+
+  // For UPLOAD: clear everything downstream (keep file)
+  if (targetStep === WizardStep.UPLOAD) {
+    return {
+      analysisResultId: null,
+      entities: [],
+      templateForm: null,
+    };
+  }
+
+  // For ANALYSIS: clear review/save state (keep file, analysisResultId, entities)
+  if (targetStep === WizardStep.ANALYSIS) {
+    return {
+      templateForm: null,
+    };
+  }
+
+  // For REVIEW: clear save state (keep everything else)
+  if (targetStep === WizardStep.REVIEW) {
+    return {
+      templateForm: null,
+    };
+  }
+
+  // SAVE: keep everything — user is at the last step
+  return {};
+}
+
 export function wizardReducer(
   state: WizardState,
   action: WizardAction
 ): WizardState {
   switch (action.type) {
-    case "SET_STEP":
-      return { ...state, currentStep: action.step };
+    case "SET_STEP": {
+      const cleared = action.clearDownstream
+        ? clearDownstreamState(state, action.step)
+        : {};
+      return { ...state, currentStep: action.step, ...cleared };
+    }
 
     case "SET_FILE":
       return { ...state, file: action.file };
