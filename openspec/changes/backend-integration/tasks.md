@@ -50,12 +50,12 @@ Chain strategy: stacked-to-main
 
 ## PR 3: Analysis Module
 
-- [ ] 3.1 **T** analysis controller spec (GET /:id + /:id/status)
-- [ ] 3.2 **T** analysis service spec (~25/poll progression, entity INSERT at 100%)
-- [ ] 3.3 Create `analysis.module.ts`
-- [ ] 3.4 Create `analysis.service.ts` (DB-backed poll, seed entities on complete)
-- [ ] 3.5 Create `analysis.controller.ts` (/:id full result, /:id/status lightweight)
-- [ ] 3.6 **I** supertest: poll cycle upload → completed + entities
+- [x] 3.1 **T** analysis controller spec (GET /:id + /:id/status)
+- [x] 3.2 **T** analysis service spec (~25/poll progression, entity INSERT at 100%)
+- [x] 3.3 Create `analysis.module.ts`
+- [x] 3.4 Create `analysis.service.ts` (DB-backed poll, seed entities on complete)
+- [x] 3.5 Create `analysis.controller.ts` (/:id full result, /:id/status lightweight)
+- [x] 3.6 **I** supertest: poll cycle upload → completed + entities
 
 ## PR 4: Review Module
 
