@@ -40,13 +40,13 @@ Chain strategy: stacked-to-main
 
 ## PR 2: Documents Module
 
-- [ ] 2.1 **T** docs controller spec (POST /upload contract)
-- [ ] 2.2 **T** docs service spec (multipart → INSERT doc + analysis_result)
-- [ ] 2.3 Create `documents.module.ts`
-- [ ] 2.4 Create `documents.service.ts` (metadata extract, DB insert)
-- [ ] 2.5 Create `documents.controller.ts` (POST /upload, FileInterceptor)
-- [ ] 2.6 Add `@types/multer` to package.json
-- [ ] 2.7 **I** supertest: upload returns Document shape
+- [x] 2.1 **T** docs controller spec (POST /upload contract)
+- [x] 2.2 **T** docs service spec (multipart → INSERT doc + analysis_result)
+- [x] 2.3 Create `documents.module.ts`
+- [x] 2.4 Create `documents.service.ts` (metadata extract, DB insert)
+- [x] 2.5 Create `documents.controller.ts` (POST /upload, FileInterceptor)
+- [x] 2.6 Add `@types/multer` to package.json
+- [x] 2.7 **I** supertest: upload returns Document shape
 
 ## PR 3: Analysis Module
 
