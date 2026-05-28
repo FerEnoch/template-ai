@@ -86,6 +86,6 @@ Chain strategy: stacked-to-main
 
 ## PR 7: E2E Test Fixes
 
-- [ ] 7.1 Diagnose 10 failing Playwright E2E tests
-- [ ] 7.2 Fix selector issues (likely MSW→real API timing, selector staleness)
-- [ ] 7.3 Verify full E2E suite green
+- [x] 7.1 Diagnose 10 failing Playwright E2E tests
+- [x] 7.2 Fix selector issues (MSW disabled, page.route() mocking, exact:true selectors)
+- [x] 7.3 Verify full E2E suite green (15/15 pass)
