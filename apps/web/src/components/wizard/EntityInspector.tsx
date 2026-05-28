@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Users,
   Building2,
@@ -9,8 +9,10 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Ban,
 } from "lucide-react";
 import type { Entity } from "@template-ai/contracts";
+import { EntityEditModal } from "./EntityEditModal";
 
 type Confidence = "ALTA" | "MEDIA" | "BAJA";
 
@@ -60,6 +62,9 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
     new Set(["PARTES"])
   );
   const [priorityReviewed, setPriorityReviewed] = useState<Set<string>>(new Set());
+  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showExcluded, setShowExcluded] = useState(false);
 
   const toggleGroup = (group: Group) => {
     setExpandedGroups((prev) => {
@@ -100,6 +105,27 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
       onEntityUpdate({ ...entity, reviewed: true });
     }
   };
+
+  const handleEditEntity = useCallback((entity: Entity) => {
+    setEditingEntity(entity);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleModalSave = useCallback(
+    async (updatedEntity: Entity) => {
+      if (onEntityUpdate) {
+        onEntityUpdate(updatedEntity);
+      }
+      setIsModalOpen(false);
+      setEditingEntity(null);
+    },
+    [onEntityUpdate]
+  );
+
+  const handleModalClose = useCallback(() => {
+    setIsModalOpen(false);
+    setEditingEntity(null);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -203,37 +229,51 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
 
               {isExpanded && (
                 <div className="divide-y divide-border border-t border-border">
-                  {groupEntities.map((entity) => {
-                    const conf = CONFIDENCE_STYLES[entity.confidence as Confidence];
-                    return (
-                      <div
-                        key={entity.id}
-                        className="group flex items-center justify-between p-3"
-                      >
-                        <div className="flex flex-1 items-center gap-4">
-                          <span className="w-20 text-[11px] font-medium text-text-secondary">
-                            {entity.label}
-                          </span>
-                          <span className="text-sm font-bold text-text-primary">
-                            {entity.value}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`flex items-center gap-1 px-1 text-[10px] font-bold ${conf.text}`}
-                          >
-                            <div className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
-                            <span>{conf.label}</span>
-                          </div>
-                          {entity.sourceSpan && (
-                            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-                              Con traza
+                  {groupEntities
+                    .filter((e) => showExcluded || !e.excluded)
+                    .map((entity) => {
+                      const conf = CONFIDENCE_STYLES[entity.confidence as Confidence];
+                      const isExcluded = entity.excluded;
+                      return (
+                        <button
+                          key={entity.id}
+                          onClick={() => handleEditEntity(entity)}
+                          className={`group flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-background ${
+                            isExcluded ? "opacity-50" : ""
+                          }`}
+                        >
+                          <div className="flex flex-1 items-center gap-4">
+                            <span className="w-20 text-[11px] font-medium text-text-secondary">
+                              <span className={isExcluded ? "line-through" : ""}>
+                                {entity.label}
+                              </span>
                             </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                            <span className={`text-sm font-bold text-text-primary ${isExcluded ? "line-through" : ""}`}>
+                              {entity.value}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isExcluded && (
+                              <span className="flex items-center gap-1 rounded border border-danger/30 bg-danger/5 px-1.5 py-0.5 text-[10px] font-bold text-danger">
+                                <Ban className="h-2.5 w-2.5" />
+                                Excluido
+                              </span>
+                            )}
+                            <div
+                              className={`flex items-center gap-1 px-1 text-[10px] font-bold ${conf.text}`}
+                            >
+                              <div className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
+                              <span>{conf.label}</span>
+                            </div>
+                            {entity.sourceSpan && (
+                              <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+                                Con traza
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -250,6 +290,26 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
           </div>
         )}
       </section>
+
+      {/* Show excluded toggle */}
+      {entities.some((e) => e.excluded) && (
+        <button
+          onClick={() => setShowExcluded((prev) => !prev)}
+          className="mx-1 text-[11px] font-medium text-accent hover:underline"
+        >
+          {showExcluded
+            ? "Ocultar entidades excluidas"
+            : `Mostrar entidades excluidas (${entities.filter((e) => e.excluded).length})`}
+        </button>
+      )}
+
+      {/* Entity Edit Modal */}
+      <EntityEditModal
+        entity={editingEntity}
+        isOpen={isModalOpen}
+        onSave={handleModalSave}
+        onClose={handleModalClose}
+      />
     </div>
   );
 }
