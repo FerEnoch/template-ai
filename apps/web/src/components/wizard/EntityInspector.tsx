@@ -78,8 +78,13 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
     });
   };
 
-  // Group entities
-  const groupedEntities = entities.reduce<Record<Group, Entity[]>>(
+  // Group entities — BAJA confidence first within each group
+  const sortedEntities = [...entities].sort((a, b) => {
+    const order: Record<string, number> = { BAJA: 0, MEDIA: 1, ALTA: 2 };
+    return (order[a.confidence] ?? 3) - (order[b.confidence] ?? 3);
+  });
+
+  const groupedEntities = sortedEntities.reduce<Record<Group, Entity[]>>(
     (acc, entity) => {
       const group = entity.group as Group;
       if (!acc[group]) acc[group] = [];

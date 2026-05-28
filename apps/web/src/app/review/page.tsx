@@ -8,6 +8,7 @@ import {
   ZoomOut,
   Printer,
   Shield,
+  AlertTriangle,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout, EntityInspector } from "@/components/wizard";
@@ -219,6 +220,21 @@ function ReviewInner() {
             </header>
 
             <div className="flex-1 space-y-6 overflow-y-auto p-6 custom-scrollbar">
+              {/* Priority review banner */}
+              {pendingBajaCount > 0 && (
+                <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-warning" />
+                  <div>
+                    <p className="text-sm font-bold text-warning">
+                      Revisión prioritaria
+                    </p>
+                    <p className="text-xs text-text-secondary">
+                      {pendingBajaCount} campo{pendingBajaCount !== 1 ? "s" : ""} con confianza BAJA {pendingBajaCount !== 1 ? "necesitan" : "necesita"} tu atención antes de continuar
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Entity Inspector */}
               <EntityInspector
                 entities={state.entities}
