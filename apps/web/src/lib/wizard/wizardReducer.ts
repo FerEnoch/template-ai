@@ -23,6 +23,13 @@ export function wizardReducer(
     case "SET_ENTITIES":
       return { ...state, entities: action.entities };
 
+    case "SET_ANALYSIS_RESULT":
+      return {
+        ...state,
+        analysisResultId: action.analysisResultId,
+        entities: action.entities,
+      };
+
     case "UPDATE_ENTITY": {
       const idx = state.entities.findIndex((e) => e.id === action.entity.id);
       if (idx === -1) return state;

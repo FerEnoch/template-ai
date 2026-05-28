@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { http, HttpResponse, delay } from "msw";
+import { setupWorker } from "msw/browser";
 import type { AnalysisResult, Document, Entity, Template } from "@template-ai/contracts";
 import {
   SAMPLE_DOCUMENT,
@@ -40,8 +41,6 @@ export function MswProvider({ children }: MswProviderProps) {
 
     const setupMsw = async () => {
       try {
-        const { setupWorker } = await import("msw/browser");
-
         const handlers = [
           http.post("/api/documents/upload", async () => {
             await delay(1000 + Math.random() * 1000);
@@ -137,9 +136,9 @@ export function MswProvider({ children }: MswProviderProps) {
         if (!cancelled) {
           setMswReady(true);
         }
-      } catch {
+      } catch(err) {
         if (!cancelled) {
-          console.warn("[MSW] Failed to initialize mock service worker");
+          console.warn("[MSW] Failed to initialize mock service worker:", err);
           setMswReady(true);
         }
       }

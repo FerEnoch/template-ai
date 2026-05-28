@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout, EntityInspector } from "@/components/wizard";
-import { useWizard } from "@/lib/wizard";
+import { useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import type { Entity } from "@template-ai/contracts";
 
@@ -42,11 +42,11 @@ function ReviewInner() {
       setStep(WizardStep.REVIEW);
     }
     if (!state.file) {
-      router.replace("?step=upload");
+      router.replace(stepUrl(WizardStep.UPLOAD));
       return;
     }
     if (!state.analysisResultId && state.entities.length === 0) {
-      router.replace("?step=analysis");
+      router.replace(stepUrl(WizardStep.ANALYSIS));
       return;
     }
   }, [searchParams, state, router, setStep]);
@@ -235,7 +235,7 @@ function ReviewInner() {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push("?step=analysis")}
+              onClick={() => router.push(stepUrl(WizardStep.ANALYSIS))}
               className="rounded border border-accent px-5 py-2 text-xs font-bold text-accent transition-colors hover:bg-accent/5"
             >
               Seguir revisando

@@ -30,6 +30,7 @@ export type WizardAction =
   | { type: "SET_STEP"; step: WizardStep }
   | { type: "SET_FILE"; file: WizardState["file"] }
   | { type: "SET_ENTITIES"; entities: Entity[] }
+  | { type: "SET_ANALYSIS_RESULT"; analysisResultId: string; entities: Entity[] }
   | { type: "UPDATE_ENTITY"; entity: Entity }
   | { type: "SET_DRAFT"; draft: WizardState }
   | { type: "LOAD_DRAFT"; draft: WizardState }

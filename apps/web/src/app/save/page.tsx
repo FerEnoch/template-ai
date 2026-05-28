@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout, SaveForm } from "@/components/wizard";
-import { useWizard } from "@/lib/wizard";
+import { useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import { clearDraft } from "@/lib/wizard";
 import type { Template } from "@template-ai/contracts";
@@ -41,15 +41,15 @@ function SaveContent({
       setStep(WizardStep.SAVE);
     }
     if (!state.file) {
-      router.replace("?step=upload");
+      router.replace(stepUrl(WizardStep.UPLOAD));
       return;
     }
     if (!state.analysisResultId && state.entities.length === 0) {
-      router.replace("?step=analysis");
+      router.replace(stepUrl(WizardStep.ANALYSIS));
       return;
     }
     if (state.entities.length === 0) {
-      router.replace("?step=review");
+      router.replace(stepUrl(WizardStep.REVIEW));
       return;
     }
   }, [searchParams, state, router, setStep]);
@@ -247,7 +247,7 @@ function SaveContent({
           <footer className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-surface/95 px-8 py-4 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] backdrop-blur-md">
             <div className="mx-auto flex max-w-7xl items-center justify-end gap-4">
               <button
-                onClick={() => router.push("?step=review")}
+                onClick={() => router.push(stepUrl(WizardStep.REVIEW))}
                 className="rounded border border-border px-8 py-3 font-label text-sm font-semibold text-text-secondary transition-colors hover:bg-background"
               >
                 Seguir editando

@@ -7,7 +7,7 @@ export { wizardReducer, initialWizardState } from "./wizardReducer";
 export { getNextStep, getPrevStep } from "./wizardReducer";
 
 // Context + Hook
-export { WizardProvider, useWizard } from "./WizardContext";
+export { WizardProvider, useWizard, STEP_PATH, stepUrl } from "./WizardContext";
 
 // Storage
 export { loadDraft, saveDraft, clearDraft } from "./storage";

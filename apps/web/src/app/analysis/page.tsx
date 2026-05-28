@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout } from "@/components/wizard";
-import { useWizard } from "@/lib/wizard";
+import { useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import { saveDraft } from "@/lib/wizard";
 import type { AnalysisResult } from "@template-ai/contracts";
@@ -35,7 +35,7 @@ export default function AnalysisPage() {
 }
 
 function AnalysisContent() {
-  const { state, setStep, nextStep, setEntities } = useWizard();
+  const { state, setStep, nextStep, setAnalysisResult: setWizardAnalysisResult } = useWizard();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -51,7 +51,7 @@ function AnalysisContent() {
       setStep(WizardStep.ANALYSIS);
     }
     if (!state.file) {
-      router.replace("?step=upload");
+      router.replace(stepUrl(WizardStep.UPLOAD));
       return;
     }
   }, [searchParams, state.file, router, setStep]);
@@ -112,8 +112,8 @@ function AnalysisContent() {
 
           if (result.status === "completed") {
             clearInterval(interval);
-            // Save entities to wizard context
-            setEntities(result.entities);
+            // Save entities AND analysisResultId to wizard context
+            setWizardAnalysisResult(documentId, result.entities);
             saveDraft(state.file!, documentId, result.entities);
             setIsUploading(false);
           } else if (result.status === "failed") {
@@ -134,7 +134,7 @@ function AnalysisContent() {
         }
       }, POLLING_INTERVAL_MS);
     },
-    [state.file, setEntities]
+    [state.file]
   );
 
   const handleContinue = useCallback(() => {
@@ -169,7 +169,7 @@ function AnalysisContent() {
             </div>
             <div className="flex shrink-0 gap-3">
               <button
-                onClick={() => router.push("?step=upload")}
+                onClick={() => router.push(stepUrl(WizardStep.UPLOAD))}
                 className="rounded border border-border px-5 py-2 text-sm font-semibold text-text-secondary transition-colors hover:bg-background"
               >
                 Cancelar Análisis

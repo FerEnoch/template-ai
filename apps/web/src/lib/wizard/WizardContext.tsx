@@ -21,6 +21,19 @@ import {
   STEPS_REQUIRING_ANALYSIS,
 } from "./types";
 
+/** Maps each wizard step to its route path segment */
+export const STEP_PATH: Record<WizardStep, string> = {
+  [WizardStep.UPLOAD]: "/upload",
+  [WizardStep.ANALYSIS]: "/analysis",
+  [WizardStep.REVIEW]: "/review",
+  [WizardStep.SAVE]: "/save",
+};
+
+/** Builds the full route URL for a step (path + query param) */
+export function stepUrl(step: WizardStep): string {
+  return `${STEP_PATH[step]}?step=${step}`;
+}
+
 interface WizardContextValue {
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
@@ -32,6 +45,7 @@ interface WizardContextValue {
   setStep: (step: WizardStep) => void;
   setFile: (file: WizardState["file"]) => void;
   setEntities: (entities: WizardState["entities"]) => void;
+  setAnalysisResult: (analysisResultId: string, entities: WizardState["entities"]) => void;
   updateEntity: (entity: WizardState["entities"][number]) => void;
   setDraft: (draft: WizardState) => void;
   loadDraft: (draft: WizardState) => void;
@@ -76,7 +90,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     const next = getNextStep(currentStep);
     if (next) {
       dispatch({ type: "SET_STEP", step: next });
-      router.push(`?step=${next}`);
+      router.push(stepUrl(next));
     }
   }, [currentStep, router]);
 
@@ -84,14 +98,14 @@ export function WizardProvider({ children }: WizardProviderProps) {
     const prev = getPrevStep(currentStep);
     if (prev) {
       dispatch({ type: "SET_STEP", step: prev });
-      router.push(`?step=${prev}`);
+      router.push(stepUrl(prev));
     }
   }, [currentStep, router]);
 
   const setStep = useCallback(
     (step: WizardStep) => {
       dispatch({ type: "SET_STEP", step });
-      router.push(`?step=${step}`);
+      router.push(stepUrl(step));
     },
     [router]
   );
@@ -106,6 +120,13 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const setEntities = useCallback(
     (entities: WizardState["entities"]) => {
       dispatch({ type: "SET_ENTITIES", entities });
+    },
+    []
+  );
+
+  const setAnalysisResult = useCallback(
+    (analysisResultId: string, entities: WizardState["entities"]) => {
+      dispatch({ type: "SET_ANALYSIS_RESULT", analysisResultId, entities });
     },
     []
   );
@@ -133,7 +154,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
 
   const reset = useCallback(() => {
     dispatch({ type: "RESET" });
-    router.push("?step=upload");
+    router.push(stepUrl(WizardStep.UPLOAD));
   }, [router]);
 
   return (
@@ -149,6 +170,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
         setStep,
         setFile,
         setEntities,
+        setAnalysisResult,
         updateEntity,
         setDraft,
         loadDraft,
