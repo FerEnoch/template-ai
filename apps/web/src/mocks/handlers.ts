@@ -4,7 +4,7 @@ import {
   SAMPLE_DOCUMENT,
   SAMPLE_ENTITIES,
   SAMPLE_TEMPLATES,
-} from "./fixtures.js";
+} from "./fixtures";
 
 // ---------------------------------------------------------------------------
 // In-memory state for simulating server-side mutable state

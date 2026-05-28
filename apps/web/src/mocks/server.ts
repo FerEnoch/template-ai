@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { setupServer } from "msw/node";
-import { handlers } from "./handlers.js";
+import { handlers } from "./handlers";
 
 // Server-side MSW for use in Vitest / Node.js environments.
 // Usage in tests:

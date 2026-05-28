@@ -1,10 +1,10 @@
-import { isMockEnabled } from "./index.js";
+import { isMockEnabled } from "./index";
 import { http, HttpResponse, delay } from "msw";
 import type { AnalysisResult, Document, Entity, Template } from "@template-ai/contracts";
 import {
   SAMPLE_DOCUMENT,
   SAMPLE_ENTITIES,
-} from "./fixtures.js";
+} from "./fixtures";
 
 // ---------------------------------------------------------------------------
 // In-memory state for simulating server-side mutable state
