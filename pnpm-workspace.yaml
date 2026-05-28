@@ -1,2 +1,6 @@
 packages:
   - apps/*
+allowBuilds:
+  "@nestjs/core": true
+  esbuild: true
+  sharp: true

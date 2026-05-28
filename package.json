@@ -1,7 +1,7 @@
 {
   "name": "template-ai",
   "private": true,
-  "packageManager": "pnpm@10.0.0",
+  "packageManager": "pnpm@11.4.0",
   "engines": {
     "node": ">=22 <23"
   },
