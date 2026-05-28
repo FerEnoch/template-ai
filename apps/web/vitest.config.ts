@@ -6,6 +6,6 @@ export default defineConfig({
     jsxImportSource: "react",
   },
   test: {
-    include: ["src/**/*.spec.ts"],
+    include: ["src/**/*.test.ts"],
   },
 });

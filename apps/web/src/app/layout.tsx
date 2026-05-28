@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Literata, Source_Serif_4, Inter } from "next/font/google";
+import { ClientLayout } from "./client-layout";
 import "./globals.css";
 
 const literata = Literata({
@@ -33,7 +34,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="es"
       className={`${literata.variable} ${sourceSerif.variable} ${inter.variable}`}
     >
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">
+        <ClientLayout>{children}</ClientLayout>
+      </body>
     </html>
   );
 }
