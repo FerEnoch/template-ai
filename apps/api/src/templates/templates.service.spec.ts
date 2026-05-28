@@ -311,7 +311,7 @@ describe("TemplatesService", () => {
           insertCalled = true;
           // Verify entities are passed as JSON string (JSONB)
           expect(params).toBeDefined();
-          expect(params![5]).toBe(JSON.stringify(entities));
+          expect(params![6]).toBe(JSON.stringify(entities));
 
           return Promise.resolve({
             rowCount: 1,

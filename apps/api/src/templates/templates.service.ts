@@ -69,6 +69,7 @@ export class TemplatesService {
         description: data.description ?? "",
         documentId: data.documentId,
         category: data.category,
+        status: data.status,
         entities: data.entities,
       };
 
