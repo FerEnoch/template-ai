@@ -3,18 +3,27 @@
 import type { ReactNode } from "react";
 import { StepIndicator } from "./StepIndicator";
 import { useWizard } from "@/lib/wizard";
-import { WizardStep } from "@/lib/wizard";
+import { WizardStep, WIZARD_STEP_ORDER } from "@/lib/wizard";
 
 interface WizardLayoutProps {
   children: ReactNode;
 }
 
 export function WizardLayout({ children }: WizardLayoutProps) {
-  const { currentStep } = useWizard();
+  const { currentStep, setStep } = useWizard();
 
   const steps = Object.values(WizardStep);
   const currentStepIndex = steps.indexOf(currentStep);
   const stepNumber = currentStepIndex + 1;
+
+  const handleStepClick = (step: WizardStep) => {
+    const clickedIndex = WIZARD_STEP_ORDER.indexOf(step);
+    const currentIndex = WIZARD_STEP_ORDER.indexOf(currentStep);
+    // Only allow navigation to completed steps (going backward)
+    if (clickedIndex < currentIndex) {
+      setStep(step);
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -25,6 +34,7 @@ export function WizardLayout({ children }: WizardLayoutProps) {
             currentStep={currentStep}
             stepNumber={stepNumber}
             totalSteps={4}
+            onStepClick={handleStepClick}
           />
         </div>
       </div>
