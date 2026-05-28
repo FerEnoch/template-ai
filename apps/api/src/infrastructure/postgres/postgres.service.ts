@@ -47,7 +47,9 @@ export class PostgresService implements OnModuleDestroy {
 
     try {
       await client.query("BEGIN");
-      await client.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+      // SET LOCAL does not support parameterized queries ($1) — interpolate directly.
+      // ownerId is a number coming from trusted server code, not user input.
+      await client.query(`SET LOCAL app.current_user_id = ${ownerId}`);
 
       const result = await callback({ client, ownerId });
 

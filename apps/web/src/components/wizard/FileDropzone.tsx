@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { Upload, FileText, CheckCircle2, Trash2, X } from "lucide-react";
 
 interface FileDropzoneProps {
-  onFileAccepted: (file: { name: string; size: number; type: string }) => void;
+  onFileAccepted: (file: { name: string; size: number; type: string }, fileObject: File) => void;
   onFileRemoved: () => void;
   acceptedFile?: { name: string; size: number; type: string } | null;
 }
@@ -60,7 +60,7 @@ export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: Fi
       };
 
       setState("uploaded");
-      onFileAccepted(fileData);
+      onFileAccepted(fileData, file);
     },
     [onFileAccepted]
   );

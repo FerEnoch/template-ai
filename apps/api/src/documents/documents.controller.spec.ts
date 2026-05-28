@@ -98,7 +98,7 @@ describe("DocumentsController", () => {
       } catch (error) {
         expect(error).toBeInstanceOf(InternalServerErrorException);
         expect((error as InternalServerErrorException).message).toBe(
-          "Internal server error during file upload",
+          "Internal server error during file upload: DB connection failed",
         );
       }
     });

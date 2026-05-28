@@ -35,7 +35,7 @@ export default function AnalysisPage() {
 }
 
 function AnalysisContent() {
-  const { state, setStep, nextStep, setAnalysisResult: setWizardAnalysisResult } = useWizard();
+  const { state, setStep, nextStep, setAnalysisResult: setWizardAnalysisResult, fileRef } = useWizard();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -65,9 +65,20 @@ function AnalysisContent() {
 
     const startAnalysis = async () => {
       try {
-        // Step 1: Upload file
+        // Step 1: Upload file — build FormData with the actual file from the dropzone
+        const fileObject = fileRef.current;
+        if (!fileObject) {
+          setError("Archivo no encontrado. Volvé a subirlo.");
+          setIsUploading(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileObject);
+
         const uploadResponse = await fetch("/api/documents/upload", {
           method: "POST",
+          body: formData,
         });
 
         if (cancelled) return;

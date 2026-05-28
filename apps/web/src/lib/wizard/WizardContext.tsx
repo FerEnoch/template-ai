@@ -6,6 +6,7 @@ import {
   useReducer,
   useCallback,
   useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -43,7 +44,8 @@ interface WizardContextValue {
   nextStep: () => void;
   prevStep: () => void;
   setStep: (step: WizardStep) => void;
-  setFile: (file: WizardState["file"]) => void;
+  setFile: (file: WizardState["file"], fileObject?: File) => void;
+  fileRef: React.MutableRefObject<File | null>;
   setEntities: (entities: WizardState["entities"]) => void;
   setAnalysisResult: (analysisResultId: string, entities: WizardState["entities"]) => void;
   updateEntity: (entity: WizardState["entities"][number]) => void;
@@ -62,6 +64,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const fileRef = useRef<File | null>(null);
 
   // Sync ?step= param on mount
   useEffect(() => {
@@ -111,8 +114,13 @@ export function WizardProvider({ children }: WizardProviderProps) {
   );
 
   const setFile = useCallback(
-    (file: WizardState["file"]) => {
+    (file: WizardState["file"], fileObject?: File) => {
       dispatch({ type: "SET_FILE", file });
+      if (fileObject) {
+        fileRef.current = fileObject;
+      } else if (!file) {
+        fileRef.current = null;
+      }
     },
     []
   );
@@ -154,6 +162,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
 
   const reset = useCallback(() => {
     dispatch({ type: "RESET" });
+    fileRef.current = null;
     router.push(stepUrl(WizardStep.UPLOAD));
   }, [router]);
 
@@ -169,6 +178,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
         prevStep,
         setStep,
         setFile,
+        fileRef,
         setEntities,
         setAnalysisResult,
         updateEntity,

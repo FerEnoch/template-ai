@@ -5,6 +5,7 @@ import {
   UploadedFile,
   BadRequestException,
   InternalServerErrorException,
+  Logger,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { DocumentsService } from "./documents.service";
@@ -44,9 +45,10 @@ export class DocumentsController {
         status: document.status,
         uploadedAt: document.uploadedAt.toISOString(),
       };
-    } catch {
+    } catch (error) {
+      Logger.error("Upload failed", (error as Error).stack, DocumentsController.name);
       throw new InternalServerErrorException(
-        "Internal server error during file upload",
+        `Internal server error during file upload: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
