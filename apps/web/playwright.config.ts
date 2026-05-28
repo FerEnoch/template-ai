@@ -8,4 +8,13 @@ export default defineConfig({
     baseURL: "http://localhost:3000",
     headless: true,
   },
+  webServer: {
+    command: "pnpm dev",
+    port: 3000,
+    reuseExistingServer: true,
+    timeout: 120_000,
+    env: {
+      NEXT_PUBLIC_MSW: "false",
+    },
+  },
 });

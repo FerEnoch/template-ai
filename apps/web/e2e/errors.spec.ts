@@ -1,26 +1,27 @@
 import { test, expect } from "@playwright/test";
+import {
+  MOCK_DOCUMENT,
+  MOCK_ANALYSIS_COMPLETED,
+  MOCK_ENTITIES,
+  MOCK_DOCUMENT_ID,
+} from "./helpers";
 
 /**
  * E2E tests for error scenarios in the wizard.
  *
- * MSW handlers check `x-mock-error` header to trigger error responses.
- * Since we can't add custom headers to the app's fetch calls from outside,
- * we use Playwright's `page.route()` to intercept and inject the error headers.
- *
- * MSW processes the request after Playwright's route continuation, so the
- * `x-mock-error` header is visible to the MSW handler running in the browser
- * service worker.
+ * All error responses are mocked directly via page.route().fulfill()
+ * — no MSW or x-mock-error headers needed. Each test explicitly mocks
+ * the API endpoints it needs, returning error HTTP responses directly.
  */
 
 test.describe("Upload failure", () => {
   test("shows error when upload returns 500", async ({ page }) => {
-    // Intercept POST /api/documents/upload and add error header
+    // Mock the upload endpoint to return 500
     await page.route("**/api/documents/upload", async (route) => {
-      await route.continue({
-        headers: {
-          ...route.request().headers(),
-          "x-mock-error": "upload-500",
-        },
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Internal server error during file upload" }),
       });
     });
 
@@ -41,7 +42,7 @@ test.describe("Upload failure", () => {
     // The analysis page should show an error
     await expect(page).toHaveURL(/\/analysis/);
 
-    // Wait for error message to appear — the upload fails so analysis page shows error
+    // Wait for error message to appear
     await expect(page.getByText(/error/i)).toBeVisible({ timeout: 15000 });
   });
 });
@@ -50,17 +51,30 @@ test.describe("Analysis failure", () => {
   test("shows failure state when analysis returns status:failed", async ({
     page,
   }) => {
-    // Intercept analysis polling and inject error header
-    await page.route("**/api/analysis/**", async (route) => {
-      await route.continue({
-        headers: {
-          ...route.request().headers(),
-          "x-mock-error": "analysis-failed",
-        },
+    // Mock upload to succeed
+    await page.route("**/api/documents/upload", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_DOCUMENT),
       });
     });
 
-    // We also need the upload to succeed — don't intercept that
+    // Mock analysis to return "failed" status
+    await page.route("**/api/analysis/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          documentId: MOCK_DOCUMENT_ID,
+          status: "failed",
+          entities: [],
+          progress: 0,
+          startedAt: new Date().toISOString(),
+        }),
+      });
+    });
+
     await page.goto("/upload?step=upload");
 
     const fileInput = page.locator("#file-input");
@@ -84,17 +98,51 @@ test.describe("Save conflict (409)", () => {
   test("shows conflict error when saving a duplicate template name", async ({
     page,
   }) => {
-    // Intercept POST /api/templates and inject 409 error header
+    // Mock upload to succeed
+    await page.route("**/api/documents/upload", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_DOCUMENT),
+      });
+    });
+
+    // Mock analysis to return completed
+    await page.route("**/api/analysis/**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(MOCK_ANALYSIS_COMPLETED),
+      });
+    });
+
+    // Mock review updates to succeed
+    await page.route("**/api/review/**/entities/**", async (route) => {
+      const body = await route.request().postDataJSON();
+      const url = new URL(route.request().url());
+      const entityId = url.pathname.split("/").pop() || "";
+      const original = MOCK_ENTITIES.find((e) => e.id === entityId);
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ...original, ...body, id: entityId }),
+      });
+    });
+
+    // Mock templates: GET returns empty, POST returns 409 conflict
     await page.route("**/api/templates", async (route) => {
       if (route.request().method() === "POST") {
-        await route.continue({
-          headers: {
-            ...route.request().headers(),
-            "x-mock-error": "save-409",
-          },
+        await route.fulfill({
+          status: 409,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "Ya existe una plantilla con ese nombre" }),
         });
       } else {
-        await route.continue();
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([]),
+        });
       }
     });
 
@@ -117,14 +165,19 @@ test.describe("Save conflict (409)", () => {
       .getByRole("button", { name: /continuar a revisión/i })
       .click();
 
-    // Mark BAJA entities as reviewed
+    // Mark BAJA entities as reviewed — use while loop for robust
+    // clicking since React re-renders after each click
     await expect(page).toHaveURL(/\/review/);
-    const reviewButtons = page.locator(
-      '[class*="border-warning"] button:has-text("Revisar")'
-    );
-    const reviewCount = await reviewButtons.count();
-    for (let i = 0; i < reviewCount; i++) {
-      await reviewButtons.nth(i).click();
+    while (
+      await page
+        .locator('[class*="border-warning"] button:has-text("Revisar")')
+        .count()
+        .then((c) => c > 0)
+    ) {
+      await page
+        .locator('[class*="border-warning"] button:has-text("Revisar")')
+        .first()
+        .click();
     }
 
     await page.getByRole("button", { name: /confirmar estructura/i }).click();

@@ -1,17 +1,30 @@
 import { test, expect } from "@playwright/test";
+import { MOCK_TEMPLATES } from "./helpers";
 
 /**
  * E2E tests for the Biblioteca (library) page.
  *
- * MSW provides mock template data via GET /api/templates.
- * For the empty state test, we use `page.route()` to intercept
- * the API call and return an empty array.
+ * API calls are mocked via Playwright's page.route().fulfill()
+ * — no MSW needed. Each test controls its own mock data.
  */
 
 test.describe("Biblioteca page — with templates", () => {
   test("displays template cards with name, category, and date", async ({
     page,
   }) => {
+    // Mock GET /api/templates to return mock templates
+    await page.route("**/api/templates", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_TEMPLATES),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     await page.goto("/biblioteca");
 
     // Wait for page to load — the heading should be visible
@@ -20,19 +33,32 @@ test.describe("Biblioteca page — with templates", () => {
     ).toBeVisible();
 
     // Template cards should appear after loading
-    // MSW returns 3 mock templates
     const cards = page.locator("button.group");
     await expect(cards.first()).toBeVisible({ timeout: 10000 });
 
     // First card should have at least a name, category, and date
     const firstCard = cards.first();
     await expect(firstCard.getByText("Contrato de compraventa - CDMX")).toBeVisible();
-    await expect(firstCard.getByText("Contratos")).toBeVisible();
+    // Use exact match — "Contratos" appears in both category badge and description
+    await expect(firstCard.getByText("Contratos", { exact: true })).toBeVisible();
     // Date format is "27 may 2026" style (es-AR locale)
     await expect(firstCard.locator("[class*='lucide-calendar']")).toBeVisible();
   });
 
   test("navigate from home to biblioteca via sidebar", async ({ page }) => {
+    // Mock GET /api/templates for the biblioteca page
+    await page.route("**/api/templates", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_TEMPLATES),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     await page.goto("/");
 
     // Click "Biblioteca" in sidebar
@@ -46,6 +72,19 @@ test.describe("Biblioteca page — with templates", () => {
   });
 
   test("navigate back to home via sidebar", async ({ page }) => {
+    // Mock GET /api/templates for the biblioteca page
+    await page.route("**/api/templates", async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify(MOCK_TEMPLATES),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
     await page.goto("/biblioteca");
 
     await expect(

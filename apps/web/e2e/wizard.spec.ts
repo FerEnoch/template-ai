@@ -1,20 +1,24 @@
 import { test, expect } from "@playwright/test";
+import {
+  MOCK_ENTITIES,
+  MOCK_DOCUMENT,
+  MOCK_ANALYSIS_COMPLETED,
+  setupWizardRoutes,
+} from "./helpers";
 
 /**
  * E2E tests for the wizard happy path and entity editing.
  *
- * These tests run against a real browser with MSW service worker intercepting
- * API calls. We do NOT use `setupServer` — the browser-based MSW worker handles
- * everything because the app uses `NEXT_PUBLIC_MSW=true`.
- *
- * Playwright's `page.route()` can intercept and modify network requests to
- * inject error headers for error scenario testing (see errors.spec.ts).
+ * API calls are mocked via Playwright's page.route() — no MSW needed.
+ * Each test sets up its own route mocks for full isolation.
  */
 
 test.describe("Wizard happy path", () => {
   test("complete full wizard flow: upload → analysis → review → save", async ({
     page,
   }) => {
+    setupWizardRoutes(page);
+
     // 1. Home page — verify CTA exists and click it
     await page.goto("/");
     await expect(
@@ -27,11 +31,9 @@ test.describe("Wizard happy path", () => {
     await expect(page).toHaveURL(/\/upload\?step=upload/);
 
     // 2. Upload page — upload a file
-    // The FileDropzone uses a hidden file input; we set the file directly.
     const fileInput = page.locator("#file-input");
     await expect(fileInput).toBeAttached();
 
-    // Create a small PDF-like file for testing
     await fileInput.setInputFiles({
       name: "contrato-test.pdf",
       mimeType: "application/pdf",
@@ -47,8 +49,6 @@ test.describe("Wizard happy path", () => {
     // 3. Analysis page — wait for completion
     await expect(page).toHaveURL(/\/analysis/);
 
-    // Wait for the "Análisis completado" heading to appear
-    // MSW polls ~4-5 times with 800ms intervals → ~4s
     await expect(
       page.getByRole("heading", { name: /análisis completado/i })
     ).toBeVisible({ timeout: 30000 });
@@ -67,14 +67,17 @@ test.describe("Wizard happy path", () => {
       page.getByRole("heading", { name: /entidades y datos detectados/i })
     ).toBeVisible();
 
-    // Verify the "Partes" group is expanded by default
-    await expect(page.getByText("COMPRADOR")).toBeVisible();
-    await expect(page.getByText("VENDEDOR")).toBeVisible();
+    // Verify entity labels are visible (use exact match to avoid
+    // matching entity values like "El vendedor entrega...")
+    await expect(page.getByText("COMPRADOR", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("VENDEDOR", { exact: true }).first()).toBeVisible();
   });
 
   test("mark BAJA entities and confirm structure to reach save page", async ({
     page,
   }) => {
+    setupWizardRoutes(page);
+
     // Navigate through wizard to review step
     await page.goto("/upload?step=upload");
 
@@ -97,17 +100,18 @@ test.describe("Wizard happy path", () => {
       .click();
     await expect(page).toHaveURL(/\/review/);
 
-    // The priority review section shows BAJA entities
-    const bajaEntities = page.locator(
-      '[class*="border-warning"] button:has-text("Revisar")'
-    );
-    const bajaCount = await bajaEntities.count();
-
-    if (bajaCount > 0) {
-      // Click "Revisar" on each BAJA entity
-      for (let i = 0; i < bajaCount; i++) {
-        await bajaEntities.nth(i).click();
-      }
+    // Click "Revisar" on each BAJA entity — use while loop because
+    // React re-renders remove the button after click
+    while (
+      await page
+        .locator('[class*="border-warning"] button:has-text("Revisar")')
+        .count()
+        .then((c) => c > 0)
+    ) {
+      await page
+        .locator('[class*="border-warning"] button:has-text("Revisar")')
+        .first()
+        .click();
     }
 
     // Now confirm structure should be enabled
@@ -126,6 +130,8 @@ test.describe("Wizard happy path", () => {
   });
 
   test("fill save form and save template", async ({ page }) => {
+    setupWizardRoutes(page);
+
     // Navigate through wizard to save step
     await page.goto("/upload?step=upload");
 
@@ -147,12 +153,16 @@ test.describe("Wizard happy path", () => {
 
     // Mark BAJA entities as reviewed
     await expect(page).toHaveURL(/\/review/);
-    const reviewButtons = page.locator(
-      '[class*="border-warning"] button:has-text("Revisar")'
-    );
-    const reviewCount = await reviewButtons.count();
-    for (let i = 0; i < reviewCount; i++) {
-      await reviewButtons.nth(i).click();
+    while (
+      await page
+        .locator('[class*="border-warning"] button:has-text("Revisar")')
+        .count()
+        .then((c) => c > 0)
+    ) {
+      await page
+        .locator('[class*="border-warning"] button:has-text("Revisar")')
+        .first()
+        .click();
     }
 
     await page.getByRole("button", { name: /confirmar estructura/i }).click();
@@ -174,6 +184,8 @@ test.describe("Wizard happy path", () => {
 
 test.describe("Entity editing via modal", () => {
   test.beforeEach(async ({ page }) => {
+    setupWizardRoutes(page);
+
     // Navigate to review step for all entity editing tests
     await page.goto("/upload?step=upload");
 
@@ -196,8 +208,7 @@ test.describe("Entity editing via modal", () => {
   });
 
   test("open entity modal, edit value, and save", async ({ page }) => {
-    // Click on an entity in the inspector to open the modal
-    // Entities are rendered as buttons in the group panel
+    // Click on COMPRADOR entity to open the modal
     await page.getByRole("button", { name: /COMPRADOR/i }).first().click();
 
     // Modal should open
@@ -223,7 +234,7 @@ test.describe("Entity editing via modal", () => {
   });
 
   test("toggle confidence in modal", async ({ page }) => {
-    // Open entity modal by clicking an entity
+    // Open entity modal by clicking COMPRADOR
     await page.getByRole("button", { name: /COMPRADOR/i }).first().click();
 
     await expect(
@@ -261,15 +272,21 @@ test.describe("Entity editing via modal", () => {
     // Save the exclusion
     await page.getByRole("button", { name: /guardar cambios/i }).click();
 
-    // Entity should show as excluded in the inspector
-    await expect(page.getByText("Excluido")).toBeVisible();
+    // Modal should close
+    await expect(
+      page.getByRole("heading", { name: /editar entidad/i })
+    ).not.toBeVisible();
 
-    // Toggle "Mostrar entidades excluidas" — should be available since we excluded one
+    // Toggle "Mostrar entidades excluidas" — the excluded entity is hidden
+    // by default and must be toggled visible first
     await page
       .getByRole("button", { name: /mostrar entidades excluidas/i })
       .click();
 
-    // The excluded entity should show with line-through
+    // Now the excluded entity should show with "Excluido" badge
+    await expect(page.getByText("Excluido")).toBeVisible();
+
+    // The excluded entity label should show with line-through
     const excludedLabel = page.locator("button:has-text('COMPRADOR')");
     await expect(excludedLabel.first()).toBeVisible();
   });
