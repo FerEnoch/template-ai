@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ── Design tokens from .stitch/DESIGN.md ── */
+@theme {
+  /* Surface hierarchy */
+  --color-background: #f5f1e8;
+  --color-surface: #fdfcf9;
+  --color-border: #e0dbd3;
+
+  /* Text hierarchy */
+  --color-text-primary: #1a1714;
+  --color-text-secondary: #5a544c;
+  --color-text-disabled: #8a847c;
+
+  /* Accent */
+  --color-accent: #3d6b8f;
+  --color-accent-hover: #2d5a78;
+
+  /* Functional */
+  --color-success: #2d7a4f;
+  --color-warning: #b07d2a;
+  --color-danger: #c0392b;
+  --color-neutral: #7a7570;
+
+  /* Typography */
+  --font-headline: "Literata", serif;
+  --font-body: "Source Serif 4", serif;
+  --font-label: "Inter", sans-serif;
+
+  /* Radii — 4px base from DESIGN.md */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* Spacing grid — 8px base */
+  --spacing-section: 2rem;
+  --spacing-card: 1.5rem;
+  --spacing-gap: 1rem;
+}
+
+/* ── Scrollbar styling ── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ── Base layer ── */
+@layer base {
+  body {
+    @apply bg-background text-text-primary font-body antialiased;
+  }
+}
