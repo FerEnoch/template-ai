@@ -1,0 +1,142 @@
+import { PoolClient } from "pg";
+
+export interface TemplateRecord {
+  id: string;
+  userId: number;
+  name: string;
+  description: string;
+  documentId: string;
+  category: string;
+  status: string;
+  entities: unknown[];
+  createdAt: Date;
+}
+
+export interface CreateTemplateInput {
+  userId: number;
+  name: string;
+  description?: string;
+  documentId: string;
+  category: string;
+  entities: unknown[];
+}
+
+function rowToTemplate(row: Record<string, unknown>): TemplateRecord {
+  return {
+    id: row["id"] as string,
+    userId: row["user_id"] as number,
+    name: row["name"] as string,
+    description: row["description"] as string,
+    documentId: row["document_id"] as string,
+    category: row["category"] as string,
+    status: row["status"] as string,
+    entities: row["entities"] as unknown[],
+    createdAt: row["created_at"] as Date,
+  };
+}
+
+export class TemplatesRepository {
+  constructor(private readonly client: PoolClient) {}
+
+  async create(input: CreateTemplateInput): Promise<TemplateRecord> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        INSERT INTO templates (user_id, name, description, document_id, category, entities)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at
+      `,
+      [
+        input.userId,
+        input.name,
+        input.description ?? "",
+        input.documentId,
+        input.category,
+        JSON.stringify(input.entities),
+      ],
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error("Failed to insert template");
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
+  async findById(id: string): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT id, user_id, name, description, document_id, category, status, entities, created_at
+        FROM templates
+        WHERE id = $1
+      `,
+      [id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
+  async findByUserId(userId: number): Promise<TemplateRecord[]> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT id, user_id, name, description, document_id, category, status, entities, created_at
+        FROM templates
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+      `,
+      [userId],
+    );
+
+    return result.rows.map(rowToTemplate);
+  }
+
+  /**
+   * Find a template by name and userId — used for 409 uniqueness check.
+   */
+  async findByNameAndUserId(name: string, userId: number): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT id, user_id, name, description, document_id, category, status, entities, created_at
+        FROM templates
+        WHERE name = $1 AND user_id = $2
+      `,
+      [name, userId],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
+  async updateStatus(id: string, status: string): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        UPDATE templates
+        SET status = $1
+        WHERE id = $2
+        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at
+      `,
+      [status, id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const result = await this.client.query(
+      `DELETE FROM templates WHERE id = $1`,
+      [id],
+    );
+
+    return (result.rowCount ?? 0) > 0;
+  }
+}
