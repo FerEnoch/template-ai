@@ -120,17 +120,18 @@ describe("storage", () => {
   describe("round-trip", () => {
     it("save then load returns equivalent data", () => {
       const file = { name: "roundtrip.pdf", size: 3333, type: "application/pdf" };
-      const entities = [
-        {
-          id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-          label: "COMPRADOR",
-          value: "María González",
-          group: "PARTES" as const,
-          confidence: "ALTA" as const,
-          sourceSpan: { start: 10, end: 25 },
-          reviewed: false,
-        },
-      ];
+const entities = [
+         {
+           id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+           label: "COMPRADOR",
+           value: "María González",
+           group: "PARTES" as const,
+           confidence: "ALTA" as const,
+           sourceSpan: { start: 10, end: 25 },
+           reviewed: false,
+           excluded: false,
+         },
+       ];
       const templateForm = {
         name: "Roundtrip",
         description: "Testing roundtrip",

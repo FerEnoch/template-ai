@@ -12,6 +12,7 @@ const mockEntity: Entity = {
   confidence: "ALTA",
   sourceSpan: { start: 10, end: 20 },
   reviewed: false,
+  excluded: false,
 };
 
 const mockEntity2: Entity = {
@@ -22,6 +23,7 @@ const mockEntity2: Entity = {
   confidence: "MEDIA",
   sourceSpan: { start: 30, end: 45 },
   reviewed: true,
+  excluded: false,
 };
 
 describe("wizardReducer", () => {
