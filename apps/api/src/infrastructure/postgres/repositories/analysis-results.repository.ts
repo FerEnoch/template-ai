@@ -99,7 +99,6 @@ export class AnalysisResultsRepository {
   }
 
   async updateStatus(id: string, status: string): Promise<AnalysisResultRecord | null> {
-    const completedAt = status === "completed" ? "now()" : null;
     const result = await this.client.query<Record<string, unknown>>(
       `
         UPDATE analysis_results

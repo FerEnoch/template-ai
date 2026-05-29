@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { ConflictException } from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { TemplatesService } from "./templates.service";
 import { PostgresService, type TransactionContext } from "../infrastructure/postgres/postgres.service";
 import type { TemplateRecord } from "../infrastructure/postgres/repositories/templates.repository";
@@ -179,6 +179,92 @@ describe("TemplatesService", () => {
         entities: [{ id: "entity-1", label: "LOCADOR", value: "J Pérez", group: "PARTES", confidence: "ALTA", sourceSpan: null, reviewed: false, excluded: false }],
         createdAt: "2025-01-15T10:30:00.000Z",
       });
+    });
+  });
+
+  describe("findOne", () => {
+    it("should return a single template by id", async () => {
+      const record = makeTemplateRecord({ id: "tmpl-uuid-1", name: "Template A" });
+
+      const mockClient = { query: vi.fn() };
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        if (sql.includes("SET LOCAL")) {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        // SELECT template by id (findById)
+        if (sql.includes("SELECT") && sql.includes("FROM templates") && sql.includes("WHERE id =")) {
+          return Promise.resolve({
+            rowCount: 1,
+            rows: [{
+              id: record.id,
+              user_id: record.userId,
+              name: record.name,
+              description: record.description,
+              document_id: record.documentId,
+              category: record.category,
+              status: record.status,
+              entities: record.entities,
+              created_at: record.createdAt,
+            }],
+          });
+        }
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      });
+
+      const mockPostgres = {
+        withOwnerTransaction: vi.fn(
+          async (ownerId: number, cb: (ctx: TransactionContext) => Promise<unknown>) => {
+            await mockClient.query("BEGIN");
+            await mockClient.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+            const result = await cb({ client: mockClient as never, ownerId });
+            await mockClient.query("COMMIT");
+            return result;
+          },
+        ),
+      } as unknown as PostgresService;
+
+      const service = new TemplatesService(mockPostgres);
+      const result = await service.findOne(0, "tmpl-uuid-1");
+
+      expect(result.id).toBe("tmpl-uuid-1");
+      expect(result.name).toBe("Template A");
+    });
+
+    it("should throw NotFoundException when template is not found", async () => {
+      const mockClient = { query: vi.fn() };
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        if (sql.includes("SET LOCAL")) {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        // findById returns null (no rows)
+        if (sql.includes("SELECT") && sql.includes("FROM templates") && sql.includes("WHERE id =")) {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      });
+
+      const mockPostgres = {
+        withOwnerTransaction: vi.fn(
+          async (ownerId: number, cb: (ctx: TransactionContext) => Promise<unknown>) => {
+            await mockClient.query("BEGIN");
+            await mockClient.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+            const result = await cb({ client: mockClient as never, ownerId });
+            await mockClient.query("COMMIT");
+            return result;
+          },
+        ),
+      } as unknown as PostgresService;
+
+      const service = new TemplatesService(mockPostgres);
+
+      await expect(service.findOne(0, "nonexistent")).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(0, "nonexistent")).rejects.toThrow('Template with id "nonexistent" not found');
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { BadRequestException, ConflictException } from "@nestjs/common";
+import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { TemplatesController } from "./templates.controller";
 import { TemplatesService } from "./templates.service";
 import type { TemplateResponse } from "./templates.service";
@@ -36,6 +36,7 @@ describe("TemplatesController", () => {
   beforeEach(() => {
     service = {
       list: vi.fn(),
+      findOne: vi.fn(),
       create: vi.fn(),
     } as unknown as TemplatesService;
     controller = new TemplatesController(service);
@@ -62,6 +63,27 @@ describe("TemplatesController", () => {
 
       expect(result).toEqual([]);
       expect(service.list).toHaveBeenCalledWith(0);
+    });
+  });
+
+  describe("GET /:id", () => {
+    it("should return a single template by id", async () => {
+      const template = makeTemplateResponse({ id: "tmpl-1", name: "Template A" });
+      vi.spyOn(service, "findOne").mockResolvedValue(template);
+
+      const result = await controller.findOne("tmpl-1");
+
+      expect(result).toEqual(template);
+      expect(service.findOne).toHaveBeenCalledWith(0, "tmpl-1");
+    });
+
+    it("should throw NotFoundException when template is not found", async () => {
+      vi.spyOn(service, "findOne").mockRejectedValue(
+        new NotFoundException('Template with id "nonexistent" not found'),
+      );
+
+      await expect(controller.findOne("nonexistent")).rejects.toThrow(NotFoundException);
+      await expect(controller.findOne("nonexistent")).rejects.toThrow('Template with id "nonexistent" not found');
     });
   });
 

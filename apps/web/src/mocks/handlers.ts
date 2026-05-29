@@ -215,6 +215,25 @@ export const handlers = [
   }),
 
   /**
+   * GET /api/templates/:id
+   * Returns a single template by id from in-memory state.
+   * Returns 404 if not found.
+   */
+  http.get("/api/templates/:id", ({ params }) => {
+    const { id } = params;
+    const template = storedTemplates.find((t) => t.id === id);
+
+    if (!template) {
+      return HttpResponse.json(
+        { error: `Template with id "${id}" not found` },
+        { status: 404 }
+      );
+    }
+
+    return HttpResponse.json(template, { status: 200 });
+  }),
+
+  /**
    * POST /api/templates
    * Saves a template. 200ms latency. Returns the created template with a
    * generated UUID and timestamp.

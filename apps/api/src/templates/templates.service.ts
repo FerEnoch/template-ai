@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from "@nestjs/common";
+import { Injectable, ConflictException, NotFoundException } from "@nestjs/common";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { TemplatesRepository } from "../infrastructure/postgres/repositories/templates.repository";
 import type { CreateTemplateInput } from "../infrastructure/postgres/repositories/templates.repository";
@@ -43,6 +43,23 @@ export class TemplatesService {
       const repo = new TemplatesRepository(client);
       const records = await repo.findByUserId(userId);
       return records.map(this.mapToResponse);
+    });
+  }
+
+  /**
+   * Find a single template by id for the given userId.
+   * Throws NotFoundException if not found.
+   */
+  async findOne(userId: number, id: string): Promise<TemplateResponse> {
+    return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
+      const repo = new TemplatesRepository(client);
+      const record = await repo.findById(id);
+
+      if (!record) {
+        throw new NotFoundException(`Template with id "${id}" not found`);
+      }
+
+      return this.mapToResponse(record);
     });
   }
 

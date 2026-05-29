@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FileText, Calendar, Tag } from "lucide-react";
 import type { Template } from "@template-ai/contracts";
 
@@ -40,10 +41,10 @@ export function TemplateCard({ template, onClick }: TemplateCardProps) {
   const entityCount = template.entities.length;
 
   return (
-    <button
-      type="button"
+    <Link
+      href={`/biblioteca/${template.id}`}
       onClick={() => onClick?.(template)}
-      className="group w-full rounded-xl border border-border bg-surface p-5 text-left shadow-sm transition-all duration-150 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
+      className="group block w-full rounded-xl border border-border bg-surface p-5 text-left shadow-sm transition-all duration-150 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -82,6 +83,6 @@ export function TemplateCard({ template, onClick }: TemplateCardProps) {
           {entityCount} {entityCount === 1 ? "campo" : "campos"}
         </span>
       </div>
-    </button>
+    </Link>
   );
 }

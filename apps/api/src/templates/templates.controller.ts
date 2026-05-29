@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, BadRequestException } from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException } from "@nestjs/common";
 import { TemplateSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
@@ -16,6 +16,20 @@ export class TemplatesController {
   @Get()
   public async findAll(): Promise<TemplateResponse[]> {
     return this.templatesService.list(0);
+  }
+
+  /**
+   * GET /templates/:id — return a single template by id.
+   */
+  @Get(":id")
+  public async findOne(@Param("id") id: string): Promise<TemplateResponse> {
+    const template = await this.templatesService.findOne(0, id);
+
+    if (!template) {
+      throw new NotFoundException(`Template with id "${id}" not found`);
+    }
+
+    return template;
   }
 
   /**
