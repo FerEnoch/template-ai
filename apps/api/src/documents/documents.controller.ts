@@ -22,6 +22,7 @@ const multerOptions = {
       cb(null, uniqueName);
     },
   }),
+  limits: { fileSize: 25 * 1024 * 1024 },
 };
 
 @Controller("documents")
