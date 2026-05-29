@@ -6,6 +6,7 @@ import { DocumentsModule } from "./documents/documents.module";
 import { AnalysisModule } from "./analysis/analysis.module";
 import { ReviewModule } from "./review/review.module";
 import { TemplatesModule } from "./templates/templates.module";
+import { AiModule } from "./ai/ai.module.js";
 
 @Module({
   controllers: [HealthController],
@@ -16,6 +17,7 @@ import { TemplatesModule } from "./templates/templates.module";
     AnalysisModule,
     ReviewModule,
     TemplatesModule,
+    AiModule,
   ],
 })
 export class AppModule {}

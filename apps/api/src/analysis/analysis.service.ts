@@ -2,24 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
-
-// ---------------------------------------------------------------------------
-// Sample entities — hardcoded POC data matching MSW fixtures
-// ---------------------------------------------------------------------------
-
-export const SAMPLE_ENTITIES = [
-  { label: "COMPRADOR", value: "María González López", group: "PARTES", confidence: "ALTA" as const, sourceSpan: { start: 142, end: 163 } },
-  { label: "VENDEDOR", value: "Carlos Rodríguez Pérez", group: "PARTES", confidence: "ALTA" as const, sourceSpan: { start: 165, end: 186 } },
-  { label: "INMUEBLE", value: "Departamento en Av. Reforma 1234, Piso 8, Col. Juárez, CDMX", group: "INMUEBLE", confidence: "ALTA" as const, sourceSpan: { start: 220, end: 285 } },
-  { label: "PRECIO_TOTAL", value: "$3,450,000.00 MXN", group: "INMUEBLE", confidence: "MEDIA" as const, sourceSpan: { start: 310, end: 325 } },
-  { label: "FECHA_FIRMA", value: "15 de junio de 2026", group: "FECHAS", confidence: "ALTA" as const, sourceSpan: { start: 400, end: 420 } },
-  { label: "ESCRITURA_NUMERO", value: "4,218", group: "ANEXOS", confidence: "BAJA" as const, sourceSpan: { start: 445, end: 450 } },
-  { label: "NOTARIO", value: "Lic. Patricia Hernández Vega", group: "ANEXOS", confidence: "ALTA" as const, sourceSpan: { start: 470, end: 498 } },
-  { label: "METODO_PAGO", value: "Transferencia bancaria por $1,725,000 y cheque de caja por $1,725,000", group: "INMUEBLE", confidence: "MEDIA" as const, sourceSpan: { start: 520, end: 595 } },
-  { label: "ANTICIPO", value: "$345,000.00 MXN (10%)", group: "INMUEBLE", confidence: "ALTA" as const, sourceSpan: { start: 600, end: 622 } },
-  { label: "PLAZO_CIERRE", value: "30 días hábiles contados a partir de la firma del presente contrato", group: "FECHAS", confidence: "MEDIA" as const, sourceSpan: { start: 650, end: 720 } },
-  { label: "CONDICION_ESPECIAL", value: "El vendedor entrega el inmueble libre de gravámenes y deudas de servicios", group: "INMUEBLE", confidence: "BAJA" as const, sourceSpan: { start: 740, end: 810 } },
-];
+import { DocumentsRepository } from "../infrastructure/postgres/repositories/documents.repository";
+import { DocumentAnalysisService } from "../ai/document-analysis.service.js";
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -57,12 +41,15 @@ export interface AnalysisStatus {
 
 @Injectable()
 export class AnalysisService {
-  public constructor(private readonly postgres: PostgresService) {}
+  public constructor(
+    private readonly postgres: PostgresService,
+    private readonly documentAnalysisService: DocumentAnalysisService,
+  ) {}
 
   /**
    * GET /:id — Returns the full analysis result, including entities.
    * On each call while "processing", increments progress by 25.
-   * When progress reaches 100, marks as "completed" and inserts sample entities.
+   * When progress reaches 100, calls AI for entity extraction and marks as "completed".
    * Once "completed", returns idempotently without re-inserting entities.
    */
   async getFullResult(documentId: string): Promise<AnalysisResult> {
@@ -86,8 +73,13 @@ export class AnalysisService {
         return this.mapToAnalysisResult(result, entities);
       }
 
-      // If terminal (failed/pending) — return without incrementing progress
-      if (result.status === "failed" || result.status === "pending") {
+      // Permanent failure: retries exhausted
+      if (result.status === "failed" && result.retryCount >= 3) {
+        return this.mapToAnalysisResult(result, []);
+      }
+
+      // Pending status — return without incrementing progress
+      if (result.status === "pending") {
         return this.mapToAnalysisResult(result, []);
       }
 
@@ -98,35 +90,55 @@ export class AnalysisService {
         throw new NotFoundException("Analysis result not found after increment");
       }
 
-      // Check if we've reached 100% — if so, complete and insert sample entities
+      // Check if we've reached 100% — if so, call AI for entity extraction
       if (incremented.progress >= 100) {
+        // Fetch the document to get the file path
+        const documentsRepo = new DocumentsRepository(client);
+        const document = await documentsRepo.findById(documentId);
+
+        if (!document) {
+          throw new NotFoundException("Document not found");
+        }
+
+        // Call AI extraction (pure logic — no DB writes)
+        const analysisResult = await this.documentAnalysisService.analyze(
+          document.filePath,
+        );
+
+        if (!analysisResult.success) {
+          // AI failed — increment retry count and mark as failed
+          await analysisRepo.incrementRetryCount(result.id, analysisResult.error ?? "Unknown error");
+          const failed = await analysisRepo.updateStatus(result.id, "failed");
+
+          if (!failed) {
+            throw new NotFoundException("Analysis result not found after status update");
+          }
+
+          return this.mapToAnalysisResult(failed, []);
+        }
+
+        // AI succeeded — insert entities
+        const entitiesRepo = new EntitiesRepository(client);
+        const entityInputs = (analysisResult.entities ?? []).map((e) => ({
+          analysisResultId: result.id,
+          documentId,
+          label: e.label,
+          value: e.value,
+          group: e.group,
+          confidence: e.confidence,
+          sourceSpan: e.sourceSpan,
+        }));
+
+        if (entityInputs.length > 0) {
+          await entitiesRepo.bulkInsert(entityInputs);
+        }
+
+        const insertedEntities = await entitiesRepo.findByAnalysisResultId(result.id);
         const completed = await analysisRepo.updateStatus(result.id, "completed");
 
         if (!completed) {
           throw new NotFoundException("Analysis result not found after status update");
         }
-
-        // Guard against duplicate insertion from concurrent requests
-        const entitiesRepo = new EntitiesRepository(client);
-        const existingEntities = await entitiesRepo.findByAnalysisResultId(result.id);
-
-        if (existingEntities.length === 0) {
-          // Insert sample entities (only if none exist yet)
-          const entityInputs = SAMPLE_ENTITIES.map((e) => ({
-            analysisResultId: result.id,
-            documentId,
-            label: e.label,
-            value: e.value,
-            group: e.group,
-            confidence: e.confidence,
-            sourceSpan: e.sourceSpan,
-          }));
-
-          await entitiesRepo.bulkInsert(entityInputs);
-        }
-
-        // Fetch the entities (whether just inserted or from a concurrent request)
-        const insertedEntities = await entitiesRepo.findByAnalysisResultId(result.id);
 
         return this.mapToAnalysisResult(completed, insertedEntities);
       }
