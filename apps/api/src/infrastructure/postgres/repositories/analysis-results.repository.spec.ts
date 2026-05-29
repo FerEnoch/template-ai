@@ -29,6 +29,8 @@ const sampleRow: Record<string, unknown> = {
   progress: 0,
   started_at: new Date("2025-01-01T00:00:00Z"),
   completed_at: null,
+  retry_count: 0,
+  error_message: null,
 };
 
 const sampleInput: CreateAnalysisResultInput = {
@@ -53,6 +55,8 @@ describe("AnalysisResultsRepository", () => {
         progress: 0,
         startedAt: new Date("2025-01-01T00:00:00Z"),
         completedAt: null,
+        retryCount: 0,
+        errorMessage: null,
       } satisfies AnalysisResultRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
@@ -172,6 +176,41 @@ describe("AnalysisResultsRepository", () => {
         "00000000-0000-0000-0000-000000000000",
         "completed",
       );
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("incrementRetryCount", () => {
+    it("increments retry_count and sets error_message, returns updated record", async () => {
+      const retriedRow = { ...sampleRow, retry_count: 1, error_message: "Rate limit exceeded" };
+      const { client, querySpy } = mockPoolClient([retriedRow]);
+      repo = new AnalysisResultsRepository(client);
+
+      const result = await repo.incrementRetryCount(
+        "550e8400-e29b-41d4-a716-446655440000",
+        "Rate limit exceeded",
+      );
+
+      expect(result).toEqual(expect.objectContaining({
+        retryCount: 1,
+        errorMessage: "Rate limit exceeded",
+      }));
+
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("retry_count = retry_count + 1"),
+        ["550e8400-e29b-41d4-a716-446655440000", "Rate limit exceeded"],
+      );
+    });
+
+    it("returns null when retry_count already at max (3)", async () => {
+      const { client } = mockPoolClient([]);
+      repo = new AnalysisResultsRepository(client);
+
+      const result = await repo.incrementRetryCount(
+        "00000000-0000-0000-0000-000000000000",
+        "Should not increment",
+      );
+
       expect(result).toBeNull();
     });
   });

@@ -17,6 +17,8 @@
     "@nestjs/platform-express": "^10.4.0",
     "@template-ai/contracts": "workspace:*",
     "dotenv": "^17.4.2",
+    "multer": "^2.1.1",
+    "openai": "^6.39.0",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"

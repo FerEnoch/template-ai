@@ -8,6 +8,7 @@ export interface UploadInput {
   filename: string;
   mimeType: string;
   sizeBytes: number;
+  filePath?: string;
 }
 
 @Injectable()
@@ -24,6 +25,7 @@ export class DocumentsService {
         filename: input.filename,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
+        filePath: input.filePath,
       });
 
       await analysisResultsRepo.create({

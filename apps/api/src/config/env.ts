@@ -5,6 +5,7 @@ export type ApiEnv = {
   NODE_ENV: NodeEnv;
   DATABASE_URL: string;
   CORS_ORIGIN: string;
+  OPENROUTER_API_KEY: string;
 };
 
 const allowedNodeEnvs: readonly NodeEnv[] = ["development", "test", "production"];
@@ -68,6 +69,14 @@ function parseCorsOrigin(value: string | undefined): string {
   return value;
 }
 
+function parseOpenRouterApiKey(value: string | undefined): string {
+  if (!value) {
+    fail("OPENROUTER_API_KEY is required");
+  }
+
+  return value;
+}
+
 let cachedApiEnv: ApiEnv | null = null;
 
 export function getApiEnv(): ApiEnv {
@@ -80,6 +89,7 @@ export function getApiEnv(): ApiEnv {
     NODE_ENV: parseNodeEnv(process.env.NODE_ENV),
     DATABASE_URL: parseDatabaseUrl(process.env.DATABASE_URL),
     CORS_ORIGIN: parseCorsOrigin(process.env.CORS_ORIGIN),
+    OPENROUTER_API_KEY: parseOpenRouterApiKey(process.env.OPENROUTER_API_KEY),
   };
 
   return cachedApiEnv;

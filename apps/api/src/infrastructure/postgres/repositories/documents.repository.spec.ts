@@ -30,6 +30,7 @@ const sampleRow: Record<string, unknown> = {
   size_bytes: 1024,
   status: "processing",
   uploaded_at: new Date("2025-01-01T00:00:00Z"),
+  file_path: null,
 };
 
 const sampleInput: CreateDocumentInput = {
@@ -57,11 +58,12 @@ describe("DocumentsRepository", () => {
         sizeBytes: 1024,
         status: "processing",
         uploadedAt: new Date("2025-01-01T00:00:00Z"),
+        filePath: null,
       } satisfies DocumentRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO documents"),
-        [1, "contract.pdf", "application/pdf", 1024],
+        [1, "contract.pdf", "application/pdf", 1024, null],
       );
     });
 
@@ -71,6 +73,34 @@ describe("DocumentsRepository", () => {
 
       await expect(repo.create(sampleInput)).rejects.toThrow(
         "Failed to insert document",
+      );
+    });
+
+    it("inserts a document with filePath and returns mapped record", async () => {
+      const rowWithFilePath = { ...sampleRow, file_path: "/uploads/abc-123.pdf" };
+      const { client, querySpy } = mockPoolClient([rowWithFilePath]);
+      repo = new DocumentsRepository(client);
+
+      const inputWithFilePath: CreateDocumentInput = {
+        ...sampleInput,
+        filePath: "/uploads/abc-123.pdf",
+      };
+      const result = await repo.create(inputWithFilePath);
+
+      expect(result).toEqual({
+        id: "550e8400-e29b-41d4-a716-446655440000",
+        userId: 1,
+        filename: "contract.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 1024,
+        status: "processing",
+        uploadedAt: new Date("2025-01-01T00:00:00Z"),
+        filePath: "/uploads/abc-123.pdf",
+      } satisfies DocumentRecord);
+
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("INSERT INTO documents"),
+        [1, "contract.pdf", "application/pdf", 1024, "/uploads/abc-123.pdf"],
       );
     });
   });
@@ -90,6 +120,7 @@ describe("DocumentsRepository", () => {
         sizeBytes: 1024,
         status: "processing",
         uploadedAt: new Date("2025-01-01T00:00:00Z"),
+        filePath: null,
       });
     });
 

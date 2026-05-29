@@ -17,6 +17,7 @@ function makeDocumentRecord(overrides: Partial<DocumentRecord> = {}): DocumentRe
     sizeBytes: 1024,
     status: "processing",
     uploadedAt: new Date("2025-01-15T10:30:00Z"),
+    filePath: null,
     ...overrides,
   };
 }
@@ -29,6 +30,8 @@ function makeAnalysisResultRecord(overrides: Partial<AnalysisResultRecord> = {})
     progress: 0,
     startedAt: new Date("2025-01-15T10:30:00Z"),
     completedAt: null,
+    retryCount: 0,
+    errorMessage: null,
     ...overrides,
   };
 }
@@ -61,6 +64,8 @@ function createMockPostgresService(
             progress: analysisRecord.progress,
             started_at: analysisRecord.startedAt,
             completed_at: analysisRecord.completedAt,
+            retry_count: analysisRecord.retryCount,
+            error_message: analysisRecord.errorMessage,
           },
         ],
       });
@@ -77,6 +82,7 @@ function createMockPostgresService(
             size_bytes: documentRecord.sizeBytes,
             status: documentRecord.status,
             uploaded_at: documentRecord.uploadedAt,
+            file_path: documentRecord.filePath,
           },
         ],
       });

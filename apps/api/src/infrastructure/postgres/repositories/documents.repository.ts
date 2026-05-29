@@ -8,6 +8,7 @@ export interface DocumentRecord {
   sizeBytes: number;
   status: string;
   uploadedAt: Date;
+  filePath: string | null;
 }
 
 export interface CreateDocumentInput {
@@ -15,6 +16,7 @@ export interface CreateDocumentInput {
   filename: string;
   mimeType: string;
   sizeBytes: number;
+  filePath?: string;
 }
 
 function rowToDocument(row: Record<string, unknown>): DocumentRecord {
@@ -26,6 +28,7 @@ function rowToDocument(row: Record<string, unknown>): DocumentRecord {
     sizeBytes: row["size_bytes"] as number,
     status: row["status"] as string,
     uploadedAt: row["uploaded_at"] as Date,
+    filePath: (row["file_path"] as string | null) ?? null,
   };
 }
 
@@ -35,11 +38,11 @@ export class DocumentsRepository {
   async create(input: CreateDocumentInput): Promise<DocumentRecord> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        INSERT INTO documents (user_id, filename, mime_type, size_bytes)
-        VALUES ($1, $2, $3, $4)
-        RETURNING id, user_id, filename, mime_type, size_bytes, status, uploaded_at
+        INSERT INTO documents (user_id, filename, mime_type, size_bytes, file_path)
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, user_id, filename, mime_type, size_bytes, status, uploaded_at, file_path
       `,
-      [input.userId, input.filename, input.mimeType, input.sizeBytes],
+      [input.userId, input.filename, input.mimeType, input.sizeBytes, input.filePath ?? null],
     );
 
     if (result.rowCount === 0) {
@@ -52,7 +55,7 @@ export class DocumentsRepository {
   async findById(id: string): Promise<DocumentRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, user_id, filename, mime_type, size_bytes, status, uploaded_at
+        SELECT id, user_id, filename, mime_type, size_bytes, status, uploaded_at, file_path
         FROM documents
         WHERE id = $1
       `,
@@ -69,7 +72,7 @@ export class DocumentsRepository {
   async findByUserId(userId: number): Promise<DocumentRecord[]> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, user_id, filename, mime_type, size_bytes, status, uploaded_at
+        SELECT id, user_id, filename, mime_type, size_bytes, status, uploaded_at, file_path
         FROM documents
         WHERE user_id = $1
         ORDER BY uploaded_at DESC
@@ -85,7 +88,7 @@ export class DocumentsRepository {
       `
         UPDATE documents SET status = $1
         WHERE id = $2
-        RETURNING id, user_id, filename, mime_type, size_bytes, status, uploaded_at
+        RETURNING id, user_id, filename, mime_type, size_bytes, status, uploaded_at, file_path
       `,
       [status, id],
     );

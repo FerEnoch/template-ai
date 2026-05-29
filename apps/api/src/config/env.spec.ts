@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const ENV_KEYS = ["PORT", "NODE_ENV", "DATABASE_URL"] as const;
+const ENV_KEYS = ["PORT", "NODE_ENV", "DATABASE_URL", "OPENROUTER_API_KEY"] as const;
 const BASE_ENV = {
   PORT: "3001",
   NODE_ENV: "test",
   DATABASE_URL: "postgres://template_ai_dev:template_ai_dev@localhost:5432/template_ai_dev",
+  OPENROUTER_API_KEY: "sk-or-test-key-123",
 } as const;
 
 const originalEnv = { ...process.env };
@@ -53,6 +54,7 @@ describe("getApiEnv", () => {
       NODE_ENV: "test",
       DATABASE_URL: BASE_ENV.DATABASE_URL,
       CORS_ORIGIN: "http://localhost:3000",
+      OPENROUTER_API_KEY: "sk-or-test-key-123",
     });
   });
 
@@ -91,5 +93,14 @@ describe("getApiEnv", () => {
 
     const env = getApiEnv();
     expect(env.CORS_ORIGIN).toBe("https://example.com");
+  });
+
+  it("fails fast when OPENROUTER_API_KEY is missing", async () => {
+    setEnv({ OPENROUTER_API_KEY: undefined });
+    delete process.env.OPENROUTER_API_KEY;
+
+    const getApiEnv = await loadGetApiEnv();
+
+    expect(() => getApiEnv()).toThrowError("[api env] OPENROUTER_API_KEY is required");
   });
 });

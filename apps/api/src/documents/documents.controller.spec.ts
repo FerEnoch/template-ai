@@ -4,6 +4,17 @@ import { DocumentsController } from "./documents.controller";
 import { DocumentsService } from "./documents.service";
 import type { DocumentRecord } from "../infrastructure/postgres/repositories/documents.repository";
 
+// Mock the AI config module to avoid import-time env validation in unit tests
+vi.mock("../config/ai.js", () => ({
+  AI_CONFIG: {
+    model: "google/gemini-2.5-flash:free",
+    apiKey: "sk-or-test-key-123",
+    maxTokens: 4096,
+    temperature: 0.1,
+  },
+  UPLOAD_DIR: "/tmp/test-uploads",
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -17,6 +28,7 @@ function makeDocumentRecord(overrides: Partial<DocumentRecord> = {}): DocumentRe
     sizeBytes: 1024,
     status: "processing",
     uploadedAt: new Date("2025-01-15T10:30:00Z"),
+    filePath: null,
     ...overrides,
   };
 }
@@ -75,6 +87,7 @@ describe("DocumentsController", () => {
         filename: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: file.size,
+        filePath: file.path,
       });
     });
 
@@ -133,6 +146,7 @@ describe("DocumentsController", () => {
         filename: "report.docx",
         mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         sizeBytes: 5242880,
+        filePath: file.path,
       });
 
       // Verify response reflects actual file metadata, not hardcoded values

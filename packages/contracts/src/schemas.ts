@@ -12,6 +12,7 @@ export const DocumentSchema = z.object({
   sizeBytes: z.number().min(1).max(25 * 1024 * 1024),
   status: z.enum(["pending", "processing", "completed", "failed"]),
   uploadedAt: z.string().datetime(),
+  filePath: z.string().optional(),
 });
 
 // Entity schema: a single extracted piece of information from a document

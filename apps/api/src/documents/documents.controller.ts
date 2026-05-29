@@ -8,14 +8,28 @@ import {
   Logger,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
+import { diskStorage } from "multer";
+import { extname } from "node:path";
+import { randomUUID } from "node:crypto";
+import { UPLOAD_DIR } from "../config/ai.js";
 import { DocumentsService } from "./documents.service";
+
+const multerOptions = {
+  storage: diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (_req: Express.Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
+      const uniqueName = `${randomUUID()}${extname(file.originalname)}`;
+      cb(null, uniqueName);
+    },
+  }),
+};
 
 @Controller("documents")
 export class DocumentsController {
   public constructor(private readonly documentsService: DocumentsService) {}
 
   @Post("upload")
-  @UseInterceptors(FileInterceptor("file"))
+  @UseInterceptors(FileInterceptor("file", multerOptions))
   public async upload(
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<{
@@ -35,6 +49,7 @@ export class DocumentsController {
         filename: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: file.size,
+        filePath: file.path,
       });
 
       return {

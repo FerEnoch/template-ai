@@ -7,6 +7,8 @@ export interface AnalysisResultRecord {
   progress: number;
   startedAt: Date;
   completedAt: Date | null;
+  retryCount: number;
+  errorMessage: string | null;
 }
 
 export interface CreateAnalysisResultInput {
@@ -22,6 +24,8 @@ function rowToAnalysisResult(row: Record<string, unknown>): AnalysisResultRecord
     progress: row["progress"] as number,
     startedAt: row["started_at"] as Date,
     completedAt: row["completed_at"] as Date | null,
+    retryCount: (row["retry_count"] as number) ?? 0,
+    errorMessage: (row["error_message"] as string | null) ?? null,
   };
 }
 
@@ -33,7 +37,7 @@ export class AnalysisResultsRepository {
       `
         INSERT INTO analysis_results (document_id, status)
         VALUES ($1, $2)
-        RETURNING id, document_id, status, progress, started_at, completed_at
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message
       `,
       [input.documentId, input.status],
     );
@@ -48,7 +52,7 @@ export class AnalysisResultsRepository {
   async findById(id: string): Promise<AnalysisResultRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, document_id, status, progress, started_at, completed_at
+        SELECT id, document_id, status, progress, started_at, completed_at, retry_count, error_message
         FROM analysis_results
         WHERE id = $1
       `,
@@ -65,7 +69,7 @@ export class AnalysisResultsRepository {
   async findByDocumentId(documentId: string): Promise<AnalysisResultRecord[]> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, document_id, status, progress, started_at, completed_at
+        SELECT id, document_id, status, progress, started_at, completed_at, retry_count, error_message
         FROM analysis_results
         WHERE document_id = $1
         ORDER BY started_at DESC
@@ -86,7 +90,7 @@ export class AnalysisResultsRepository {
         UPDATE analysis_results
         SET progress = LEAST(progress + 25, 100)
         WHERE id = $1
-        RETURNING id, document_id, status, progress, started_at, completed_at
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message
       `,
       [id],
     );
@@ -105,9 +109,33 @@ export class AnalysisResultsRepository {
         SET status = $1,
             completed_at = CASE WHEN $1 = 'completed' THEN now() ELSE completed_at END
         WHERE id = $2
-        RETURNING id, document_id, status, progress, started_at, completed_at
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message
       `,
       [status, id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToAnalysisResult(result.rows[0]);
+  }
+
+  /**
+   * Increment the retry count and set the error message.
+   * Returns the updated record, or null if not found.
+   * The DB constraint retry_count_range ensures retry_count stays within [0, 3].
+   */
+  async incrementRetryCount(id: string, errorMessage: string): Promise<AnalysisResultRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        UPDATE analysis_results
+        SET retry_count = retry_count + 1,
+            error_message = $2
+        WHERE id = $1 AND retry_count < 3
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message
+      `,
+      [id, errorMessage],
     );
 
     if (result.rowCount === 0 || result.rows.length === 0) {

@@ -19,6 +19,8 @@ function makeAnalysisResultRecord(
     progress: 0,
     startedAt: new Date("2026-05-27T10:30:05.000Z"),
     completedAt: null,
+    retryCount: 0,
+    errorMessage: null,
     ...overrides,
   };
 }
