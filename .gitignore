@@ -84,6 +84,9 @@ Thumbs.db
 # Google Flow mockups
 docs/mockups-google-flow
 
+# Upload directories (dev artifacts — use bucket in production)
+apps/api/uploads/
+
 # Playwright CLI snapshots
 .playwright-cli/
 home.yml
