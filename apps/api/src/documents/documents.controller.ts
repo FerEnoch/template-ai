@@ -7,7 +7,6 @@ import {
   BadRequestException,
   InternalServerErrorException,
   ParseFilePipe,
-  FileTypeValidator,
   MaxFileSizeValidator,
   Logger,
 } from "@nestjs/common";
@@ -17,6 +16,7 @@ import { extname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { UPLOAD_DIR } from "../config/ai.js";
 import { DocumentsService } from "./documents.service";
+import { SmartFileValidator } from "./smart-file.validator";
 
 const multerOptions = {
   storage: diskStorage({
@@ -40,9 +40,7 @@ export class DocumentsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new FileTypeValidator({
-            fileType: /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|image\/jpeg)$/,
-          }),
+          new SmartFileValidator(),
           new MaxFileSizeValidator({ maxSize: 25 * 1024 * 1024 }),
         ],
       }),
