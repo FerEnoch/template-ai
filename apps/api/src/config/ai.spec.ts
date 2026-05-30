@@ -24,12 +24,28 @@ describe("AI_CONFIG", () => {
     expect(AI_CONFIG.model).toBe("openai/gpt-4o");
   });
 
-  it("defaults model to google/gemini-2.5-flash:free when AI_MODEL is not set", async () => {
+  it("is undefined when AI_MODEL is not set (no hardcoded fallback)", async () => {
     delete process.env.AI_MODEL;
 
     const { AI_CONFIG } = await import("./ai.js");
 
-    expect(AI_CONFIG.model).toBe("google/gemini-2.5-flash:free");
+    expect(AI_CONFIG.model).toBeUndefined();
+  });
+
+  it("resolves modelFallback from AI_MODEL_FALLBACK env var", async () => {
+    process.env.AI_MODEL_FALLBACK = "google/gemma-4-31b-it:free";
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.modelFallback).toBe("google/gemma-4-31b-it:free");
+  });
+
+  it("is undefined when AI_MODEL_FALLBACK is not set (no hardcoded fallback)", async () => {
+    delete process.env.AI_MODEL_FALLBACK;
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.modelFallback).toBeUndefined();
   });
 
   it("exposes apiKey from OPENROUTER_API_KEY", async () => {

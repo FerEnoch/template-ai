@@ -22,6 +22,7 @@ vi.mock("openai", () => {
 vi.mock("../config/ai.js", () => ({
   AI_CONFIG: {
     model: "test-model",
+    modelFallback: undefined,
     apiKey: "test-api-key",
     maxTokens: 4096,
     temperature: 0.1,

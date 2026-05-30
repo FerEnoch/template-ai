@@ -82,11 +82,13 @@ Ejemplo de salida:
 
 const JSON_SCHEMA = {
   type: "object" as const,
+  additionalProperties: false,
   properties: {
     entities: {
       type: "array" as const,
       items: {
         type: "object" as const,
+        additionalProperties: false,
         properties: {
           label: { type: "string" as const },
           value: { type: "string" as const },
@@ -100,6 +102,7 @@ const JSON_SCHEMA = {
           },
           sourceSpan: {
             type: "object" as const,
+            additionalProperties: false,
             properties: {
               start: { type: "number" as const },
               end: { type: "number" as const },
@@ -133,9 +136,17 @@ export class OpenRouterService {
   }
 
   async extractEntities(documentText: string): Promise<ExtractEntitiesResult> {
+    const model = AI_CONFIG.model;
+    if (!model) {
+      throw new OpenRouterError(
+        "AI_MODEL is not configured. Set AI_MODEL in your environment.",
+        "MODEL_NOT_CONFIGURED",
+      );
+    }
+
     try {
       const response = await this.client.chat.completions.create({
-        model: AI_CONFIG.model,
+        model,
         max_tokens: AI_CONFIG.maxTokens,
         temperature: AI_CONFIG.temperature,
         response_format: {

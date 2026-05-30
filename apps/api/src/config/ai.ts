@@ -4,7 +4,8 @@ import { getApiEnv } from "./env.js";
 const env = getApiEnv();
 
 export const AI_CONFIG = {
-  model: process.env.AI_MODEL ?? "google/gemini-2.5-flash:free",
+  model: process.env.AI_MODEL,
+  modelFallback: process.env.AI_MODEL_FALLBACK,
   apiKey: env.OPENROUTER_API_KEY,
   maxTokens: 4096,
   temperature: 0.1,
