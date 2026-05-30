@@ -1,10 +1,14 @@
 import {
   Controller,
   Post,
+  HttpCode,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
   InternalServerErrorException,
+  ParseFilePipe,
+  FileTypeValidator,
+  MaxFileSizeValidator,
   Logger,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -30,9 +34,20 @@ export class DocumentsController {
   public constructor(private readonly documentsService: DocumentsService) {}
 
   @Post("upload")
+  @HttpCode(200)
   @UseInterceptors(FileInterceptor("file", multerOptions))
   public async upload(
-    @UploadedFile() file: Express.Multer.File | undefined,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new FileTypeValidator({
+            fileType: /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|image\/jpeg)$/,
+          }),
+          new MaxFileSizeValidator({ maxSize: 25 * 1024 * 1024 }),
+        ],
+      }),
+    )
+    file: Express.Multer.File | undefined,
   ): Promise<{
     id: string;
     filename: string;

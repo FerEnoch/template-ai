@@ -4,7 +4,7 @@
 
 ### Requirement: API bootstrap contract
 
-`apps/api` MUST validate `PORT`, `NODE_ENV`, and `DATABASE_URL` before serving traffic. Startup MUST fail fast on invalid env.
+`apps/api` MUST validate `PORT`, `NODE_ENV`, `DATABASE_URL`, and `OPENROUTER_API_KEY` before serving traffic. Startup MUST fail fast on invalid or missing env values. The `AI_MODEL` variable is optional and defaults to `google/gemini-2.5-flash:free`.
 
 #### Scenario: API starts from valid env
 - GIVEN valid api env values
@@ -15,6 +15,17 @@
 - GIVEN `DATABASE_URL` is missing or invalid
 - WHEN the operator starts `apps/api`
 - THEN startup exits non-zero before serving requests
+
+#### Scenario: API starts with all required env including AI key
+- GIVEN valid api env values including `OPENROUTER_API_KEY`
+- WHEN the operator runs the pnpm command
+- THEN the app listens on the configured port with AI services initialized
+
+#### Scenario: API rejects missing AI key
+- GIVEN `OPENROUTER_API_KEY` is missing
+- WHEN the operator starts `apps/api`
+- THEN startup exits non-zero before serving requests
+- AND the error message identifies `OPENROUTER_API_KEY` as missing
 
 ### Requirement: Web bootstrap contract
 

@@ -304,31 +304,20 @@ describe("TemplatesService", () => {
       expect(mockPostgres.withOwnerTransaction).toHaveBeenCalledWith(0, expect.any(Function));
     });
 
-    it("should throw ConflictException when a template with the same name already exists for the user", async () => {
-      const existingRecord = makeTemplateRecord({ name: "Duplicate Name" });
-
-      // Override the mock to make the uniqueness check find an existing template
+    it("should throw ConflictException when the database unique constraint rejects a duplicate name", async () => {
+      // Override the mock to make the INSERT throw a unique violation (pg error code 23505)
       const mockClient = { query: vi.fn() };
       mockClient.query.mockImplementation((sql: string) => {
         if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK" || sql.includes("SET LOCAL")) {
           return Promise.resolve({ rowCount: 0, rows: [] });
         }
-        // findByNameAndUserId returns existing template
-        if (sql.includes("SELECT") && sql.includes("FROM templates") && sql.includes("WHERE name =") && sql.includes("AND user_id =")) {
-          return Promise.resolve({
-            rowCount: 1,
-            rows: [{
-              id: existingRecord.id,
-              user_id: existingRecord.userId,
-              name: existingRecord.name,
-              description: existingRecord.description,
-              document_id: existingRecord.documentId,
-              category: existingRecord.category,
-              status: existingRecord.status,
-              entities: JSON.stringify(existingRecord.entities),
-              created_at: existingRecord.createdAt,
-            }],
-          });
+        // INSERT INTO templates throws a unique violation
+        if (sql.includes("INSERT INTO templates")) {
+          const error = new Error(
+            'duplicate key value violates unique constraint "templates_name_unique_per_user"',
+          );
+          (error as unknown as Record<string, unknown>).code = "23505";
+          return Promise.reject(error);
         }
         return Promise.resolve({ rowCount: 0, rows: [] });
       });

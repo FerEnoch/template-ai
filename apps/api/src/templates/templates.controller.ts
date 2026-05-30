@@ -3,8 +3,9 @@ import { TemplateSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
 
-// Build the creation schema by omitting server-generated fields
-const CreateTemplateBody = TemplateSchema.omit({ id: true, createdAt: true });
+// Build the creation schema: omit server-generated fields and status (backend
+// defaults to "draft" when not provided — see controller create() method).
+const CreateTemplateBody = TemplateSchema.omit({ id: true, createdAt: true, status: true });
 
 @Controller("templates")
 export class TemplatesController {
@@ -51,7 +52,7 @@ export class TemplatesController {
       documentId: parsed.data.documentId,
       entities: parsed.data.entities,
       category: parsed.data.category,
-      status: parsed.data.status,
+      status: "draft",
     };
 
     return this.templatesService.create(data);

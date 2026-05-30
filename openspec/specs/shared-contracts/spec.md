@@ -24,7 +24,7 @@ The system MUST provide `packages/contracts` as a pnpm workspace package. The pa
 
 ### Requirement: Document schema
 
-The system MUST define a `Document` schema with fields: `id` (uuid string), `filename` (non-empty string), `mimeType` (enum: PDF, DOCX, JPG), `sizeBytes` (positive integer, max 25MB), `status` (enum: pending, uploading, uploaded, failed), `uploadedAt` (ISO datetime string).
+The system MUST define a `Document` schema with fields: `id` (uuid string), `filename` (non-empty string), `mimeType` (enum: PDF, DOCX, JPG), `sizeBytes` (positive integer, max 25MB), `status` (enum: pending, uploading, uploaded, failed), `uploadedAt` (ISO datetime string), `filePath` (string, path to persisted file on disk, nullable for backward compatibility).
 
 #### Scenario: Valid document passes validation
 
@@ -37,6 +37,18 @@ The system MUST define a `Document` schema with fields: `id` (uuid string), `fil
 - GIVEN a document with `sizeBytes: 30_000_000`
 - WHEN parsed by the Document schema
 - THEN validation fails with a size constraint error
+
+#### Scenario: Valid document with filePath passes validation
+
+- GIVEN a document object with all existing fields plus `filePath: "/uploads/abc123-report.pdf"`
+- WHEN parsed by the Document schema
+- THEN validation succeeds and `filePath` is accessible on the inferred type
+
+#### Scenario: Document without filePath still valid (backward compat)
+
+- GIVEN a legacy document object without `filePath`
+- WHEN parsed by the Document schema
+- THEN validation succeeds (filePath is optional/nullable)
 
 ### Requirement: Entity schema
 

@@ -4,6 +4,20 @@ import { TemplatesRepository } from "../infrastructure/postgres/repositories/tem
 import type { CreateTemplateInput } from "../infrastructure/postgres/repositories/templates.repository";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Detect PostgreSQL unique violation (error code 23505). */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as Record<string, unknown>).code === "23505"
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
 
@@ -65,20 +79,15 @@ export class TemplatesService {
 
   /**
    * Create a new template.
-   * Checks for duplicate name before inserting.
-   * Throws ConflictException if a template with the same name already exists for this user.
+   * Relies on the UNIQUE (user_id, name) constraint in PostgreSQL to detect
+   * duplicates. Catches unique violation (code 23505) and throws ConflictException.
+   * This avoids the TOCTOU race of a SELECT-then-INSERT pattern.
    */
   async create(data: CreateTemplateData): Promise<TemplateResponse> {
     const userId = 0; // POC sentinel
 
     return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
       const repo = new TemplatesRepository(client);
-
-      // Uniqueness check
-      const existing = await repo.findByNameAndUserId(data.name, userId);
-      if (existing) {
-        throw new ConflictException("A template with this name already exists");
-      }
 
       const input: CreateTemplateInput = {
         userId,
@@ -90,8 +99,15 @@ export class TemplatesService {
         entities: data.entities,
       };
 
-      const record = await repo.create(input);
-      return this.mapToResponse(record);
+      try {
+        const record = await repo.create(input);
+        return this.mapToResponse(record);
+      } catch (error: unknown) {
+        if (isUniqueViolation(error)) {
+          throw new ConflictException("A template with this name already exists");
+        }
+        throw error;
+      }
     });
   }
 
