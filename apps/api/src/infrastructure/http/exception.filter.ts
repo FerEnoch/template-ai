@@ -1,18 +1,40 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from "@nestjs/common";
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from "@nestjs/common";
 import { Response } from "express";
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   public catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest();
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
       const error = this.extractMessage(exceptionResponse);
+
+      // Log 5xx server errors with full stack; log 4xx client errors at warn level
+      if (status >= 500) {
+        this.logger.error(
+          `HTTP ${status} ${request.method} ${request.url} — ${error}`,
+          (exception as Error).stack,
+        );
+      } else {
+        this.logger.warn(
+          `HTTP ${status} ${request.method} ${request.url} — ${error}`,
+        );
+      }
+
       response.status(status).json({ error });
     } else {
+      // Non-HttpException — always an unexpected 500. Log with stack so we can debug.
+      this.logger.error(
+        `Unhandled exception on ${request.method} ${request.url}`,
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+
       response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         error: "Internal server error",
       });
