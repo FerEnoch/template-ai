@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import OpenAI from "openai";
 import { z } from "zod";
 import { AI_CONFIG } from "../config/ai.js";
@@ -123,6 +123,7 @@ const JSON_SCHEMA = {
 @Injectable()
 export class OpenRouterService {
   private readonly client: OpenAI;
+  private readonly logger = new Logger(OpenRouterService.name);
 
   constructor() {
     this.client = new OpenAI({
@@ -144,6 +145,30 @@ export class OpenRouterService {
       );
     }
 
+    try {
+      return await this.callModel(model, documentText);
+    } catch (error) {
+      // If the primary model is not found (404) and a fallback is configured, retry
+      if (
+        error instanceof OpenRouterError &&
+        error.code === "MODEL_NOT_FOUND" &&
+        AI_CONFIG.modelFallback
+      ) {
+        this.logger.warn(
+          `Primary model "${model}" not found — falling back to "${AI_CONFIG.modelFallback}"`,
+        );
+        return await this.callModel(AI_CONFIG.modelFallback, documentText);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Execute the AI extraction call against a specific model.
+   * Extracted to enable model fallback without duplicating the try/catch logic.
+   */
+  private async callModel(model: string, documentText: string): Promise<ExtractEntitiesResult> {
     try {
       const response = await this.client.chat.completions.create({
         model,
@@ -206,7 +231,7 @@ export class OpenRouterService {
 
       if (status === 404) {
         throw new OpenRouterError(
-          `Model not found: ${AI_CONFIG.model}`,
+          `Model not found: ${model}`,
           "MODEL_NOT_FOUND",
         );
       }
