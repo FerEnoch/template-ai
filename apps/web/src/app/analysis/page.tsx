@@ -116,7 +116,12 @@ function AnalysisContent() {
         attempt++;
         try {
           const response = await fetch(`/api/analysis/${documentId}`);
-          if (!response.ok) return;
+          if (!response.ok) {
+            clearInterval(interval);
+            setError(`Error del servidor (${response.status}): el análisis no pudo completarse. Intentá de nuevo.`);
+            setIsUploading(false);
+            return;
+          }
 
           const result: AnalysisResult = await response.json();
           setAnalysisResult(result);
