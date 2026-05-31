@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
@@ -51,6 +51,8 @@ type Phase1Result =
 
 @Injectable()
 export class AnalysisService {
+  private readonly logger = new Logger(AnalysisService.name);
+
   public constructor(
     private readonly postgres: PostgresService,
     private readonly documentAnalysisService: DocumentAnalysisService,
@@ -79,6 +81,10 @@ export class AnalysisService {
       }
 
       const result = results[0];
+
+      this.logger.log(
+        `Phase 1: documentId=${documentId} status=${result.status} progress=${result.progress} retryCount=${result.retryCount}`,
+      );
 
       // Terminal states — return as-is
       if (result.status === "completed") {
@@ -130,7 +136,17 @@ export class AnalysisService {
     // Fase 2: Fuera de transacción — leer documento + llamar a AI
     // -----------------------------------------------------------------------
     const document = await this.fetchDocument(phase1Result.documentId, 0);
+    this.logger.log(
+      `Phase 2: document ${phase1Result.documentId} — ` +
+      `${document ? `found, filePath=${document.filePath ?? '(null)'}` : "NOT FOUND (null)"}`,
+    );
+
     const aiResult = await this.documentAnalysisService.analyze(document?.filePath ?? null);
+    this.logger.log(
+      `Phase 2: AI result — success=${aiResult.success}, ` +
+      `entities=${aiResult.entities?.length ?? 0}, ` +
+      `error=${aiResult.error ?? "none"}`,
+    );
 
     // -----------------------------------------------------------------------
     // Fase 3: Transacción corta #2 — escribir entidades o registrar falla
@@ -139,6 +155,10 @@ export class AnalysisService {
       const analysisRepo = new AnalysisResultsRepository(client);
 
       if (!aiResult.success) {
+        this.logger.warn(
+          `Phase 3: marking analysis ${phase1Result.analysisResultId} as failed — ` +
+          `retryCount will be incremented, error: ${aiResult.error ?? "Unknown error"}`,
+        );
         await analysisRepo.incrementRetryCount(phase1Result.analysisResultId, aiResult.error ?? "Unknown error");
         const failed = await analysisRepo.updateStatus(phase1Result.analysisResultId, "failed");
         if (!failed) {
@@ -170,6 +190,10 @@ export class AnalysisService {
         throw new NotFoundException("Analysis result not found after status update");
       }
 
+      this.logger.log(
+        `Phase 3: analysis ${phase1Result.analysisResultId} completed — ` +
+        `${insertedEntities.length} entities inserted`,
+      );
       return this.mapToAnalysisResult(completed, insertedEntities);
     });
   }
