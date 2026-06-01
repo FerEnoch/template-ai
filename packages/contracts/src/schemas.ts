@@ -10,7 +10,7 @@ export const DocumentSchema = z.object({
     "image/jpeg",
   ]),
   sizeBytes: z.number().min(1).max(25 * 1024 * 1024),
-  status: z.enum(["pending", "processing", "completed", "failed"]),
+  status: z.enum(["pending", "processing", "analyzing", "completed", "failed"]),
   uploadedAt: z.string().datetime(),
   filePath: z.string().optional(),
 });
@@ -35,11 +35,12 @@ export const EntitySchema = z.object({
 // Analysis result schema: outcome of document analysis job
 export const AnalysisResultSchema = z.object({
   documentId: z.string().uuid(),
-  status: z.enum(["pending", "processing", "completed", "failed"]),
+  status: z.enum(["pending", "processing", "analyzing", "completed", "failed"]),
   entities: z.array(EntitySchema),
   progress: z.number().min(0).max(100),
   startedAt: z.string().datetime().optional(),
   completedAt: z.string().datetime().optional(),
+  extractedText: z.string().nullable(),
 });
 
 // Template schema: a saved document template ready for reuse

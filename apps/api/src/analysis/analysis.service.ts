@@ -16,6 +16,7 @@ export interface AnalysisResult {
   startedAt: string;
   completedAt: string | null;
   entities: AnalysisEntity[];
+  extractedText: string | null;
 }
 
 export interface AnalysisEntity {
@@ -183,6 +184,11 @@ export class AnalysisService {
         await entitiesRepo.bulkInsert(entityInputs);
       }
 
+      // Save extracted text for document preview
+      if (aiResult.extractedText) {
+        await analysisRepo.saveExtractedText(phase1Result.analysisResultId, aiResult.extractedText);
+      }
+
       const insertedEntities = await entitiesRepo.findByAnalysisResultId(phase1Result.analysisResultId);
       const completed = await analysisRepo.updateStatus(phase1Result.analysisResultId, "completed");
 
@@ -248,6 +254,7 @@ export class AnalysisService {
       progress: record.progress,
       startedAt: record.startedAt.toISOString(),
       completedAt: record.completedAt ? record.completedAt.toISOString() : null,
+      extractedText: record.extractedText,
       entities: entities.map((e) => ({
         id: e.id,
         label: e.label,
