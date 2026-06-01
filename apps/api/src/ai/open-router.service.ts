@@ -215,7 +215,16 @@ export class OpenRouterService {
         );
       }
 
-      const entityArray = parsed.entities ?? parsed;
+      // Narrow parsed from unknown: if it's an object with an "entities" key,
+      // unwrap it (json_schema mode wraps output). Otherwise use the raw value
+      // directly (model might return a bare array).
+      const entityArray: unknown =
+        parsed !== null &&
+        typeof parsed === "object" &&
+        !Array.isArray(parsed) &&
+        "entities" in parsed
+          ? (parsed as Record<string, unknown>).entities
+          : parsed;
 
       const result = AiEntityArraySchema.safeParse(entityArray);
 
