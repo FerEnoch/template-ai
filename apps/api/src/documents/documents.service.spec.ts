@@ -32,6 +32,7 @@ function makeAnalysisResultRecord(overrides: Partial<AnalysisResultRecord> = {})
     completedAt: null,
     retryCount: 0,
     errorMessage: null,
+    extractedText: null,
     ...overrides,
   };
 }

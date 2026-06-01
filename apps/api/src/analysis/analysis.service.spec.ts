@@ -19,6 +19,7 @@ function makeAnalysisResultRecord(
     completedAt: null,
     retryCount: 0,
     errorMessage: null,
+    extractedText: null,
     ...overrides,
   };
 }
@@ -77,6 +78,11 @@ function createMockPostgresService(setup: {
   documentRecords?: DocumentRecord[];
   incrementedRecord?: AnalysisResultRecord;
   statusUpdatedRecord?: AnalysisResultRecord;
+  /**
+   * When true, atomicTransitionToAnalyzing returns 0 rows
+   * (simulating a lost race where another request already transitioned).
+   */
+  atomicTransitionNoop?: boolean;
 }): PostgresService {
   const { analysisRecords, entityRecords = [], documentRecords = [] } = setup;
 
@@ -126,6 +132,29 @@ function createMockPostgresService(setup: {
               completed_at: null,
               retry_count: (record.retryCount ?? 0) + 1,
               error_message: typeof params?.[1] === "string" ? params[1] : "AI extraction failed",
+            },
+          ],
+        });
+      }
+
+      // UPDATE analysis_results — atomicTransitionToAnalyzing (has AND status = 'processing')
+      if (sql.includes("UPDATE analysis_results") && sql.includes("AND status = 'processing'")) {
+        if (setup.atomicTransitionNoop) {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        const record = analysisRecords[0];
+        return Promise.resolve({
+          rowCount: 1,
+          rows: [
+            {
+              id: record.id,
+              document_id: record.documentId,
+              status: "analyzing",
+              progress: Math.min(record.progress + 25, 100),
+              started_at: record.startedAt,
+              completed_at: null,
+              retry_count: record.retryCount ?? 0,
+              error_message: record.errorMessage ?? null,
             },
           ],
         });
@@ -262,6 +291,11 @@ function createMockPostgresService(setup: {
         return result;
       },
     ),
+    withConnection: vi.fn(
+      async (cb: (client: unknown) => Promise<unknown>) => {
+        return await cb(mockClient as never);
+      },
+    ),
   } as unknown as PostgresService;
 
   return mockPostgres;
@@ -367,7 +401,42 @@ describe("AnalysisService", () => {
       expect(result.progress).toBe(100);
       expect(result.status).toBe("completed");
       expect(result.documentId).toBe("doc-1");
+      expect(result.extractedText).toBeNull(); // mock did not include extractedText
       expect(mockAnalyze).toHaveBeenCalledWith("/uploads/test.pdf");
+    });
+
+    it("should return terminal (no entities) when atomic guard is lost to a concurrent request", async () => {
+      const initialRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 75,
+      });
+      const incrementedRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "processing",
+        progress: 100,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [initialRecord],
+        incrementedRecord,
+        atomicTransitionNoop: true, // <-- atomic guard returns null (race lost)
+      });
+      const mockDocAnalysis = createMockDocumentAnalysisService();
+      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+
+      const result = await service.getFullResult("doc-1");
+
+      // Lost the race — returns terminal with progress 100 but NO entities
+      // Status remains "processing" because the atomic guard didn't transition it
+      expect(result.status).toBe("processing");
+      expect(result.progress).toBe(100);
+      expect(result.entities).toEqual([]);
+      // AI was NOT called (another request won the atomic guard)
+      expect(mockAnalyze).not.toHaveBeenCalled();
+      // Next poll will see "analyzing" (set by the winner) and eventually "completed"
     });
 
     it("should return completed result as-is (idempotent)", async () => {
@@ -581,7 +650,7 @@ describe("AnalysisService", () => {
     });
   });
 
-  describe("getStatus", () => {
+  describe("getStatus (read-only)", () => {
     it("should throw NotFoundException when document has no analysis result", async () => {
       const mockPostgres = createMockPostgresService({ analysisRecords: [] });
       const mockDocAnalysis = createMockDocumentAnalysisService();
@@ -590,7 +659,7 @@ describe("AnalysisService", () => {
       await expect(service.getStatus("nonexistent-id")).rejects.toThrow(NotFoundException);
     });
 
-    it("should return completed status with progress 100 without incrementing", async () => {
+    it("should return completed status without modifying anything", async () => {
       const completedRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -611,7 +680,7 @@ describe("AnalysisService", () => {
       expect(result.documentId).toBe("doc-1");
     });
 
-    it("should return failed status without incrementing progress", async () => {
+    it("should return failed status without side effects", async () => {
       const failedRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -631,7 +700,7 @@ describe("AnalysisService", () => {
       expect(result.progress).toBe(30);
     });
 
-    it("should return pending status without incrementing progress", async () => {
+    it("should return pending status without side effects", async () => {
       const pendingRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -651,72 +720,48 @@ describe("AnalysisService", () => {
       expect(result.progress).toBe(0);
     });
 
-    it("should increment progress when status is processing", async () => {
+    it("should return analyzing status without side effects", async () => {
+      const analyzingRecord = makeAnalysisResultRecord({
+        id: "analysis-1",
+        documentId: "doc-1",
+        status: "analyzing",
+        progress: 100,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        analysisRecords: [analyzingRecord],
+      });
+      const mockDocAnalysis = createMockDocumentAnalysisService();
+      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+
+      const result = await service.getStatus("doc-1");
+
+      expect(result.status).toBe("analyzing");
+      expect(result.progress).toBe(100);
+    });
+
+    it("should return processing status without incrementing progress", async () => {
       const processingRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
         status: "processing",
         progress: 50,
       });
-      const incrementedRecord = makeAnalysisResultRecord({
-        id: "analysis-1",
-        documentId: "doc-1",
-        status: "processing",
-        progress: 75,
-      });
 
       const mockPostgres = createMockPostgresService({
         analysisRecords: [processingRecord],
-        incrementedRecord,
       });
+      // The mock's withConnection will use the same mockClient;
+      // no incrementedRecord is needed because getStatus no longer mutates.
       const mockDocAnalysis = createMockDocumentAnalysisService();
       const service = new AnalysisService(mockPostgres, mockDocAnalysis);
 
       const result = await service.getStatus("doc-1");
 
+      // Read-only: returns the exact stored progress without incrementing
       expect(result.status).toBe("processing");
-      expect(result.progress).toBe(75);
-    });
-
-    it("should transition to completed when getStatus increments progress to 100", async () => {
-      const processingRecord = makeAnalysisResultRecord({
-        id: "analysis-1",
-        documentId: "doc-1",
-        status: "processing",
-        progress: 75,
-      });
-      const incrementedRecord = makeAnalysisResultRecord({
-        id: "analysis-1",
-        documentId: "doc-1",
-        status: "processing",
-        progress: 100,
-      });
-      const completedRecord = makeAnalysisResultRecord({
-        id: "analysis-1",
-        documentId: "doc-1",
-        status: "completed",
-        progress: 100,
-        completedAt: new Date("2026-05-27T10:35:22.000Z"),
-      });
-
-      const mockPostgres = createMockPostgresService({
-        analysisRecords: [processingRecord],
-        incrementedRecord,
-        statusUpdatedRecord: completedRecord,
-      });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
-
-      const result = await service.getStatus("doc-1");
-
-      expect(result.status).toBe("completed");
-      expect(result.progress).toBe(100);
-      expect(result).not.toHaveProperty("entities");
-      expect(result).toEqual({
-        documentId: "doc-1",
-        status: "completed",
-        progress: 100,
-      });
+      expect(result.progress).toBe(50);
+      expect(result.documentId).toBe("doc-1");
     });
   });
 });

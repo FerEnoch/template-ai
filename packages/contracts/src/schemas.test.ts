@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EntitySchema } from "./schemas.js";
+import { AnalysisResultSchema, EntitySchema } from "./schemas.js";
 
 describe("EntitySchema", () => {
   const validEntity = {
@@ -58,5 +58,50 @@ describe("EntitySchema", () => {
     if (result.success) {
       expect(result.data.excluded).toBe(true);
     }
+  });
+});
+
+describe("AnalysisResultSchema", () => {
+  const validResult = {
+    documentId: "550e8400-e29b-41d4-a716-446655440000",
+    status: "completed" as const,
+    entities: [],
+    progress: 100,
+    extractedText: null,
+  };
+
+  it("accepts extractedText as null (legacy documents)", () => {
+    const result = AnalysisResultSchema.safeParse(validResult);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.extractedText).toBeNull();
+    }
+  });
+
+  it("accepts extractedText as a string", () => {
+    const result = AnalysisResultSchema.safeParse({
+      ...validResult,
+      extractedText: "Cláusula primera: El comprador adquiere el inmueble...",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.extractedText).toBe(
+        "Cláusula primera: El comprador adquiere el inmueble...",
+      );
+    }
+  });
+
+  it("rejects when extractedText is missing", () => {
+    const { extractedText, ...withoutText } = validResult;
+    const result = AnalysisResultSchema.safeParse(withoutText);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects when extractedText is a number", () => {
+    const result = AnalysisResultSchema.safeParse({
+      ...validResult,
+      extractedText: 123,
+    });
+    expect(result.success).toBe(false);
   });
 });

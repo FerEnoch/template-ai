@@ -199,4 +199,50 @@ describe("MSW Handlers (unit)", () => {
       expect(response.status).toBe(404);
     });
   });
+
+  describe("Analysis polling flow (GET /:id/status → GET /:id)", () => {
+    const docId = "e07c2a2f-510b-41b8-8dd6-cf5d68849e5b";
+
+    it("GET /:id/status returns lightweight status (no entities, no extractedText)", async () => {
+      const response = await invokeHandler(
+        "GET",
+        `http://localhost/api/analysis/${docId}/status`,
+      );
+      expect(response.status).toBe(200);
+
+      const body = await response.json();
+      expect(body).toHaveProperty("documentId");
+      expect(body).toHaveProperty("status");
+      expect(body).toHaveProperty("progress");
+      // Status endpoint is lightweight — must NOT include heavy fields
+      expect(body).not.toHaveProperty("entities");
+      expect(body).not.toHaveProperty("extractedText");
+    });
+
+    it("GET /:id returns completed result with extractedText after full analysis", async () => {
+      // Drive analysis to completion via GET /:id (the mutating endpoint)
+      let finalStatus = "";
+      for (let i = 0; i < 10; i++) {
+        const response = await invokeHandler(
+          "GET",
+          `http://localhost/api/analysis/${docId}`,
+        );
+        const body = await response.json();
+        finalStatus = body.status;
+        if (finalStatus === "completed") break;
+      }
+      expect(finalStatus).toBe("completed");
+
+      // Fetch once more to get the final completed result
+      const response = await invokeHandler(
+        "GET",
+        `http://localhost/api/analysis/${docId}`,
+      );
+      const body = await response.json();
+      expect(body.status).toBe("completed");
+      expect(Array.isArray(body.entities)).toBe(true);
+      // Must include extractedText field (nullable, but present)
+      expect(body).toHaveProperty("extractedText");
+    });
+  });
 });

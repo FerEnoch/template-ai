@@ -16,6 +16,7 @@ function makeAnalysisResult(overrides: Partial<AnalysisResult> = {}): AnalysisRe
     startedAt: "2026-05-27T10:30:05.000Z",
     completedAt: null,
     entities: [],
+    extractedText: null,
     ...overrides,
   };
 }
@@ -67,6 +68,7 @@ describe("AnalysisController", () => {
         progress: 100,
         startedAt: "2026-05-27T10:30:05.000Z",
         completedAt: "2026-05-27T10:35:22.000Z",
+        extractedText: null,
         entities: [
           {
             id: "entity-1",

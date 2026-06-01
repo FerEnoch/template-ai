@@ -31,6 +31,7 @@ const sampleRow: Record<string, unknown> = {
   completed_at: null,
   retry_count: 0,
   error_message: null,
+  extracted_text: null,
 };
 
 const sampleInput: CreateAnalysisResultInput = {
@@ -57,6 +58,7 @@ describe("AnalysisResultsRepository", () => {
         completedAt: null,
         retryCount: 0,
         errorMessage: null,
+        extractedText: null,
       } satisfies AnalysisResultRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
@@ -177,6 +179,52 @@ describe("AnalysisResultsRepository", () => {
         "completed",
       );
       expect(result).toBeNull();
+    });
+  });
+
+  describe("atomicTransitionToAnalyzing", () => {
+    it("transitions from 'processing' to 'analyzing' atomically", async () => {
+      const analyzingRow = { ...sampleRow, status: "analyzing" };
+      const { client, querySpy } = mockPoolClient([analyzingRow]);
+      repo = new AnalysisResultsRepository(client);
+
+      const result = await repo.atomicTransitionToAnalyzing(
+        "550e8400-e29b-41d4-a716-446655440000",
+      );
+
+      expect(result).toEqual(expect.objectContaining({ status: "analyzing" }));
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("AND status = 'processing'"),
+        ["550e8400-e29b-41d4-a716-446655440000"],
+      );
+    });
+
+    it("returns null when status is NOT 'processing' (race lost)", async () => {
+      const { client } = mockPoolClient([]);
+      repo = new AnalysisResultsRepository(client);
+
+      const result = await repo.atomicTransitionToAnalyzing(
+        "00000000-0000-0000-0000-000000000000",
+      );
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe("saveExtractedText", () => {
+    it("saves extracted text for an analysis result", async () => {
+      const { client, querySpy } = mockPoolClient([]);
+      repo = new AnalysisResultsRepository(client);
+
+      await repo.saveExtractedText(
+        "550e8400-e29b-41d4-a716-446655440000",
+        "Sample extracted text content",
+      );
+
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE analysis_results SET extracted_text"),
+        ["550e8400-e29b-41d4-a716-446655440000", "Sample extracted text content"],
+      );
     });
   });
 
