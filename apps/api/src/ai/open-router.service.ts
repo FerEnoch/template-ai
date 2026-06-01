@@ -148,14 +148,15 @@ export class OpenRouterService {
     try {
       return await this.callModel(model, documentText);
     } catch (error) {
-      // If the primary model is not found (404) and a fallback is configured, retry
+      // Fallback: retry with secondary model on MODEL_NOT_FOUND or RATE_LIMIT
       if (
         error instanceof OpenRouterError &&
-        error.code === "MODEL_NOT_FOUND" &&
+        (error.code === "MODEL_NOT_FOUND" || error.code === "RATE_LIMIT") &&
         AI_CONFIG.modelFallback
       ) {
+        const reason = error.code === "RATE_LIMIT" ? "rate limited" : "not found";
         this.logger.warn(
-          `Primary model "${model}" not found — falling back to "${AI_CONFIG.modelFallback}"`,
+          `Primary model "${model}" ${reason} — falling back to "${AI_CONFIG.modelFallback}"`,
         );
         return await this.callModel(AI_CONFIG.modelFallback, documentText);
       }

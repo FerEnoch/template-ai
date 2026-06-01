@@ -1,4 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+
+// Mock AI_CONFIG before any imports that transitively load config/ai.ts
+// (which calls getApiEnv() requiring PORT in the environment)
+vi.mock("../config/ai.js", () => ({
+  AI_CONFIG: {
+    model: "test-model",
+    modelFallback: "test-fallback",
+    apiKey: "test-key",
+    maxTokens: 4096,
+    temperature: 0.1,
+  },
+}));
+
 import { DocumentAnalysisService } from "./document-analysis.service.js";
 import { OpenRouterService } from "./open-router.service.js";
 import type { AnalyzeResult } from "./document-analysis.service.js";

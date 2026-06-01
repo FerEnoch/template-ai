@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
-import { OpenRouterService } from "./open-router.service.js";
+import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
@@ -17,6 +17,8 @@ export interface AnalyzeResult {
   }>;
   error?: string;
 }
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 @Injectable()
 export class DocumentAnalysisService {
@@ -83,9 +85,9 @@ export class DocumentAnalysisService {
       };
     }
 
-    // Call AI to extract entities
+    // Call AI with retry on rate limit
     try {
-      const aiResult = await this.openRouterService.extractEntities(fileContent);
+      const aiResult = await this.callAiWithRetry(fileContent);
 
       return {
         success: true,
@@ -104,5 +106,41 @@ export class DocumentAnalysisService {
 
       return { success: false, error: message };
     }
+  }
+
+  /**
+   * Call AI extraction with exponential backoff on rate limits.
+   * Primary model → (rate limit?) → fallback model → (rate limit?) → wait → retry.
+   * Gives up after exhausting all attempts.
+   */
+  private async callAiWithRetry(fileContent: string) {
+    const delays = [2_000, 5_000]; // 2s, then 5s between retries
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = delays[attempt - 1];
+          console.warn(
+            `[DocumentAnalysisService] AI rate limited — retrying in ${delay / 1000}s (attempt ${attempt})...`,
+          );
+          await sleep(delay);
+        }
+        return await this.openRouterService.extractEntities(fileContent);
+      } catch (error) {
+        lastError = error;
+        // Only retry on rate limit errors
+        if (
+          error instanceof OpenRouterError &&
+          error.code === "RATE_LIMIT" &&
+          attempt < delays.length
+        ) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastError;
   }
 }
