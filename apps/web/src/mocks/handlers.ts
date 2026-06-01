@@ -18,6 +18,7 @@ let storedAnalysisResult: AnalysisResult = {
   entities: [] as Entity[],
   progress: 0,
   startedAt: new Date().toISOString(),
+  extractedText: null,
 };
 let storedEntities: Entity[] = SAMPLE_ENTITIES.map((e) => ({ ...e }));
 let storedTemplates: Template[] = SAMPLE_TEMPLATES.map((t) => ({
@@ -78,6 +79,7 @@ export const handlers = [
       entities: [],
       progress: 0,
       startedAt: new Date().toISOString(),
+      extractedText: null,
     };
 
     return HttpResponse.json(newDocument, { status: 200 });
@@ -112,17 +114,34 @@ export const handlers = [
     if (storedAnalysisResult.status === "processing") {
       analysisProgressTimer += 1;
 
-      // Progress increments by 20-25 per call, simulating real work
+      // Progress increments by 25 per call, simulating real work
       const newProgress = Math.min(analysisProgressTimer * 25, 100);
-      const newStatus = newProgress >= 100 ? "completed" : "processing";
 
+      if (newProgress >= 100) {
+        // Transition to "analyzing" — AI call would happen now on the real server
+        storedAnalysisResult = {
+          ...storedAnalysisResult,
+          documentId: id as string,
+          status: "analyzing",
+          progress: newProgress,
+          entities: [],
+        };
+      } else {
+        storedAnalysisResult = {
+          ...storedAnalysisResult,
+          documentId: id as string,
+          status: "processing",
+          progress: newProgress,
+          entities: [],
+        };
+      }
+    } else if (storedAnalysisResult.status === "analyzing") {
+      // Next poll: AI call "finished" — transition to completed with entities
       storedAnalysisResult = {
         ...storedAnalysisResult,
-        documentId: id as string,
-        status: newStatus,
-        progress: newProgress,
-        entities: newStatus === "completed" ? storedEntities : [],
-        completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
+        status: "completed",
+        entities: storedEntities,
+        completedAt: new Date().toISOString(),
       };
     }
 
@@ -131,7 +150,9 @@ export const handlers = [
 
   /**
    * GET /api/analysis/:id/status
-   * Lightweight endpoint for polling. Returns just the status + progress.
+   * Lightweight read-only endpoint for polling. Returns just status + progress
+   * WITHOUT side effects. Progress is exclusively driven by GET /:id.
+   * This prevents race conditions from duplicate AI triggers (Causa #3).
    */
   http.get("/api/analysis/:id/status", ({ params, request }) => {
     const { id } = params;
@@ -149,21 +170,7 @@ export const handlers = [
       );
     }
 
-    if (storedAnalysisResult.status === "processing") {
-      analysisProgressTimer += 1;
-      const newProgress = Math.min(analysisProgressTimer * 25, 100);
-      const newStatus = newProgress >= 100 ? "completed" : "processing";
-
-      storedAnalysisResult = {
-        ...storedAnalysisResult,
-        documentId: id as string,
-        status: newStatus,
-        progress: newProgress,
-        entities: newStatus === "completed" ? storedEntities : [],
-        completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
-      };
-    }
-
+    // Read-only: return current status without mutating anything
     return HttpResponse.json(
       {
         documentId: id,

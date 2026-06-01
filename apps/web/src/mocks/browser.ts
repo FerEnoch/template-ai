@@ -18,6 +18,7 @@ let storedAnalysisResult: AnalysisResult = {
   entities: [],
   progress: 0,
   startedAt: new Date().toISOString(),
+  extractedText: null,
 };
 let storedEntities: Entity[] = SAMPLE_ENTITIES.map((e) => ({ ...e }));
 let analysisProgressTimer = 0;
@@ -63,6 +64,7 @@ export async function initMsw() {
         entities: [],
         progress: 0,
         startedAt: new Date().toISOString(),
+        extractedText: null,
       };
 
       return HttpResponse.json(newDocument, { status: 200 });
@@ -79,15 +81,30 @@ export async function initMsw() {
       if (storedAnalysisResult.status === "processing") {
         analysisProgressTimer += 1;
         const newProgress = Math.min(analysisProgressTimer * 25, 100);
-        const newStatus = newProgress >= 100 ? "completed" : "processing";
 
+        if (newProgress >= 100) {
+          storedAnalysisResult = {
+            ...storedAnalysisResult,
+            documentId: id as string,
+            status: "analyzing",
+            progress: newProgress,
+            entities: [],
+          };
+        } else {
+          storedAnalysisResult = {
+            ...storedAnalysisResult,
+            documentId: id as string,
+            status: "processing",
+            progress: newProgress,
+            entities: [],
+          };
+        }
+      } else if (storedAnalysisResult.status === "analyzing") {
         storedAnalysisResult = {
           ...storedAnalysisResult,
-          documentId: id as string,
-          status: newStatus,
-          progress: newProgress,
-          entities: newStatus === "completed" ? storedEntities : [],
-          completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
+          status: "completed",
+          entities: storedEntities,
+          completedAt: new Date().toISOString(),
         };
       }
 
@@ -104,15 +121,30 @@ export async function initMsw() {
       if (storedAnalysisResult.status === "processing") {
         analysisProgressTimer += 1;
         const newProgress = Math.min(analysisProgressTimer * 25, 100);
-        const newStatus = newProgress >= 100 ? "completed" : "processing";
 
+        if (newProgress >= 100) {
+          storedAnalysisResult = {
+            ...storedAnalysisResult,
+            documentId: id as string,
+            status: "analyzing",
+            progress: newProgress,
+            entities: [],
+          };
+        } else {
+          storedAnalysisResult = {
+            ...storedAnalysisResult,
+            documentId: id as string,
+            status: "processing",
+            progress: newProgress,
+            entities: [],
+          };
+        }
+      } else if (storedAnalysisResult.status === "analyzing") {
         storedAnalysisResult = {
           ...storedAnalysisResult,
-          documentId: id as string,
-          status: newStatus,
-          progress: newProgress,
-          entities: newStatus === "completed" ? storedEntities : [],
-          completedAt: newStatus === "completed" ? new Date().toISOString() : undefined,
+          status: "completed",
+          entities: storedEntities,
+          completedAt: new Date().toISOString(),
         };
       }
 

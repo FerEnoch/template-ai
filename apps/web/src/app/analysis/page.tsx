@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check,
@@ -16,10 +16,11 @@ import { WizardLayout } from "@/components/wizard";
 import { useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import { saveDraft } from "@/lib/wizard";
-import type { AnalysisResult } from "@template-ai/contracts";
+import type { AnalysisResult, Entity } from "@template-ai/contracts";
 
 const POLLING_INTERVAL_MS = 800;
-const MAX_POLLING_ATTEMPTS = 20;
+const MAX_POLLING_ATTEMPTS = 60;
+const MAX_POLLING_TIME_MS = 55_000;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -42,7 +43,9 @@ function AnalysisContent() {
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const pollingCleanupRef = useRef<(() => void) | null>(null);
 
   // Guard: redirect if no file
   useEffect(() => {
@@ -94,7 +97,7 @@ function AnalysisContent() {
         if (cancelled) return;
 
         // Step 2: Poll for analysis result
-        pollForAnalysis(document.id);
+        pollingCleanupRef.current = pollForAnalysis(document.id);
       } catch {
         if (!cancelled) setError("Error de conexión");
         setIsUploading(false);
@@ -105,6 +108,10 @@ function AnalysisContent() {
 
     return () => {
       cancelled = true;
+      if (pollingCleanupRef.current) {
+        pollingCleanupRef.current();
+        pollingCleanupRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.file]);
@@ -112,36 +119,72 @@ function AnalysisContent() {
   const pollForAnalysis = useCallback(
     (documentId: string) => {
       let attempt = 0;
+      const startedAt = Date.now();
+
       const interval = setInterval(async () => {
         attempt++;
         try {
-          const response = await fetch(`/api/analysis/${documentId}`);
-          if (!response.ok) {
+          // Poll lightweight /status endpoint to avoid mutating state and flooding logs
+          const statusResponse = await fetch(`/api/analysis/${documentId}/status`);
+          if (!statusResponse.ok) {
             clearInterval(interval);
-            setError(`Error del servidor (${response.status}): el análisis no pudo completarse. Intentá de nuevo.`);
+            setError(`Error del servidor (${statusResponse.status}): el análisis no pudo completarse. Intentá de nuevo.`);
             setIsUploading(false);
             return;
           }
 
-          const result: AnalysisResult = await response.json();
-          setAnalysisResult(result);
+          const statusResult: { documentId: string; status: string; progress: number } =
+            await statusResponse.json();
 
-          if (result.status === "completed") {
+          if (statusResult.status === "completed") {
             clearInterval(interval);
-            // Save entities AND analysisResultId to wizard context
-            setWizardAnalysisResult(documentId, result.entities);
-            saveDraft(state.file!, documentId, result.entities);
-            setIsUploading(false);
-          } else if (result.status === "failed") {
+            // Fetch full result ONCE to get entities and extractedText
+            try {
+              const fullResponse = await fetch(`/api/analysis/${documentId}`);
+              if (!fullResponse.ok) {
+                setError(`Error del servidor (${fullResponse.status}) al obtener resultados.`);
+                setIsUploading(false);
+                return;
+              }
+              const result: AnalysisResult = await fullResponse.json();
+              setAnalysisResult(result);
+              setWarning(null);
+              setWizardAnalysisResult(documentId, result.entities);
+              saveDraft(state.file!, documentId, result.entities);
+              setIsUploading(false);
+            } catch {
+              setError("Error de conexión al obtener resultados.");
+              setIsUploading(false);
+            }
+          } else if (statusResult.status === "failed") {
             clearInterval(interval);
             setError("El análisis falló. Intentá de nuevo.");
             setIsUploading(false);
-          } else if (attempt >= MAX_POLLING_ATTEMPTS) {
-            clearInterval(interval);
-            setError("El análisis está tardando demasiado. Intentá de nuevo.");
-            setIsUploading(false);
           } else {
-            setPollingAttempts(attempt);
+            const elapsed = Date.now() - startedAt;
+            if (elapsed > MAX_POLLING_TIME_MS) {
+              // Soft warning — keep polling in case AI is just slow
+              setWarning("El análisis está tardando más de lo esperado. Seguimos intentando...");
+            }
+            if (attempt >= MAX_POLLING_ATTEMPTS) {
+              clearInterval(interval);
+              setError("El análisis está tardando demasiado. Intentá de nuevo.");
+              setIsUploading(false);
+            } else {
+              setPollingAttempts(attempt);
+              // Keep polling — progress updates via lightweight status
+              setAnalysisResult((prev) =>
+                prev
+                  ? { ...prev, progress: statusResult.progress, status: statusResult.status as AnalysisResult["status"] }
+                  : {
+                      documentId,
+                      status: statusResult.status as AnalysisResult["status"],
+                      progress: statusResult.progress,
+                      entities: [],
+                      extractedText: null,
+                    },
+              );
+            }
           }
         } catch {
           clearInterval(interval);
@@ -149,8 +192,54 @@ function AnalysisContent() {
           setIsUploading(false);
         }
       }, POLLING_INTERVAL_MS);
+
+      // Store interval for cleanup on unmount
+      return () => clearInterval(interval);
     },
-    [state.file]
+    [state.file, setWizardAnalysisResult],
+  );
+
+  const renderHighlightedText = useCallback(
+    (text: string, entities: Entity[]): React.ReactNode => {
+      const sorted = entities
+        .filter((e) => e.sourceSpan)
+        .sort((a, b) => (a.sourceSpan!.start - b.sourceSpan!.start));
+
+      if (sorted.length === 0) {
+        return <span>{text}</span>;
+      }
+
+      const segments: React.ReactNode[] = [];
+      let lastEnd = 0;
+
+      for (const entity of sorted) {
+        const span = entity.sourceSpan!;
+        if (span.start > lastEnd) {
+          segments.push(
+            <span key={`text-${lastEnd}`}>{text.slice(lastEnd, span.start)}</span>,
+          );
+        }
+        const colorClass =
+          entity.confidence === "ALTA"
+            ? "bg-success/20 border-b-2 border-success/50"
+            : "bg-warning/20 border-b-2 border-warning/50";
+        segments.push(
+          <mark
+            key={entity.id}
+            className={`rounded px-0.5 ${colorClass} cursor-help`}
+            title={`${entity.label}: ${entity.value}`}
+          >
+            {text.slice(span.start, span.end)}
+          </mark>,
+        );
+        lastEnd = span.end;
+      }
+      if (lastEnd < text.length) {
+        segments.push(<span key={`text-${lastEnd}`}>{text.slice(lastEnd)}</span>);
+      }
+      return <>{segments}</>;
+    },
+    [],
   );
 
   const handleContinue = useCallback(() => {
@@ -420,6 +509,44 @@ function AnalysisContent() {
                         <div className="h-4 w-4/6 animate-pulse rounded bg-border/50" />
                       </div>
                     </>
+                  ) : isCompleted && analysisResult ? (
+                    analysisResult.extractedText ? (
+                      <div className="space-y-4">
+                        <div className="prose prose-sm max-w-none whitespace-pre-wrap font-body text-sm leading-relaxed text-text-primary">
+                          {renderHighlightedText(
+                            analysisResult.extractedText,
+                            analysisResult.entities,
+                          )}
+                        </div>
+                        {state.file && (
+                          <div className="rounded-lg border border-border bg-background p-4">
+                            <p className="text-xs font-medium text-text-primary">
+                              {state.file.name}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              {formatBytes(state.file.size)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center gap-3 py-12">
+                        <FileText className="h-8 w-8 text-text-disabled" />
+                        <p className="text-sm text-text-secondary">
+                          Vista previa no disponible para este documento
+                        </p>
+                        {state.file && (
+                          <div className="mt-2 rounded-lg border border-border bg-background p-4">
+                            <p className="text-xs font-medium text-text-primary">
+                              {state.file.name}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              {formatBytes(state.file.size)}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )
                   ) : (
                     <>
                       <div className="h-8 w-3/4 rounded bg-border/30" />
@@ -527,6 +654,8 @@ function AnalysisContent() {
           <footer className="mt-12 flex flex-col items-center gap-4 border-t border-border pt-8">
             {error ? (
               <p className="text-sm font-medium text-danger">{error}</p>
+            ) : warning ? (
+              <p className="text-sm font-medium text-warning">{warning}</p>
             ) : (
               <p className="max-w-lg text-center font-body text-sm italic text-text-secondary">
                 &ldquo;Si algo no se puede analizar con claridad, te lo decimos
