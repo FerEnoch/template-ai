@@ -83,7 +83,7 @@ export class AnalysisService {
 
       const result = results[0];
 
-      this.logger.log(
+      this.logger.debug(
         `Phase 1: documentId=${documentId} status=${result.status} progress=${result.progress} retryCount=${result.retryCount}`,
       );
 
@@ -118,6 +118,9 @@ export class AnalysisService {
         // (entities will be populated when Phase 3 of the winner completes).
         const transitioned = await analysisRepo.atomicTransitionToAnalyzing(result.id);
         if (transitioned) {
+          this.logger.log(
+            `Phase 1: documentId=${documentId} TRANSITION → analyzing (progress=100)`,
+          );
           return { type: "needs-ai" as const, analysisResultId: result.id, documentId };
         }
         // Another request is already handling the AI call — return terminal

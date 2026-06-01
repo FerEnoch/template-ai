@@ -113,41 +113,13 @@ export async function initMsw() {
 
     /**
      * GET /api/analysis/:id/status
-     * Lightweight endpoint for polling. Returns just status + progress.
+     * Lightweight read-only endpoint for polling. Returns just status + progress
+     * WITHOUT side effects. Progress is exclusively driven by GET /:id.
      */
     http.get("/api/analysis/:id/status", ({ params }) => {
       const { id } = params;
 
-      if (storedAnalysisResult.status === "processing") {
-        analysisProgressTimer += 1;
-        const newProgress = Math.min(analysisProgressTimer * 25, 100);
-
-        if (newProgress >= 100) {
-          storedAnalysisResult = {
-            ...storedAnalysisResult,
-            documentId: id as string,
-            status: "analyzing",
-            progress: newProgress,
-            entities: [],
-          };
-        } else {
-          storedAnalysisResult = {
-            ...storedAnalysisResult,
-            documentId: id as string,
-            status: "processing",
-            progress: newProgress,
-            entities: [],
-          };
-        }
-      } else if (storedAnalysisResult.status === "analyzing") {
-        storedAnalysisResult = {
-          ...storedAnalysisResult,
-          status: "completed",
-          entities: storedEntities,
-          completedAt: new Date().toISOString(),
-        };
-      }
-
+      // Read-only: return current status without mutating anything
       return HttpResponse.json(
         {
           documentId: id,

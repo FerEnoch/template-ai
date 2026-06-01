@@ -96,7 +96,9 @@ function AnalysisContent() {
 
         if (cancelled) return;
 
-        // Step 2: Poll for analysis result
+        // Step 2: Poll GET /:id to drive the backend pipeline.
+        // Each call increments progress by 25; the 4th call triggers the AI phase.
+        // The backend's atomic guard prevents duplicate AI calls from concurrent polls.
         pollingCleanupRef.current = pollForAnalysis(document.id);
       } catch {
         if (!cancelled) setError("Error de conexión");
@@ -124,46 +126,32 @@ function AnalysisContent() {
       const interval = setInterval(async () => {
         attempt++;
         try {
-          // Poll lightweight /status endpoint to avoid mutating state and flooding logs
-          const statusResponse = await fetch(`/api/analysis/${documentId}/status`);
-          if (!statusResponse.ok) {
+          // Poll GET /:id — backend increments progress by 25 per call.
+          // Atomic guard prevents duplicate AI calls; only the 4th call triggers Phase 2.
+          const response = await fetch(`/api/analysis/${documentId}`);
+          if (!response.ok) {
             clearInterval(interval);
-            setError(`Error del servidor (${statusResponse.status}): el análisis no pudo completarse. Intentá de nuevo.`);
+            setError(`Error del servidor (${response.status}): el análisis no pudo completarse. Intentá de nuevo.`);
             setIsUploading(false);
             return;
           }
 
-          const statusResult: { documentId: string; status: string; progress: number } =
-            await statusResponse.json();
+          const result: AnalysisResult = await response.json();
 
-          if (statusResult.status === "completed") {
+          if (result.status === "completed") {
             clearInterval(interval);
-            // Fetch full result ONCE to get entities and extractedText
-            try {
-              const fullResponse = await fetch(`/api/analysis/${documentId}`);
-              if (!fullResponse.ok) {
-                setError(`Error del servidor (${fullResponse.status}) al obtener resultados.`);
-                setIsUploading(false);
-                return;
-              }
-              const result: AnalysisResult = await fullResponse.json();
-              setAnalysisResult(result);
-              setWarning(null);
-              setWizardAnalysisResult(documentId, result.entities);
-              saveDraft(state.file!, documentId, result.entities);
-              setIsUploading(false);
-            } catch {
-              setError("Error de conexión al obtener resultados.");
-              setIsUploading(false);
-            }
-          } else if (statusResult.status === "failed") {
+            setAnalysisResult(result);
+            setWarning(null);
+            setWizardAnalysisResult(documentId, result.entities);
+            saveDraft(state.file!, documentId, result.entities);
+            setIsUploading(false);
+          } else if (result.status === "failed") {
             clearInterval(interval);
             setError("El análisis falló. Intentá de nuevo.");
             setIsUploading(false);
           } else {
             const elapsed = Date.now() - startedAt;
             if (elapsed > MAX_POLLING_TIME_MS) {
-              // Soft warning — keep polling in case AI is just slow
               setWarning("El análisis está tardando más de lo esperado. Seguimos intentando...");
             }
             if (attempt >= MAX_POLLING_ATTEMPTS) {
@@ -171,19 +159,8 @@ function AnalysisContent() {
               setError("El análisis está tardando demasiado. Intentá de nuevo.");
               setIsUploading(false);
             } else {
+              setAnalysisResult(result);
               setPollingAttempts(attempt);
-              // Keep polling — progress updates via lightweight status
-              setAnalysisResult((prev) =>
-                prev
-                  ? { ...prev, progress: statusResult.progress, status: statusResult.status as AnalysisResult["status"] }
-                  : {
-                      documentId,
-                      status: statusResult.status as AnalysisResult["status"],
-                      progress: statusResult.progress,
-                      entities: [],
-                      extractedText: null,
-                    },
-              );
             }
           }
         } catch {
@@ -193,7 +170,6 @@ function AnalysisContent() {
         }
       }, POLLING_INTERVAL_MS);
 
-      // Store interval for cleanup on unmount
       return () => clearInterval(interval);
     },
     [state.file, setWizardAnalysisResult],
@@ -251,7 +227,7 @@ function AnalysisContent() {
   const progress = analysisResult?.progress ?? 0;
   const status = analysisResult?.status ?? "processing";
   const isCompleted = status === "completed";
-  const isProcessing = status === "processing";
+  const isProcessing = status === "processing" || status === "analyzing";
 
   const altaCount = analysisResult?.entities.filter((e) => e.confidence === "ALTA").length ?? 0;
   const bajaCount = analysisResult?.entities.filter((e) => e.confidence === "BAJA").length ?? 0;
@@ -458,7 +434,7 @@ function AnalysisContent() {
                         <div
                           className="h-full rounded-full bg-success"
                           style={{
-                            width: `${Math.round((altaCount / analysisResult.entities.length) * 100)}%`,
+                            width: `${Math.round((altaCount / (analysisResult.entities.length || 1)) * 100)}%`,
                           }}
                         />
                       </div>
@@ -472,7 +448,7 @@ function AnalysisContent() {
                           <div
                             className="h-full rounded-full bg-warning"
                             style={{
-                              width: `${Math.round((bajaCount / analysisResult.entities.length) * 100)}%`,
+                              width: `${Math.round((bajaCount / (analysisResult.entities.length || 1)) * 100)}%`,
                             }}
                           />
                         </div>
