@@ -122,55 +122,156 @@ function AnalysisContent() {
     (documentId: string) => {
       let attempt = 0;
       const startedAt = Date.now();
+      const isStaleRef = { current: false }; // race condition guard — prevents stale callbacks from mutating state
+      let progressTriggerActive = false;      // prevents concurrent /:id calls
 
-      const interval = setInterval(async () => {
-        attempt++;
+      // Helper: call GET /:id to advance progress (outside the polling loop).
+      // Each call increments progress by 25 in the backend Phase 1.
+      // If the call completes the analysis (returns terminal status), handles it immediately.
+      const triggerProgress = async () => {
+        if (progressTriggerActive || isStaleRef.current) return;
+        progressTriggerActive = true;
         try {
-          // Poll GET /:id — backend increments progress by 25 per call.
-          // Atomic guard prevents duplicate AI calls; only the 4th call triggers Phase 2.
           const response = await fetch(`/api/analysis/${documentId}`);
-          if (!response.ok) {
-            clearInterval(interval);
-            setError(`Error del servidor (${response.status}): el análisis no pudo completarse. Intentá de nuevo.`);
-            setIsUploading(false);
-            return;
-          }
-
+          if (!response.ok || isStaleRef.current) return;
           const result: AnalysisResult = await response.json();
+          if (isStaleRef.current) return;
 
+          // If this call completed the analysis (status is terminal), handle immediately
           if (result.status === "completed") {
+            isStaleRef.current = true;
             clearInterval(interval);
             setAnalysisResult(result);
             setWarning(null);
             setWizardAnalysisResult(documentId, result.entities);
             saveDraft(state.file!, documentId, result.entities);
             setIsUploading(false);
-          } else if (result.status === "failed") {
+            return;
+          }
+          if (result.status === "failed") {
+            isStaleRef.current = true;
             clearInterval(interval);
+            setAnalysisResult(result);
             setError("El análisis falló. Intentá de nuevo.");
             setIsUploading(false);
+            return;
+          }
+          // Otherwise: progress was incremented, keep polling
+        } catch {
+          // Network error during trigger — will retry on next poll cycle
+        } finally {
+          progressTriggerActive = false;
+        }
+      };
+
+      // Main polling loop: monitors status via lightweight GET /:id/status endpoint.
+      // Read-only, fast (<30ms), no DB mutations — no log spam.
+      const interval = setInterval(async () => {
+        if (isStaleRef.current) return; // guard: cleared or unmounted
+        attempt++;
+
+        try {
+          const response = await fetch(`/api/analysis/${documentId}/status`);
+          if (!response.ok) {
+            isStaleRef.current = true;
+            clearInterval(interval);
+            setError(`Error del servidor (${response.status})`);
+            setIsUploading(false);
+            return;
+          }
+
+          const statusData: { documentId: string; status: string; progress: number } =
+            await response.json();
+
+          if (isStaleRef.current) return; // re-check after await
+
+          if (statusData.status === "completed") {
+            clearInterval(interval);
+            // Fetch full result ONCE with entities and extractedText
+            const fullResponse = await fetch(`/api/analysis/${documentId}`);
+            if (!fullResponse.ok) {
+              if (!isStaleRef.current) {
+                setError(`Error al obtener el resultado (${fullResponse.status})`);
+                setIsUploading(false);
+              }
+              return;
+            }
+            const fullResult: AnalysisResult = await fullResponse.json();
+            if (!isStaleRef.current) {
+              setAnalysisResult(fullResult);
+              setWarning(null);
+              setWizardAnalysisResult(documentId, fullResult.entities);
+              saveDraft(state.file!, documentId, fullResult.entities);
+              setIsUploading(false);
+            }
+          } else if (statusData.status === "failed") {
+            clearInterval(interval);
+            // Build minimal AnalysisResult for failed state transition
+            const failedResult: AnalysisResult = {
+              documentId,
+              status: "failed",
+              progress: statusData.progress,
+              entities: [],
+              extractedText: null,
+            } as AnalysisResult;
+            if (!isStaleRef.current) {
+              setAnalysisResult(failedResult); // ← B5 fix: update state so isProcessing becomes false
+              setError("El análisis falló. Intentá de nuevo.");
+              setIsUploading(false);
+            }
           } else {
+            // Still processing — check timeouts and trigger progress if needed
             const elapsed = Date.now() - startedAt;
             if (elapsed > MAX_POLLING_TIME_MS) {
               setWarning("El análisis está tardando más de lo esperado. Seguimos intentando...");
             }
             if (attempt >= MAX_POLLING_ATTEMPTS) {
+              isStaleRef.current = true;
               clearInterval(interval);
               setError("El análisis está tardando demasiado. Intentá de nuevo.");
               setIsUploading(false);
-            } else {
-              setAnalysisResult(result);
+              return;
+            }
+
+            // Update progress bar with status data
+            if (!isStaleRef.current) {
+              setAnalysisResult((prev) =>
+                prev
+                  ? { ...prev, status: statusData.status as AnalysisResult["status"], progress: statusData.progress }
+                  : ({
+                      documentId,
+                      status: statusData.status,
+                      progress: statusData.progress,
+                      entities: [],
+                      extractedText: null,
+                    } as AnalysisResult),
+              );
               setPollingAttempts(attempt);
+            }
+
+            // Advance the backend pipeline by calling /:id if progress < 100
+            if (statusData.status === "processing" && statusData.progress < 100) {
+              triggerProgress();
             }
           }
         } catch {
-          clearInterval(interval);
-          setError("Error de conexión");
-          setIsUploading(false);
+          if (!isStaleRef.current) {
+            isStaleRef.current = true;
+            clearInterval(interval);
+            setError("Error de conexión");
+            setIsUploading(false);
+          }
         }
       }, POLLING_INTERVAL_MS);
 
-      return () => clearInterval(interval);
+      // Fire initial progress trigger immediately (without waiting for first poll)
+      triggerProgress();
+
+      // Cleanup: mark stale → prevents in-flight callbacks from mutating state after unmount
+      return () => {
+        isStaleRef.current = true;
+        clearInterval(interval);
+      };
     },
     [state.file, setWizardAnalysisResult],
   );
