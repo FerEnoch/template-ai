@@ -56,11 +56,52 @@ describe("AI_CONFIG", () => {
     expect(AI_CONFIG.apiKey).toBe("sk-or-test-key-456");
   });
 
-  it("has expected maxTokens and temperature defaults", async () => {
+  it("has expected temperature default", async () => {
     const { AI_CONFIG } = await import("./ai.js");
 
-    expect(AI_CONFIG.maxTokens).toBe(4096);
     expect(AI_CONFIG.temperature).toBe(0.1);
+  });
+
+  it("defaults maxTokens to 8192 when AI_MAX_TOKENS is not set", async () => {
+    delete process.env.AI_MAX_TOKENS;
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.maxTokens).toBe(8192);
+  });
+
+  it("resolves maxTokens from AI_MAX_TOKENS env var", async () => {
+    process.env.AI_MAX_TOKENS = "16384";
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.maxTokens).toBe(16384);
+  });
+
+  it("throws at import time when AI_MAX_TOKENS is below 8192", async () => {
+    process.env.AI_MAX_TOKENS = "4096";
+
+    await expect(import("./ai.js")).rejects.toThrow("8192");
+  });
+
+  it("throws at import time when AI_MAX_TOKENS is NaN", async () => {
+    process.env.AI_MAX_TOKENS = "not-a-number";
+
+    await expect(import("./ai.js")).rejects.toThrow("8192");
+  });
+
+  it("throws at import time when AI_MAX_TOKENS contains non-numeric suffix", async () => {
+    process.env.AI_MAX_TOKENS = "8192abc";
+
+    await expect(import("./ai.js")).rejects.toThrow("8192");
+  });
+
+  it("treats empty AI_MAX_TOKENS as unset (defaults to 8192)", async () => {
+    process.env.AI_MAX_TOKENS = "";
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.maxTokens).toBe(8192);
   });
 });
 

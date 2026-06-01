@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Mock AI_CONFIG before any imports that transitively load config/ai.ts
 // (which calls getApiEnv() requiring PORT in the environment)
@@ -7,13 +7,13 @@ vi.mock("../config/ai.js", () => ({
     model: "test-model",
     modelFallback: "test-fallback",
     apiKey: "test-key",
-    maxTokens: 4096,
+    maxTokens: 8192,
     temperature: 0.1,
   },
 }));
 
 import { DocumentAnalysisService } from "./document-analysis.service.js";
-import { OpenRouterService } from "./open-router.service.js";
+import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import type { AnalyzeResult } from "./document-analysis.service.js";
 import type { AiEntity } from "./open-router.service.js";
 
@@ -160,6 +160,115 @@ describe("DocumentAnalysisService", () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe("Rate limit exceeded");
+    });
+  });
+
+  describe("callAiWithRetry", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should retry on RATE_LIMIT errors up to 3 attempts", async () => {
+      mockExtractEntities
+        .mockRejectedValueOnce(new OpenRouterError("rate limited", "RATE_LIMIT"))
+        .mockRejectedValueOnce(new OpenRouterError("rate limited again", "RATE_LIMIT"))
+        .mockResolvedValue({ entities: [], rawResponse: "[]" });
+
+      // Trigger analyze which calls callAiWithRetry internally
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "test",
+        numpages: 1,
+      });
+
+      const analyzePromise = service.analyze("/uploads/test.pdf");
+
+      // Advance timers to skip backoff delays
+      await vi.runAllTimersAsync();
+      const result = await analyzePromise;
+
+      expect(result.success).toBe(true);
+      expect(mockExtractEntities).toHaveBeenCalledTimes(3);
+    });
+
+    it("should retry on NETWORK_ERROR", async () => {
+      mockExtractEntities
+        .mockRejectedValueOnce(new OpenRouterError("unreachable", "NETWORK_ERROR"))
+        .mockResolvedValue({ entities: [], rawResponse: "[]" });
+
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "test",
+        numpages: 1,
+      });
+
+      const analyzePromise = service.analyze("/uploads/test.pdf");
+      await vi.runAllTimersAsync();
+      const result = await analyzePromise;
+
+      expect(result.success).toBe(true);
+      expect(mockExtractEntities).toHaveBeenCalledTimes(2);
+    });
+
+    it("should retry on INVALID_RESPONSE", async () => {
+      mockExtractEntities
+        .mockRejectedValueOnce(new OpenRouterError("bad json", "INVALID_RESPONSE"))
+        .mockResolvedValue({ entities: [], rawResponse: "[]" });
+
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "test",
+        numpages: 1,
+      });
+
+      const analyzePromise = service.analyze("/uploads/test.pdf");
+      await vi.runAllTimersAsync();
+      const result = await analyzePromise;
+
+      expect(result.success).toBe(true);
+      expect(mockExtractEntities).toHaveBeenCalledTimes(2);
+    });
+
+    it("should NOT retry on CONFIG_ERROR (AUTH_ERROR)", async () => {
+      mockExtractEntities.mockRejectedValue(
+        new OpenRouterError("bad key", "AUTH_ERROR"),
+      );
+
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "test",
+        numpages: 1,
+      });
+
+      const result = await service.analyze("/uploads/test.pdf");
+
+      expect(result.success).toBe(false);
+      expect(mockExtractEntities).toHaveBeenCalledTimes(1);
+    });
+
+    it("should fail permanently after 3 attempts", async () => {
+      mockExtractEntities
+        .mockRejectedValue(new OpenRouterError("e1", "INVALID_RESPONSE"))
+        .mockRejectedValue(new OpenRouterError("e2", "INVALID_RESPONSE"))
+        .mockRejectedValue(new OpenRouterError("e3", "INVALID_RESPONSE"));
+
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "test",
+        numpages: 1,
+      });
+
+      const analyzePromise = service.analyze("/uploads/test.pdf");
+      await vi.runAllTimersAsync();
+      const result = await analyzePromise;
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("e3");
+      expect(mockExtractEntities).toHaveBeenCalledTimes(3);
     });
   });
 });

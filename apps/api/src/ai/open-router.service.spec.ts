@@ -24,7 +24,7 @@ vi.mock("../config/ai.js", () => ({
     model: "test-model",
     modelFallback: undefined,
     apiKey: "test-api-key",
-    maxTokens: 4096,
+    maxTokens: 8192,
     temperature: 0.1,
   },
   UPLOAD_DIR: "/tmp/test-uploads",
@@ -195,6 +195,87 @@ describe("OpenRouterService", () => {
       } catch (err) {
         expect(err).toBeInstanceOf(OpenRouterError);
         expect((err as OpenRouterError).code).toBe("NETWORK_ERROR");
+      }
+    });
+
+    it("should throw INVALID_RESPONSE on malformed JSON (truncated)", async () => {
+      // Simulate truncated JSON response from AI
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: '{"entities": [{"label": "COMPRADOR", "value": "Juan', // truncated
+            },
+          },
+        ],
+      });
+
+      try {
+        await service.extractEntities("text");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OpenRouterError);
+        expect((err as OpenRouterError).code).toBe("INVALID_RESPONSE");
+        expect((err as OpenRouterError).message).toContain("Invalid JSON response");
+        expect((err as OpenRouterError).message).not.toContain("unreachable"); // not misclassified
+      }
+    });
+
+    it("should parse JSON wrapped in markdown fences", async () => {
+      const entities = [
+        { label: "COMPRADOR", value: "Juan Pérez", group: "PARTES", confidence: "ALTA" },
+      ];
+
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: "```json\n" + JSON.stringify({ entities }) + "\n```",
+            },
+          },
+        ],
+      });
+
+      const result = await service.extractEntities("text");
+
+      expect(result.entities).toHaveLength(1);
+      expect(result.entities[0].label).toBe("COMPRADOR");
+    });
+
+    it("should throw INVALID_RESPONSE when given plain non-JSON text", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: "Lo siento, no puedo procesar este documento.",
+            },
+          },
+        ],
+      });
+
+      try {
+        await service.extractEntities("text");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OpenRouterError);
+        expect((err as OpenRouterError).code).toBe("INVALID_RESPONSE");
+      }
+    });
+
+    it("should throw INVALID_RESPONSE for SyntaxError from any code path", async () => {
+      // Simulate a scenario where a SyntaxError reaches the catch block
+      // (B2 safety net: the guard after instanceof OpenRouterError check)
+      const syntaxErr = new SyntaxError("Unexpected token");
+      // Remove .status so it falls through to the SyntaxError guard
+      mockCreate.mockRejectedValue(syntaxErr);
+
+      try {
+        await service.extractEntities("text");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OpenRouterError);
+        expect((err as OpenRouterError).code).toBe("INVALID_RESPONSE");
+        expect((err as OpenRouterError).code).not.toBe("NETWORK_ERROR");
       }
     });
   });

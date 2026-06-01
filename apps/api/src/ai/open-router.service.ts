@@ -190,7 +190,31 @@ export class OpenRouterService {
       });
 
       const rawResponse = response.choices[0]?.message?.content ?? "";
-      const parsed = JSON.parse(rawResponse);
+
+      // Strip markdown fences — some models wrap JSON in ```json blocks
+      // despite json_schema mode.
+      const stripMarkdownFences = (text: string): string => {
+        const trimmed = text.trim();
+        const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+        return fenceMatch ? fenceMatch[1].trim() : trimmed;
+      };
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(stripMarkdownFences(rawResponse));
+      } catch (parseError) {
+        this.logger.error(
+          `Invalid JSON from model ${model}: ${(parseError as Error).message}`,
+        );
+        this.logger.debug(
+          `Raw response (first 1000 chars): ${rawResponse.substring(0, 1000)}`,
+        );
+        throw new OpenRouterError(
+          `Invalid JSON response from ${model}: ${(parseError as Error).message}`,
+          "INVALID_RESPONSE",
+        );
+      }
+
       const entityArray = parsed.entities ?? parsed;
 
       const result = AiEntityArraySchema.safeParse(entityArray);
@@ -221,6 +245,18 @@ export class OpenRouterService {
     } catch (error) {
       if (error instanceof OpenRouterError) {
         throw error;
+      }
+
+      // Safety net: catch any SyntaxError that escapes JSON.parse protection.
+      // Should not happen after B1 try/catch, but guards against future regressions.
+      if (error instanceof SyntaxError) {
+        this.logger.error(
+          `Unprotected JSON.parse failed: ${error.message}`,
+        );
+        throw new OpenRouterError(
+          `Invalid JSON response: ${error.message}`,
+          "INVALID_RESPONSE",
+        );
       }
 
       // Check for API errors with status codes (OpenAI.APIError or similar)
