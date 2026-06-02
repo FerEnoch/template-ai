@@ -16,6 +16,8 @@ import { WizardLayout } from "@/components/wizard";
 import { useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import { saveDraft } from "@/lib/wizard";
+import { AnalysisProgress, MESSAGES } from "@/components/analysis/AnalysisProgress";
+import type { AnalysisProgressProps } from "@/components/analysis/AnalysisProgress";
 import type { AnalysisResult, Entity } from "@template-ai/contracts";
 
 const POLLING_INTERVAL_MS = 800;
@@ -45,7 +47,11 @@ function AnalysisContent() {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [analyzingElapsed, setAnalyzingElapsed] = useState(0);
+  const [messageIndex, setMessageIndex] = useState(0);
   const pollingCleanupRef = useRef<(() => void) | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Guard: redirect if no file
   useEffect(() => {
@@ -117,6 +123,41 @@ function AnalysisContent() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.file]);
+
+  // Timer + rotating messages management
+  useEffect(() => {
+    const status = analysisResult?.status;
+    const isAnalyzing = status === "analyzing";
+
+    if (!isAnalyzing) {
+      setAnalyzingElapsed(0);
+      setMessageIndex(0);
+      return;
+    }
+
+    // Start 1s timer
+    timerRef.current = setInterval(() => {
+      setAnalyzingElapsed((prev) => prev + 1);
+    }, 1000);
+
+    // Start 6s message rotation (start from 1 because message 0 shows on first render)
+    let idx = 1;
+    msgRef.current = setInterval(() => {
+      setMessageIndex(idx % MESSAGES.length);
+      idx++;
+    }, 6000);
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      if (msgRef.current) {
+        clearInterval(msgRef.current);
+        msgRef.current = null;
+      }
+    };
+  }, [analysisResult?.status]);
 
   const pollForAnalysis = useCallback(
     (documentId: string) => {
@@ -328,7 +369,9 @@ function AnalysisContent() {
   const progress = analysisResult?.progress ?? 0;
   const status = analysisResult?.status ?? "processing";
   const isCompleted = status === "completed";
-  const isProcessing = status === "processing" || status === "analyzing";
+  const isProcessing = status === "processing";
+  const isAnalyzing = status === "analyzing";
+  const showWaitingUI = isProcessing || isAnalyzing;
 
   const altaCount = analysisResult?.entities.filter((e) => e.confidence === "ALTA").length ?? 0;
   const bajaCount = analysisResult?.entities.filter((e) => e.confidence === "BAJA").length ?? 0;
@@ -383,12 +426,12 @@ function AnalysisContent() {
                 <div className="relative z-10 flex items-start gap-4">
                   <div
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
-                      isCompleted || isProcessing
+                      isCompleted || showWaitingUI
                         ? "border-green-200 bg-green-50"
                         : "border-border bg-background"
                     }`}
                   >
-                    {isCompleted || isProcessing ? (
+                    {isCompleted || showWaitingUI ? (
                       <Check className="h-4 w-4 text-success" />
                     ) : (
                       <div className="h-1.5 w-1.5 rounded-full bg-text-disabled" />
@@ -400,10 +443,10 @@ function AnalysisContent() {
                     </p>
                     <p
                       className={`text-xs ${
-                        isCompleted || isProcessing ? "text-success" : "text-text-disabled"
+                        isCompleted || showWaitingUI ? "text-success" : "text-text-disabled"
                       }`}
                     >
-                      {isCompleted || isProcessing ? "Completado" : "Pendiente"}
+                      {isCompleted || showWaitingUI ? "Completado" : "Pendiente"}
                     </p>
                   </div>
                 </div>
@@ -414,14 +457,14 @@ function AnalysisContent() {
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
                       isCompleted
                         ? "border-green-200 bg-green-50"
-                        : isProcessing
+                        : showWaitingUI
                         ? "border-blue-200 bg-blue-50"
                         : "border-border bg-background"
                     }`}
                   >
                     {isCompleted ? (
                       <Check className="h-4 w-4 text-success" />
-                    ) : isProcessing ? (
+                    ) : showWaitingUI ? (
                       <Loader2 className="h-4 w-4 animate-spin text-accent" />
                     ) : (
                       <div className="h-1.5 w-1.5 rounded-full bg-text-disabled" />
@@ -435,12 +478,12 @@ function AnalysisContent() {
                       className={`text-xs ${
                         isCompleted
                           ? "text-success"
-                          : isProcessing
+                          : showWaitingUI
                           ? "text-accent font-medium italic"
                           : "text-text-disabled"
                       }`}
                     >
-                      {isCompleted ? "Completado" : isProcessing ? "En proceso..." : "Pendiente"}
+                      {isCompleted ? "Completado" : showWaitingUI ? "En proceso..." : "Pendiente"}
                     </p>
                   </div>
                 </div>
@@ -451,11 +494,15 @@ function AnalysisContent() {
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
                       isCompleted
                         ? "border-green-200 bg-green-50"
+                        : isAnalyzing
+                        ? "border-blue-200 bg-blue-50"
                         : "border-border bg-background"
                     }`}
                   >
                     {isCompleted ? (
                       <Check className="h-4 w-4 text-success" />
+                    ) : isAnalyzing ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-accent" />
                     ) : (
                       <div className="h-1.5 w-1.5 rounded-full bg-text-disabled" />
                     )}
@@ -466,10 +513,14 @@ function AnalysisContent() {
                     </p>
                     <p
                       className={`text-xs ${
-                        isCompleted ? "text-success" : "text-text-disabled"
+                        isCompleted
+                          ? "text-success"
+                          : isAnalyzing
+                          ? "text-accent font-medium italic"
+                          : "text-text-disabled"
                       }`}
                     >
-                      {isCompleted ? "Completado" : "Pendiente"}
+                      {isCompleted ? "Completado" : isAnalyzing ? "En proceso..." : "Pendiente"}
                     </p>
                   </div>
                 </div>
@@ -480,11 +531,15 @@ function AnalysisContent() {
                     className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
                       isCompleted
                         ? "border-green-200 bg-green-50"
+                        : isAnalyzing
+                        ? "border-blue-200 bg-blue-50"
                         : "border-border bg-background"
                     }`}
                   >
                     {isCompleted ? (
                       <Check className="h-4 w-4 text-success" />
+                    ) : isAnalyzing ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-accent" />
                     ) : (
                       <div className="h-1.5 w-1.5 rounded-full bg-text-disabled" />
                     )}
@@ -495,10 +550,14 @@ function AnalysisContent() {
                     </p>
                     <p
                       className={`text-xs ${
-                        isCompleted ? "text-success" : "text-text-disabled"
+                        isCompleted
+                          ? "text-success"
+                          : isAnalyzing
+                          ? "text-accent font-medium italic"
+                          : "text-text-disabled"
                       }`}
                     >
-                      {isCompleted ? "Completado" : "Pendiente"}
+                      {isCompleted ? "Completado" : isAnalyzing ? "En proceso..." : "Pendiente"}
                     </p>
                   </div>
                 </div>
@@ -571,21 +630,15 @@ function AnalysisContent() {
                   </span>
                 </div>
                 <div className="flex-grow space-y-6 p-8">
-                  {isProcessing ? (
-                    <>
-                      <div className="h-8 w-3/4 animate-pulse rounded bg-border" />
-                      <div className="space-y-3">
-                        <div className="h-4 w-full animate-pulse rounded bg-border/50" />
-                        <div className="h-4 w-full animate-pulse rounded bg-border/50" />
-                        <div className="h-4 w-5/6 animate-pulse rounded bg-border/50" />
-                        <div className="h-4 w-full animate-pulse rounded bg-border/50" />
-                      </div>
-                      <div className="h-48 w-full animate-pulse rounded-lg border border-dashed border-border bg-border/30" />
-                      <div className="space-y-3">
-                        <div className="h-4 w-full animate-pulse rounded bg-border/50" />
-                        <div className="h-4 w-4/6 animate-pulse rounded bg-border/50" />
-                      </div>
-                    </>
+                  {showWaitingUI ? (
+                    <AnalysisProgress
+                      status={status as AnalysisProgressProps["status"]}
+                      progress={progress}
+                      fileName={state.file?.name}
+                      fileSize={state.file?.size}
+                      analyzingElapsed={analyzingElapsed}
+                      currentMessageIndex={messageIndex}
+                    />
                   ) : isCompleted && analysisResult ? (
                     analysisResult.extractedText ? (
                       <div className="space-y-4">
@@ -662,7 +715,7 @@ function AnalysisContent() {
                   </span>
                 </div>
                 <div className="flex-grow space-y-8 p-6">
-                  {isProcessing ? (
+                  {showWaitingUI ? (
                     <>
                       <div className="space-y-3">
                         <div className="h-3 w-20 animate-pulse rounded bg-border" />
