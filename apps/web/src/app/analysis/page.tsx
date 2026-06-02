@@ -23,6 +23,111 @@ import type { AnalysisResult, Entity } from "@template-ai/contracts";
 const POLLING_INTERVAL_MS = 800;
 const MAX_POLLING_ATTEMPTS = 60;
 const MAX_POLLING_TIME_MS = 55_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+const MAX_FETCH_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 400;
+const RETRY_MAX_DELAY_MS = 4_000;
+const MAX_CONSECUTIVE_TRANSIENT_ERRORS = 5;
+const CONNECTION_WARNING_MESSAGE = "La conexión está inestable. Reintentando automáticamente...";
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function getNestedErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+
+  const maybeCode = (error as { code?: unknown }).code;
+  if (typeof maybeCode === "string") return maybeCode;
+
+  const maybeCause = (error as { cause?: unknown }).cause;
+  if (!maybeCause || typeof maybeCause !== "object") return undefined;
+
+  const nestedCode = (maybeCause as { code?: unknown }).code;
+  return typeof nestedCode === "string" ? nestedCode : undefined;
+}
+
+function isTransientNetworkError(error: unknown): boolean {
+  if (isAbortError(error)) return true;
+
+  const code = getNestedErrorCode(error)?.toUpperCase();
+  if (code && ["ECONNRESET", "ETIMEDOUT", "EPIPE", "UND_ERR_SOCKET"].includes(code)) {
+    return true;
+  }
+
+  const message =
+    typeof error === "object" && error && "message" in error
+      ? String((error as { message?: unknown }).message ?? "").toLowerCase()
+      : "";
+
+  return [
+    "failed to fetch",
+    "fetch failed",
+    "networkerror",
+    "network error",
+    "socket hang up",
+    "econnreset",
+    "timeout",
+    "connection",
+  ].some((fragment) => message.includes(fragment));
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options?: {
+    staleRef?: { current: boolean };
+    retries?: number;
+    timeoutMs?: number;
+  },
+): Promise<Response> {
+  const staleRef = options?.staleRef;
+  const retries = options?.retries ?? MAX_FETCH_RETRIES;
+  const timeoutMs = options?.timeoutMs ?? REQUEST_TIMEOUT_MS;
+
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    if (staleRef?.current) {
+      throw lastError ?? new DOMException("Request aborted", "AbortError");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      return response;
+    } catch (error) {
+      clearTimeout(timeout);
+      lastError = error;
+
+      const isLastAttempt = attempt >= retries;
+      const shouldRetry = isTransientNetworkError(error) && !isLastAttempt && !staleRef?.current;
+
+      if (!shouldRetry) {
+        throw error;
+      }
+
+      const delay = Math.min(RETRY_BASE_DELAY_MS * 2 ** attempt, RETRY_MAX_DELAY_MS);
+      await wait(delay);
+    }
+  }
+
+  throw lastError ?? new Error("Unknown fetch error");
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -52,6 +157,22 @@ function AnalysisContent() {
   const pollingCleanupRef = useRef<(() => void) | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const msgRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const unmountedRef = useRef(false);
+  const activeControllersRef = useRef<Set<AbortController>>(new Set());
+
+  const abortInFlightRequests = useCallback(() => {
+    activeControllersRef.current.forEach((controller) => {
+      controller.abort();
+    });
+    activeControllersRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true;
+      abortInFlightRequests();
+    };
+  }, [abortInFlightRequests]);
 
   // Guard: redirect if no file
   useEffect(() => {
@@ -85,10 +206,16 @@ function AnalysisContent() {
         const formData = new FormData();
         formData.append("file", fileObject);
 
-        const uploadResponse = await fetch("/api/documents/upload", {
-          method: "POST",
-          body: formData,
-        });
+        const uploadResponse = await fetchWithRetry(
+          "/api/documents/upload",
+          {
+            method: "POST",
+            body: formData,
+          },
+          {
+            retries: MAX_FETCH_RETRIES,
+          },
+        );
 
         if (cancelled) return;
 
@@ -106,8 +233,8 @@ function AnalysisContent() {
         // Each call increments progress by 25; the 4th call triggers the AI phase.
         // The backend's atomic guard prevents duplicate AI calls from concurrent polls.
         pollingCleanupRef.current = pollForAnalysis(document.id);
-      } catch {
-        if (!cancelled) setError("Error de conexión");
+      } catch (fetchError) {
+        if (!cancelled && !isAbortError(fetchError)) setError("Error de conexión");
         setIsUploading(false);
       }
     };
@@ -116,6 +243,7 @@ function AnalysisContent() {
 
     return () => {
       cancelled = true;
+      abortInFlightRequests();
       if (pollingCleanupRef.current) {
         pollingCleanupRef.current();
         pollingCleanupRef.current = null;
@@ -165,6 +293,8 @@ function AnalysisContent() {
       const startedAt = Date.now();
       const isStaleRef = { current: false }; // race condition guard — prevents stale callbacks from mutating state
       let progressTriggerActive = false;      // prevents concurrent /:id calls
+      let statusRequestActive = false;
+      let consecutiveTransientErrors = 0;
 
       // Helper: call GET /:id to advance progress (outside the polling loop).
       // Each call increments progress by 25 in the backend Phase 1.
@@ -173,7 +303,11 @@ function AnalysisContent() {
         if (progressTriggerActive || isStaleRef.current) return;
         progressTriggerActive = true;
         try {
-          const response = await fetch(`/api/analysis/${documentId}`);
+          const response = await fetchWithRetry(
+            `/api/analysis/${documentId}`,
+            {},
+            { staleRef: isStaleRef },
+          );
           if (!response.ok || isStaleRef.current) return;
           const result: AnalysisResult = await response.json();
           if (isStaleRef.current) return;
@@ -198,8 +332,10 @@ function AnalysisContent() {
             return;
           }
           // Otherwise: progress was incremented, keep polling
-        } catch {
-          // Network error during trigger — will retry on next poll cycle
+        } catch (triggerError) {
+          if (!isStaleRef.current && isTransientNetworkError(triggerError)) {
+            setWarning(CONNECTION_WARNING_MESSAGE);
+          }
         } finally {
           progressTriggerActive = false;
         }
@@ -208,11 +344,20 @@ function AnalysisContent() {
       // Main polling loop: monitors status via lightweight GET /:id/status endpoint.
       // Read-only, fast (<30ms), no DB mutations — no log spam.
       const interval = setInterval(async () => {
-        if (isStaleRef.current) return; // guard: cleared or unmounted
+        if (isStaleRef.current || statusRequestActive) return; // guard: cleared, unmounted, or overlap
+        statusRequestActive = true;
         attempt++;
 
         try {
-          const response = await fetch(`/api/analysis/${documentId}/status`);
+          const response = await fetchWithRetry(
+            `/api/analysis/${documentId}/status`,
+            {},
+            { staleRef: isStaleRef },
+          );
+
+          consecutiveTransientErrors = 0;
+          setWarning(null);
+
           if (!response.ok) {
             isStaleRef.current = true;
             clearInterval(interval);
@@ -229,7 +374,11 @@ function AnalysisContent() {
           if (statusData.status === "completed") {
             clearInterval(interval);
             // Fetch full result ONCE with entities and extractedText
-            const fullResponse = await fetch(`/api/analysis/${documentId}`);
+            const fullResponse = await fetchWithRetry(
+              `/api/analysis/${documentId}`,
+              {},
+              { staleRef: isStaleRef },
+            );
             if (!fullResponse.ok) {
               if (!isStaleRef.current) {
                 setError(`Error al obtener el resultado (${fullResponse.status})`);
@@ -295,13 +444,23 @@ function AnalysisContent() {
               triggerProgress();
             }
           }
-        } catch {
-          if (!isStaleRef.current) {
-            isStaleRef.current = true;
-            clearInterval(interval);
-            setError("Error de conexión");
-            setIsUploading(false);
+        } catch (statusError) {
+          if (isStaleRef.current || isAbortError(statusError)) return;
+
+          if (isTransientNetworkError(statusError)) {
+            consecutiveTransientErrors += 1;
+            if (consecutiveTransientErrors < MAX_CONSECUTIVE_TRANSIENT_ERRORS) {
+              setWarning(CONNECTION_WARNING_MESSAGE);
+            }
+            return;
           }
+
+          isStaleRef.current = true;
+          clearInterval(interval);
+          setError("Error de conexión");
+          setIsUploading(false);
+        } finally {
+          statusRequestActive = false;
         }
       }, POLLING_INTERVAL_MS);
 
@@ -312,9 +471,10 @@ function AnalysisContent() {
       return () => {
         isStaleRef.current = true;
         clearInterval(interval);
+        abortInFlightRequests();
       };
     },
-    [state.file, setWizardAnalysisResult],
+    [state.file, setWizardAnalysisResult, abortInFlightRequests, fetchWithRetry],
   );
 
   const renderHighlightedText = useCallback(
