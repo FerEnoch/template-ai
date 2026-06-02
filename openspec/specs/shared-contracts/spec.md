@@ -68,7 +68,7 @@ The system MUST define an `Entity` schema with fields: `id` (uuid string), `labe
 
 ### Requirement: AnalysisResult schema
 
-The system MUST define an `AnalysisResult` schema with fields: `documentId` (uuid string), `status` (enum: pending, processing, completed, failed), `entities` (array of Entity), `progress` (integer 0–100), `startedAt` (ISO datetime), `completedAt` (ISO datetime, nullable).
+The system MUST define an `AnalysisResult` schema with fields: `documentId` (uuid string), `status` (enum: pending, processing, analyzing, completed, failed), `entities` (array of Entity), `progress` (integer 0–100), `startedAt` (ISO datetime), `completedAt` (ISO datetime, nullable).
 
 #### Scenario: Completed analysis with entities
 
