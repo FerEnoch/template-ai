@@ -37,23 +37,23 @@ Chain strategy: pending
 
 ## Phase 2: Entity Editing (depends on Phase 1; parallel to Phase 3)
 
-- [ ] 2.1 Create `apps/web/src/components/wizard/EntityEditModal.tsx` — native `<dialog>`, value input, confidence toggle, Excluir/Restaurar button
+- [x] 2.1 Create `apps/web/src/components/wizard/EntityEditModal.tsx` — native `<dialog>`, value input, confidence toggle, Excluir/Restaurar button
 - [ ] 2.2 Make entity rows clickable `<button>` in `EntityInspector.tsx`; dim excluded entities; open modal on click
-- [ ] 2.3 Export `EntityEditModal` from `components/wizard/index.ts`
+- [x] 2.3 Export `EntityEditModal` from `components/wizard/index.ts`
 - [ ] 2.4 Extend `handleEntityUpdate` in `review/page.tsx` with `excluded` payload + inline error state
 - [ ] 2.5 Write unit test for EntityEditModal — renders, value edit, exclude toggle, error on API fail
 
 ## Phase 3: Template Library (depends on Phase 1; parallel to Phase 2)
 
-- [ ] 3.1 Create `apps/web/src/components/biblioteca/TemplateCard.tsx` — name, category, date, entity count
-- [ ] 3.2 Create `apps/web/src/components/biblioteca/TemplateGrid.tsx` — grid with loading/empty/error states
-- [ ] 3.3 Create `apps/web/src/app/biblioteca/page.tsx` — client fetch `GET /api/templates`, render grid/empty/error
-- [ ] 3.4 Change sidebar "Biblioteca" href from `"#"` to `"/biblioteca"` in `sidebar.tsx`
+- [x] 3.1 Create `apps/web/src/components/biblioteca/TemplateCard.tsx` — name, category, date, entity count
+- [x] 3.2 Create `apps/web/src/components/biblioteca/TemplateGrid.tsx` — grid with loading/empty/error states
+- [x] 3.3 Create `apps/web/src/app/biblioteca/page.tsx` — client fetch `GET /api/templates`, render grid/empty/error
+- [x] 3.4 Change sidebar "Biblioteca" href from `"#"` to `"/biblioteca"` in `sidebar.tsx`
 
 ## Phase 4: E2E Infrastructure (parallel to all)
 
-- [ ] 4.1 Add `@playwright/test` dev dep + `test:e2e` script to `apps/web/package.json`
-- [ ] 4.2 Create `apps/web/playwright.config.ts` — baseURL, webServer, testDir
+- [x] 4.1 Add `@playwright/test` dev dep + `test:e2e` script to `apps/web/package.json`
+- [x] 4.2 Create `apps/web/playwright.config.ts` — baseURL, webServer, testDir
 
 ## Phase 5: E2E Tests (depends on Phase 2 + 3 + 4)
 

@@ -52,9 +52,9 @@ The system MUST define a `Document` schema with fields: `id` (uuid string), `fil
 
 ### Requirement: Entity schema
 
-The system MUST define an `Entity` schema with fields: `id` (uuid string), `label` (non-empty string), `value` (string), `group` (non-empty string), `confidence` (enum: alta, media, baja), `sourceSpan` (object with `start` and `end` positive integers, **optional/nullable** — an entity whose value cannot be located in the extracted text is still valid, just not highlightable), `reviewed` (boolean, default false).
+The system MUST define an `Entity` schema with fields: `id` (uuid string), `label` (non-empty string), `value` (string), `group` (non-empty string), `confidence` (enum: alta, media, baja), `sourceSpan` (object with `start` and `end` positive integers, **optional/nullable** — an entity whose value cannot be located in the extracted text is still valid, just not highlightable), `reviewed` (boolean, default false), `excluded` (boolean, default false).
 
-(Previously: `sourceSpan` was required — analysis responses with no exact match failed validation)
+(Previously: `sourceSpan` was required — analysis responses with no exact match failed validation. The `excluded` field did not exist.)
 
 #### Scenario: Valid entity passes validation
 
@@ -73,6 +73,18 @@ The system MUST define an `Entity` schema with fields: `id` (uuid string), `labe
 - GIVEN an entity whose `sourceSpan` is `undefined` (post-validation fallback)
 - WHEN parsed by the Entity schema
 - THEN validation succeeds and the entity remains usable in the UI
+
+#### Scenario: Excluded field defaults to false
+
+- GIVEN an entity without an `excluded` field
+- WHEN parsed by the Entity schema
+- THEN validation succeeds with `excluded: false`
+
+#### Scenario: Excluded entity validates
+
+- GIVEN an entity with `excluded: true`
+- WHEN parsed by the Entity schema
+- THEN validation succeeds
 
 ### Requirement: AnalysisResult schema
 
