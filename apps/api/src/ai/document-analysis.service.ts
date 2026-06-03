@@ -18,6 +18,57 @@ export interface AnalyzeResult {
   error?: string;
 }
 
+type AnalyzeEntity = NonNullable<AnalyzeResult["entities"]>[number];
+
+export function validateAndCorrectSpans(
+  entities: AnalyzeEntity[],
+  extractedText: string,
+): AnalyzeEntity[] {
+  for (const entity of entities) {
+    if (!entity.sourceSpan || !entity.value) {
+      continue;
+    }
+
+    const matches: number[] = [];
+    let fromIndex = 0;
+
+    while (fromIndex <= extractedText.length) {
+      const matchIndex = extractedText.indexOf(entity.value, fromIndex);
+      if (matchIndex === -1) {
+        break;
+      }
+
+      matches.push(matchIndex);
+      fromIndex = matchIndex + 1;
+    }
+
+    if (matches.length === 0) {
+      entity.sourceSpan = undefined;
+      continue;
+    }
+
+    if (matches.length === 1) {
+      const [start] = matches;
+      entity.sourceSpan = { start, end: start + entity.value.length };
+      continue;
+    }
+
+    const aiStart = entity.sourceSpan.start;
+    const closestStart = matches.reduce((closest, current) => {
+      const currentDistance = Math.abs(current - aiStart);
+      const closestDistance = Math.abs(closest - aiStart);
+      return currentDistance < closestDistance ? current : closest;
+    }, matches[0]);
+
+    entity.sourceSpan = {
+      start: closestStart,
+      end: closestStart + entity.value.length,
+    };
+  }
+
+  return entities;
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 @Injectable()
