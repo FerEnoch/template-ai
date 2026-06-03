@@ -141,17 +141,20 @@ export class DocumentAnalysisService {
     // Call AI with retry on rate limit
     try {
       const aiResult = await this.callAiWithRetry(fileContent);
+      const entities = aiResult.entities.map((e) => ({
+        label: e.label,
+        value: e.value,
+        group: e.group,
+        confidence: e.confidence,
+        sourceSpan: e.sourceSpan,
+      }));
+
+      const correctedEntities = validateAndCorrectSpans(entities, fileContent);
 
       return {
         success: true,
         extractedText: fileContent,
-        entities: aiResult.entities.map((e) => ({
-          label: e.label,
-          value: e.value,
-          group: e.group,
-          confidence: e.confidence,
-          sourceSpan: e.sourceSpan,
-        })),
+        entities: correctedEntities,
       };
     } catch (error) {
       const message =
