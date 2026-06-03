@@ -12,7 +12,10 @@ vi.mock("../config/ai.js", () => ({
   },
 }));
 
-import { DocumentAnalysisService } from "./document-analysis.service.js";
+import {
+  DocumentAnalysisService,
+  validateAndCorrectSpans,
+} from "./document-analysis.service.js";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import type { AnalyzeResult } from "./document-analysis.service.js";
 import type { AiEntity } from "./open-router.service.js";
@@ -269,6 +272,139 @@ describe("DocumentAnalysisService", () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe("e3");
       expect(mockExtractEntities).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe("validateAndCorrectSpans", () => {
+    it("should replace sourceSpan with exact match position when value appears once", () => {
+      const entities = [
+        {
+          label: "COMPRADOR",
+          value: "Juan Pérez",
+          group: "PARTES",
+          confidence: "ALTA",
+          sourceSpan: { start: 100, end: 110 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "Contrato entre Juan Pérez y María López");
+
+      expect(corrected[0].sourceSpan).toEqual({ start: 15, end: 25 });
+    });
+
+    it("should choose closest match to AI span when value appears multiple times", () => {
+      const extractedText = `${"a".repeat(48)}Lima${"b".repeat(248)}Lima`;
+      const entities = [
+        {
+          label: "CIUDAD",
+          value: "Lima",
+          group: "INMUEBLE",
+          confidence: "MEDIA",
+          sourceSpan: { start: 50, end: 54 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, extractedText);
+
+      expect(corrected[0].sourceSpan).toEqual({ start: 48, end: 52 });
+    });
+
+    it("should set sourceSpan to undefined when there is no match", () => {
+      const entities = [
+        {
+          label: "NOMBRE",
+          value: "XYZ",
+          group: "PARTES",
+          confidence: "BAJA",
+          sourceSpan: { start: 1, end: 4 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "Contrato entre Juan y Maria");
+
+      expect(corrected[0].sourceSpan).toBeUndefined();
+    });
+
+    it("should keep entity without sourceSpan unchanged", () => {
+      const entities = [
+        {
+          label: "NOMBRE",
+          value: "Juan",
+          group: "PARTES",
+          confidence: "ALTA",
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "Contrato entre Juan y Maria");
+
+      expect(corrected[0].sourceSpan).toBeUndefined();
+    });
+
+    it("should clear spans when extractedText is empty", () => {
+      const entities = [
+        {
+          label: "NOMBRE",
+          value: "Juan",
+          group: "PARTES",
+          confidence: "ALTA",
+          sourceSpan: { start: 1, end: 5 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "");
+
+      expect(corrected[0].sourceSpan).toBeUndefined();
+    });
+
+    it("should skip entities with empty value", () => {
+      const entities = [
+        {
+          label: "NOMBRE",
+          value: "",
+          group: "PARTES",
+          confidence: "ALTA",
+          sourceSpan: { start: 10, end: 10 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "Contrato entre Juan y Maria");
+
+      expect(corrected[0].sourceSpan).toEqual({ start: 10, end: 10 });
+    });
+
+    it("should be case-sensitive and clear sourceSpan on casing mismatch", () => {
+      const entities = [
+        {
+          label: "COMPRADOR",
+          value: "Juan Pérez",
+          group: "PARTES",
+          confidence: "ALTA",
+          sourceSpan: { start: 0, end: 10 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "juan pérez firma el contrato");
+
+      expect(corrected[0].sourceSpan).toBeUndefined();
+    });
+
+    it("should return new entity objects without mutating input", () => {
+      const entities = [
+        {
+          label: "COMPRADOR",
+          value: "Juan Pérez",
+          group: "PARTES",
+          confidence: "ALTA",
+          sourceSpan: { start: 0, end: 10 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "Contrato entre Juan Pérez y María López");
+
+      expect(corrected).not.toBe(entities);
+      expect(corrected[0]).not.toBe(entities[0]);
+      expect(entities[0].sourceSpan).toEqual({ start: 0, end: 10 });
+      expect(corrected[0].sourceSpan).toEqual({ start: 15, end: 25 });
     });
   });
 });

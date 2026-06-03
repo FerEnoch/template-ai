@@ -18,6 +18,59 @@ export interface AnalyzeResult {
   error?: string;
 }
 
+type AnalyzeEntity = NonNullable<AnalyzeResult["entities"]>[number];
+
+export function validateAndCorrectSpans(
+  entities: AnalyzeEntity[],
+  extractedText: string,
+): AnalyzeEntity[] {
+  return entities.map((entity) => {
+    const corrected = { ...entity };
+
+    if (!corrected.sourceSpan || !corrected.value) {
+      return corrected;
+    }
+
+    const matches: number[] = [];
+    let fromIndex = 0;
+
+    while (fromIndex <= extractedText.length) {
+      const matchIndex = extractedText.indexOf(corrected.value, fromIndex);
+      if (matchIndex === -1) {
+        break;
+      }
+
+      matches.push(matchIndex);
+      fromIndex = matchIndex + 1;
+    }
+
+    if (matches.length === 0) {
+      corrected.sourceSpan = undefined;
+      return corrected;
+    }
+
+    if (matches.length === 1) {
+      const [start] = matches;
+      corrected.sourceSpan = { start, end: start + corrected.value.length };
+      return corrected;
+    }
+
+    const aiStart = corrected.sourceSpan.start;
+    const closestStart = matches.reduce((closest, current) => {
+      const currentDistance = Math.abs(current - aiStart);
+      const closestDistance = Math.abs(closest - aiStart);
+      return currentDistance < closestDistance ? current : closest;
+    }, matches[0]);
+
+    corrected.sourceSpan = {
+      start: closestStart,
+      end: closestStart + corrected.value.length,
+    };
+
+    return corrected;
+  });
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 @Injectable()
@@ -90,17 +143,20 @@ export class DocumentAnalysisService {
     // Call AI with retry on rate limit
     try {
       const aiResult = await this.callAiWithRetry(fileContent);
+      const entities = aiResult.entities.map((e) => ({
+        label: e.label,
+        value: e.value,
+        group: e.group,
+        confidence: e.confidence,
+        sourceSpan: e.sourceSpan,
+      }));
+
+      const correctedEntities = validateAndCorrectSpans(entities, fileContent);
 
       return {
         success: true,
         extractedText: fileContent,
-        entities: aiResult.entities.map((e) => ({
-          label: e.label,
-          value: e.value,
-          group: e.group,
-          confidence: e.confidence,
-          sourceSpan: e.sourceSpan,
-        })),
+        entities: correctedEntities,
       };
     } catch (error) {
       const message =
