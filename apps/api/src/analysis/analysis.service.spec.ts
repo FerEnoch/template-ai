@@ -2,7 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { NotFoundException } from "@nestjs/common";
 import { AnalysisService } from "./analysis.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
-import { DocumentAnalysisService } from "../ai/document-analysis.service.js";
+import type { Queue } from "bullmq";
+import type { AnalysisJobPayload } from "./analysis.queue";
 import type { AnalysisResultRecord } from "../infrastructure/postgres/repositories/analysis-results.repository";
 import type { EntityRecord } from "../infrastructure/postgres/repositories/entities.repository";
 import type { DocumentRecord } from "../infrastructure/postgres/repositories/documents.repository";
@@ -54,10 +55,10 @@ function makeDocumentRecord(overrides: Partial<DocumentRecord> = {}): DocumentRe
   };
 }
 
-const mockAnalyze = vi.fn();
+const mockQueueAdd = vi.fn();
 
-function createMockDocumentAnalysisService(): DocumentAnalysisService {
-  return { analyze: mockAnalyze } as unknown as DocumentAnalysisService;
+function createMockAnalysisQueue(): Queue<AnalysisJobPayload, any, string> {
+  return { add: mockQueueAdd } as unknown as Queue<AnalysisJobPayload, any, string>;
 }
 
 /**
@@ -313,8 +314,8 @@ describe("AnalysisService", () => {
   describe("getFullResult", () => {
     it("should throw NotFoundException when document has no analysis result", async () => {
       const mockPostgres = createMockPostgresService({ analysisRecords: [] });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       await expect(service.getFullResult("nonexistent-id")).rejects.toThrow(NotFoundException);
       await expect(service.getFullResult("nonexistent-id")).rejects.toThrow(
@@ -340,8 +341,8 @@ describe("AnalysisService", () => {
         analysisRecords: [initialRecord],
         incrementedRecord,
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
@@ -350,7 +351,7 @@ describe("AnalysisService", () => {
       expect(result.documentId).toBe("doc-1");
     });
 
-    it("should call AI extraction and insert entities when progress reaches 100", async () => {
+    it("should enqueue analysis job when progress reaches 100 (happy path)", async () => {
       const initialRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -379,12 +380,7 @@ describe("AnalysisService", () => {
         makeDocumentRecord({ id: "doc-1", filePath: "/uploads/test.pdf" }),
       ];
 
-      mockAnalyze.mockResolvedValue({
-        success: true,
-        entities: [
-          { label: "COMPRADOR", value: "Juan Pérez", group: "PARTES", confidence: "ALTA" },
-        ],
-      });
+      mockQueueAdd.mockResolvedValue({ id: "job-1" });
 
       const mockPostgres = createMockPostgresService({
         analysisRecords: [initialRecord],
@@ -393,16 +389,21 @@ describe("AnalysisService", () => {
         entityRecords,
         documentRecords,
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
       expect(result.progress).toBe(100);
-      expect(result.status).toBe("completed");
+      expect(result.status).toBe("analyzing"); // job enqueued, worker handles completion
       expect(result.documentId).toBe("doc-1");
-      expect(result.extractedText).toBeNull(); // mock did not include extractedText
-      expect(mockAnalyze).toHaveBeenCalledWith("/uploads/test.pdf");
+      expect(result.entities).toEqual([]); // worker populates entities asynchronously
+      expect(mockQueueAdd).toHaveBeenCalledWith("analyze", {
+        analysisResultId: "analysis-1",
+        documentId: "doc-1",
+        ownerId: 0,
+        filePath: "/uploads/test.pdf",
+      });
     });
 
     it("should return terminal (no entities) when atomic guard is lost to a concurrent request", async () => {
@@ -424,8 +425,8 @@ describe("AnalysisService", () => {
         incrementedRecord,
         atomicTransitionNoop: true, // <-- atomic guard returns null (race lost)
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
@@ -435,7 +436,7 @@ describe("AnalysisService", () => {
       expect(result.progress).toBe(100);
       expect(result.entities).toEqual([]);
       // AI was NOT called (another request won the atomic guard)
-      expect(mockAnalyze).not.toHaveBeenCalled();
+      expect(mockQueueAdd).not.toHaveBeenCalled();
       // Next poll will see "analyzing" (set by the winner) and eventually "completed"
     });
 
@@ -456,15 +457,15 @@ describe("AnalysisService", () => {
         analysisRecords: [completedRecord],
         entityRecords,
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
       expect(result.status).toBe("completed");
       expect(result.progress).toBe(100);
       // Should NOT call analyze for completed results
-      expect(mockAnalyze).not.toHaveBeenCalled();
+      expect(mockQueueAdd).not.toHaveBeenCalled();
     });
 
     it("should return entities when status is completed", async () => {
@@ -501,8 +502,8 @@ describe("AnalysisService", () => {
         analysisRecords: [completedRecord],
         entityRecords,
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
@@ -529,15 +530,15 @@ describe("AnalysisService", () => {
         analysisRecords: [initialRecord],
         incrementedRecord,
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
       expect(result.progress).toBe(75);
       expect(result.status).toBe("processing");
       expect(result.completedAt).toBeNull();
-      expect(mockAnalyze).not.toHaveBeenCalled();
+      expect(mockQueueAdd).not.toHaveBeenCalled();
     });
 
     it("should return empty entities when status is processing", async () => {
@@ -558,8 +559,8 @@ describe("AnalysisService", () => {
         }),
         entityRecords: [],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
@@ -580,15 +581,15 @@ describe("AnalysisService", () => {
       const mockPostgres = createMockPostgresService({
         analysisRecords: [failedRecord],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
       expect(result.status).toBe("failed");
       expect(result.progress).toBe(100);
       expect(result.entities).toEqual([]);
-      expect(mockAnalyze).not.toHaveBeenCalled();
+      expect(mockQueueAdd).not.toHaveBeenCalled();
     });
 
     it("should return pending result immediately without incrementing progress", async () => {
@@ -602,8 +603,8 @@ describe("AnalysisService", () => {
       const mockPostgres = createMockPostgresService({
         analysisRecords: [pendingRecord],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
@@ -612,7 +613,7 @@ describe("AnalysisService", () => {
       expect(result.entities).toEqual([]);
     });
 
-    it("should fail gracefully when AI extraction fails", async () => {
+    it("should enqueue analysis job when progress reaches 100 (async)", async () => {
       const initialRecord = makeAnalysisResultRecord({
         id: "analysis-1",
         documentId: "doc-1",
@@ -626,10 +627,7 @@ describe("AnalysisService", () => {
         progress: 100,
       });
 
-      mockAnalyze.mockResolvedValue({
-        success: false,
-        error: "AI extraction failed",
-      });
+      mockQueueAdd.mockResolvedValue({ id: "job-1" });
 
       const documentRecords = [
         makeDocumentRecord({ id: "doc-1", filePath: "/uploads/test.pdf" }),
@@ -640,21 +638,26 @@ describe("AnalysisService", () => {
         incrementedRecord,
         documentRecords,
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getFullResult("doc-1");
 
-      expect(result.status).toBe("failed");
-      expect(mockAnalyze).toHaveBeenCalledWith("/uploads/test.pdf");
+      expect(result.status).toBe("analyzing"); // AI failure handled by worker retries
+      expect(mockQueueAdd).toHaveBeenCalledWith("analyze", {
+        analysisResultId: "analysis-1",
+        documentId: "doc-1",
+        ownerId: 0,
+        filePath: "/uploads/test.pdf",
+      });
     });
   });
 
   describe("getStatus (read-only)", () => {
     it("should throw NotFoundException when document has no analysis result", async () => {
       const mockPostgres = createMockPostgresService({ analysisRecords: [] });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       await expect(service.getStatus("nonexistent-id")).rejects.toThrow(NotFoundException);
     });
@@ -670,8 +673,8 @@ describe("AnalysisService", () => {
       const mockPostgres = createMockPostgresService({
         analysisRecords: [completedRecord],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getStatus("doc-1");
 
@@ -691,8 +694,8 @@ describe("AnalysisService", () => {
       const mockPostgres = createMockPostgresService({
         analysisRecords: [failedRecord],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getStatus("doc-1");
 
@@ -711,8 +714,8 @@ describe("AnalysisService", () => {
       const mockPostgres = createMockPostgresService({
         analysisRecords: [pendingRecord],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getStatus("doc-1");
 
@@ -731,8 +734,8 @@ describe("AnalysisService", () => {
       const mockPostgres = createMockPostgresService({
         analysisRecords: [analyzingRecord],
       });
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getStatus("doc-1");
 
@@ -753,8 +756,8 @@ describe("AnalysisService", () => {
       });
       // The mock's withConnection will use the same mockClient;
       // no incrementedRecord is needed because getStatus no longer mutates.
-      const mockDocAnalysis = createMockDocumentAnalysisService();
-      const service = new AnalysisService(mockPostgres, mockDocAnalysis);
+      const mockAnalysisQueue = createMockAnalysisQueue();
+      const service = new AnalysisService(mockPostgres, mockAnalysisQueue);
 
       const result = await service.getStatus("doc-1");
 

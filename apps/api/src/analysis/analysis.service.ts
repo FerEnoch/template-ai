@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, Logger } from "@nestjs/common";
+import { Injectable, NotFoundException, Logger, HttpException, HttpStatus } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bullmq";
+import type { Queue } from "bullmq";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
 import { DocumentsRepository } from "../infrastructure/postgres/repositories/documents.repository";
-import { DocumentAnalysisService } from "../ai/document-analysis.service.js";
+import { ANALYSIS_QUEUE, type AnalysisJobPayload } from "./analysis.queue";
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -56,18 +58,17 @@ export class AnalysisService {
 
   public constructor(
     private readonly postgres: PostgresService,
-    private readonly documentAnalysisService: DocumentAnalysisService,
+    @InjectQueue(ANALYSIS_QUEUE)
+    private readonly analysisQueue: Queue<AnalysisJobPayload>,
   ) {}
 
   /**
    * GET /:id — Returns the full analysis result, including entities.
    *
-   * Refactored into three phases to avoid holding a DB transaction open
-   * across the long-running AI call (Causa #2):
-   *
+   * Three-phase async architecture:
    *   Phase 1 — Short transaction: increment progress, transition to "analyzing"
-   *   Phase 2 — Outside transaction: AI extraction (10-30s)
-   *   Phase 3 — Short transaction: insert entities, mark completed
+   *   Phase 2 — Enqueue job: fetch document path, add BullMQ job, return immediately
+   *   Phase 3 — Worker (analysis.processor.ts): AI extraction + entity insert + status update
    */
   async getFullResult(documentId: string): Promise<AnalysisResult> {
     // -----------------------------------------------------------------------
@@ -137,7 +138,9 @@ export class AnalysisService {
     if (phase1Result.type === "in-progress") return phase1Result.result;
 
     // -----------------------------------------------------------------------
-    // Fase 2: Fuera de transacción — leer documento + llamar a AI
+    // Fase 2: Encolar job para procesamiento asíncrono y retornar inmediatamente
+    // El worker (analysis.processor.ts) se encarga de la extracción AI
+    // y la escritura de entidades (Fase 3).
     // -----------------------------------------------------------------------
     const document = await this.fetchDocument(phase1Result.documentId, 0);
     this.logger.log(
@@ -145,65 +148,37 @@ export class AnalysisService {
       `${document ? `found, filePath=${document.filePath ?? '(null)'}` : "NOT FOUND (null)"}`,
     );
 
-    const aiResult = await this.documentAnalysisService.analyze(document?.filePath ?? null);
-    this.logger.log(
-      `Phase 2: AI result — success=${aiResult.success}, ` +
-      `entities=${aiResult.entities?.length ?? 0}, ` +
-      `error=${aiResult.error ?? "none"}`,
-    );
-
-    // -----------------------------------------------------------------------
-    // Fase 3: Transacción corta #2 — escribir entidades o registrar falla
-    // -----------------------------------------------------------------------
-    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
-      const analysisRepo = new AnalysisResultsRepository(client);
-
-      if (!aiResult.success) {
-        this.logger.warn(
-          `Phase 3: marking analysis ${phase1Result.analysisResultId} as failed — ` +
-          `retryCount will be incremented, error: ${aiResult.error ?? "Unknown error"}`,
-        );
-        await analysisRepo.incrementRetryCount(phase1Result.analysisResultId, aiResult.error ?? "Unknown error");
-        const failed = await analysisRepo.updateStatus(phase1Result.analysisResultId, "failed");
-        if (!failed) {
-          throw new NotFoundException("Analysis result not found after status update");
-        }
-        return this.mapToAnalysisResult(failed, []);
-      }
-
-      // AI succeeded — insert entities
-      const entitiesRepo = new EntitiesRepository(client);
-      const entityInputs = (aiResult.entities ?? []).map((e) => ({
+    try {
+      await this.analysisQueue.add("analyze", {
         analysisResultId: phase1Result.analysisResultId,
         documentId: phase1Result.documentId,
-        label: e.label,
-        value: e.value,
-        group: e.group,
-        confidence: e.confidence,
-        sourceSpan: e.sourceSpan,
-      }));
-
-      if (entityInputs.length > 0) {
-        await entitiesRepo.bulkInsert(entityInputs);
-      }
-
-      // Save extracted text for document preview
-      if (aiResult.extractedText) {
-        await analysisRepo.saveExtractedText(phase1Result.analysisResultId, aiResult.extractedText);
-      }
-
-      const insertedEntities = await entitiesRepo.findByAnalysisResultId(phase1Result.analysisResultId);
-      const completed = await analysisRepo.updateStatus(phase1Result.analysisResultId, "completed");
-
-      if (!completed) {
-        throw new NotFoundException("Analysis result not found after status update");
-      }
+        ownerId: 0,
+        filePath: document?.filePath ?? null,
+      });
 
       this.logger.log(
-        `Phase 3: analysis ${phase1Result.analysisResultId} completed — ` +
-        `${insertedEntities.length} entities inserted`,
+        `Phase 2: analysis job enqueued for ${phase1Result.analysisResultId}`,
       );
-      return this.mapToAnalysisResult(completed, insertedEntities);
+    } catch (error) {
+      this.logger.error(
+        `Phase 2: failed to enqueue analysis job — ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw new HttpException(
+        "El servicio de análisis no está disponible en este momento. Reintentá en unos segundos.",
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    // Return immediately with the current analysis state.
+    // The status is "analyzing" — entities will be populated by the worker.
+    // The frontend polls GET /:id/status until "completed", then fetches GET /:id for entities.
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const analysisRepo = new AnalysisResultsRepository(client);
+      const results = await analysisRepo.findByDocumentId(documentId);
+      if (results.length === 0) {
+        throw new NotFoundException("Analysis result not found after enqueue");
+      }
+      return this.mapToAnalysisResult(results[0], []);
     });
   }
 

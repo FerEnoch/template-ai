@@ -6,7 +6,9 @@ import { AppModule } from "./app.module";
 import { getApiEnv } from "./config/env";
 import { HttpExceptionFilter } from "./infrastructure/http/exception.filter";
 
-const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+// 30s request timeout — async workers handle AI inference,
+// no more blocking HTTP connections for 20-30s.
+const REQUEST_TIMEOUT_MS = 30 * 1000;
 const KEEP_ALIVE_TIMEOUT_MS = 75 * 1000;
 const HEADERS_TIMEOUT_MS = 76 * 1000;
 

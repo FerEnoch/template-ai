@@ -6,7 +6,7 @@ WAIT_SLEEP ?= 2
 
 .PHONY: \
 	env-dev-init env-test-init env-init preflight-env-dev preflight-env-test \
-	wait-postgres-dev wait-postgres-test \
+	wait-postgres-dev wait-postgres-test wait-redis-dev \
 	dev dev-down dev-logs dev-ps db-dev-shell db-dev-reset \
 	test-db-up test-db-down test-db-logs test-db-ps db-test-shell db-test-reset \
 	smoke test help
@@ -27,18 +27,34 @@ define wait_for_postgres
 	exit 1
 endef
 
+define wait_for_redis
+	@attempt=1; \
+	while [ $$attempt -le $(WAIT_RETRIES) ]; do \
+		if $(1) exec -T redis redis-cli ping >/dev/null 2>&1; then \
+			printf "Redis is ready for %s (attempt %s/%s).\n" "$(2)" "$$attempt" "$(WAIT_RETRIES)"; \
+			exit 0; \
+		fi; \
+		printf "Waiting for Redis (%s): attempt %s/%s...\n" "$(2)" "$$attempt" "$(WAIT_RETRIES)"; \
+		attempt=$$((attempt + 1)); \
+		sleep $(WAIT_SLEEP); \
+	done; \
+	printf "ERROR: Redis readiness timed out for %s after %ss (%s attempts x %ss).\n" "$(2)" "$$(( $(WAIT_RETRIES) * $(WAIT_SLEEP) ))" "$(WAIT_RETRIES)" "$(WAIT_SLEEP)" >&2; \
+	printf "Hint: inspect status with '%s ps' and logs with '%s logs redis'.\n" "$(1)" "$(1)" >&2; \
+	exit 1
+endef
+
 help:
-	@printf "Local operations (PostgreSQL only):\n"
+	@printf "Local operations (PostgreSQL + Redis):\n"
 	@printf "  NOTE: App install/dev/lint/typecheck run via pnpm (workspace scripts), not Make.\n"
 	@printf "  make env-dev-init   # Create .env.dev from example if missing\n"
 	@printf "  make env-test-init  # Create .env.test from example if missing\n"
 	@printf "  make env-init       # Initialize both env files if missing\n"
-	@printf "  make dev            # Start dev PostgreSQL stack\n"
+	@printf "  make dev            # Start dev PostgreSQL + Redis stack\n"
 	@printf "  make dev-down       # Stop dev stack\n"
-	@printf "  make dev-logs       # Show dev PostgreSQL logs\n"
+	@printf "  make dev-logs       # Show dev PostgreSQL + Redis logs\n"
 	@printf "  make dev-ps         # Show dev stack status\n"
 	@printf "  make db-dev-shell   # Open psql in dev DB\n"
-	@printf "  make db-dev-reset   # Recreate dev DB storage\n"
+	@printf "  make db-dev-reset   # Recreate dev DB + Redis storage\n"
 	@printf "  make test-db-up     # Start test PostgreSQL stack\n"
 	@printf "  make test-db-down   # Stop test stack\n"
 	@printf "  make test-db-logs   # Show test PostgreSQL logs\n"
@@ -89,15 +105,19 @@ wait-postgres-dev: preflight-env-dev
 wait-postgres-test: preflight-env-test
 	$(call wait_for_postgres,$(COMPOSE_TEST),test)
 
+wait-redis-dev: preflight-env-dev
+	$(call wait_for_redis,$(COMPOSE_DEV),dev)
+
 dev: preflight-env-dev
-	$(COMPOSE_DEV) up -d postgres
+	$(COMPOSE_DEV) up -d postgres redis
 	$(MAKE) wait-postgres-dev
+	$(MAKE) wait-redis-dev
 
 dev-down: preflight-env-dev
 	$(COMPOSE_DEV) down
 
 dev-logs: preflight-env-dev
-	$(COMPOSE_DEV) logs postgres
+	$(COMPOSE_DEV) logs postgres redis
 
 dev-ps: preflight-env-dev
 	$(COMPOSE_DEV) ps
@@ -107,8 +127,9 @@ db-dev-shell: preflight-env-dev
 
 db-dev-reset: preflight-env-dev
 	$(COMPOSE_DEV) down -v
-	$(COMPOSE_DEV) up -d postgres
+	$(COMPOSE_DEV) up -d postgres redis
 	$(MAKE) wait-postgres-dev
+	$(MAKE) wait-redis-dev
 
 test-db-up: preflight-env-test
 	$(COMPOSE_TEST) up -d postgres

@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const ENV_KEYS = ["PORT", "NODE_ENV", "DATABASE_URL", "OPENROUTER_API_KEY"] as const;
+const ENV_KEYS = [
+  "PORT",
+  "NODE_ENV",
+  "DATABASE_URL",
+  "OPENROUTER_API_KEY",
+  "REDIS_HOST",
+  "REDIS_PORT",
+] as const;
 const BASE_ENV = {
   PORT: "3001",
   NODE_ENV: "test",
   DATABASE_URL: "postgres://template_ai_dev:template_ai_dev@localhost:5432/template_ai_dev",
   OPENROUTER_API_KEY: "sk-or-test-key-123",
+  REDIS_HOST: "localhost",
+  REDIS_PORT: "6379",
 } as const;
 
 const originalEnv = { ...process.env };
@@ -55,6 +64,8 @@ describe("getApiEnv", () => {
       DATABASE_URL: BASE_ENV.DATABASE_URL,
       CORS_ORIGIN: "http://localhost:3000",
       OPENROUTER_API_KEY: "sk-or-test-key-123",
+      REDIS_HOST: "localhost",
+      REDIS_PORT: 6379,
     });
   });
 
@@ -102,5 +113,22 @@ describe("getApiEnv", () => {
     const getApiEnv = await loadGetApiEnv();
 
     expect(() => getApiEnv()).toThrowError("[api env] OPENROUTER_API_KEY is required");
+  });
+
+  it("fails fast when REDIS_HOST is missing", async () => {
+    setEnv({ REDIS_HOST: undefined });
+    delete process.env.REDIS_HOST;
+
+    const getApiEnv = await loadGetApiEnv();
+
+    expect(() => getApiEnv()).toThrowError("[api env] REDIS_HOST is required");
+  });
+
+  it("fails fast when REDIS_PORT is out of range", async () => {
+    setEnv({ REDIS_PORT: "70000" });
+
+    const getApiEnv = await loadGetApiEnv();
+
+    expect(() => getApiEnv()).toThrowError("[api env] REDIS_PORT must be an integer between 1 and 65535");
   });
 });

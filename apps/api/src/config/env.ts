@@ -6,6 +6,8 @@ export type ApiEnv = {
   DATABASE_URL: string;
   CORS_ORIGIN: string;
   OPENROUTER_API_KEY: string;
+  REDIS_HOST: string;
+  REDIS_PORT: number;
 };
 
 const allowedNodeEnvs: readonly NodeEnv[] = ["development", "test", "production"];
@@ -77,6 +79,28 @@ function parseOpenRouterApiKey(value: string | undefined): string {
   return value;
 }
 
+function parseRedisHost(value: string | undefined): string {
+  if (!value) {
+    fail("REDIS_HOST is required");
+  }
+
+  return value;
+}
+
+function parseRedisPort(value: string | undefined): number {
+  if (!value) {
+    fail("REDIS_PORT is required");
+  }
+
+  const port = Number(value);
+
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    fail("REDIS_PORT must be an integer between 1 and 65535");
+  }
+
+  return port;
+}
+
 let cachedApiEnv: ApiEnv | null = null;
 
 export function getApiEnv(): ApiEnv {
@@ -90,6 +114,8 @@ export function getApiEnv(): ApiEnv {
     DATABASE_URL: parseDatabaseUrl(process.env.DATABASE_URL),
     CORS_ORIGIN: parseCorsOrigin(process.env.CORS_ORIGIN),
     OPENROUTER_API_KEY: parseOpenRouterApiKey(process.env.OPENROUTER_API_KEY),
+    REDIS_HOST: parseRedisHost(process.env.REDIS_HOST),
+    REDIS_PORT: parseRedisPort(process.env.REDIS_PORT),
   };
 
   return cachedApiEnv;

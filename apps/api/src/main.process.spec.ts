@@ -59,6 +59,8 @@ describe("API bootstrap process contract", () => {
       NODE_ENV: "test",
       DATABASE_URL:
         "postgres://template_ai_dev:template_ai_dev@127.0.0.1:1/template_ai_dev?connect_timeout=1",
+      REDIS_HOST: "localhost",
+      REDIS_PORT: "6379",
     });
 
     try {
@@ -84,6 +86,8 @@ describe("API bootstrap process contract", () => {
       NODE_ENV: "test",
       // Override DATABASE_URL to an invalid value to trigger env validation failure
       DATABASE_URL: "",
+      REDIS_HOST: "localhost",
+      REDIS_PORT: "6379",
     });
 
     const exitCode = await waitForExit(child, 90_000);
