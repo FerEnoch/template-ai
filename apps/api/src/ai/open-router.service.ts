@@ -55,7 +55,7 @@ Para cada entidad, identifica:
 - value: valor exacto encontrado en el documento
 - group: categoría (PARTES, INMUEBLE, FECHAS, ANEXOS)
 - confidence: nivel de confianza (ALTA, MEDIA, BAJA)
-- sourceSpan: posición aproximada en el texto (start, end) si es posible
+- sourceSpan: posición exacta en el texto (start, end) si es posible
 
 Responde EXCLUSIVAMENTE con un JSON array de entidades. No incluyas texto adicional.
 
