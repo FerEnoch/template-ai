@@ -15,10 +15,15 @@ export function renderHighlightedText(text: string, entities: Entity[]): ReactNo
 
   for (const entity of sorted) {
     const span = entity.sourceSpan!;
+    const clampedStart = Math.max(span.start, lastEnd);
 
-    if (span.start > lastEnd) {
+    if (clampedStart >= span.end) {
+      continue;
+    }
+
+    if (clampedStart > lastEnd) {
       segments.push(
-        <span key={`text-${lastEnd}`}>{text.slice(lastEnd, span.start)}</span>,
+        <span key={`text-${lastEnd}`}>{text.slice(lastEnd, clampedStart)}</span>,
       );
     }
 
@@ -33,7 +38,7 @@ export function renderHighlightedText(text: string, entities: Entity[]): ReactNo
         className={`rounded px-0.5 ${colorClass} cursor-help`}
         title={`${entity.label}: ${entity.value}`}
       >
-        {text.slice(span.start, span.end)}
+        {text.slice(clampedStart, span.end)}
       </mark>,
     );
 

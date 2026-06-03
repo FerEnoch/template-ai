@@ -24,16 +24,18 @@ export function validateAndCorrectSpans(
   entities: AnalyzeEntity[],
   extractedText: string,
 ): AnalyzeEntity[] {
-  for (const entity of entities) {
-    if (!entity.sourceSpan || !entity.value) {
-      continue;
+  return entities.map((entity) => {
+    const corrected = { ...entity };
+
+    if (!corrected.sourceSpan || !corrected.value) {
+      return corrected;
     }
 
     const matches: number[] = [];
     let fromIndex = 0;
 
     while (fromIndex <= extractedText.length) {
-      const matchIndex = extractedText.indexOf(entity.value, fromIndex);
+      const matchIndex = extractedText.indexOf(corrected.value, fromIndex);
       if (matchIndex === -1) {
         break;
       }
@@ -43,30 +45,30 @@ export function validateAndCorrectSpans(
     }
 
     if (matches.length === 0) {
-      entity.sourceSpan = undefined;
-      continue;
+      corrected.sourceSpan = undefined;
+      return corrected;
     }
 
     if (matches.length === 1) {
       const [start] = matches;
-      entity.sourceSpan = { start, end: start + entity.value.length };
-      continue;
+      corrected.sourceSpan = { start, end: start + corrected.value.length };
+      return corrected;
     }
 
-    const aiStart = entity.sourceSpan.start;
+    const aiStart = corrected.sourceSpan.start;
     const closestStart = matches.reduce((closest, current) => {
       const currentDistance = Math.abs(current - aiStart);
       const closestDistance = Math.abs(closest - aiStart);
       return currentDistance < closestDistance ? current : closest;
     }, matches[0]);
 
-    entity.sourceSpan = {
+    corrected.sourceSpan = {
       start: closestStart,
-      end: closestStart + entity.value.length,
+      end: closestStart + corrected.value.length,
     };
-  }
 
-  return entities;
+    return corrected;
+  });
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
