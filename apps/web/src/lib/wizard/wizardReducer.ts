@@ -6,6 +6,7 @@ export const initialWizardState: WizardState = {
   file: null,
   analysisResultId: null,
   entities: [],
+  extractedText: null,
   templateForm: null,
 };
 
@@ -21,6 +22,7 @@ function clearDownstreamState(state: WizardState, targetStep: WizardStep): Parti
     return {
       analysisResultId: null,
       entities: [],
+      extractedText: null,
       templateForm: null,
     };
   }
@@ -66,6 +68,7 @@ export function wizardReducer(
         ...state,
         analysisResultId: action.analysisResultId,
         entities: action.entities,
+        extractedText: action.extractedText,
       };
 
     case "UPDATE_ENTITY": {
@@ -82,6 +85,7 @@ export function wizardReducer(
         file: action.draft.file,
         analysisResultId: action.draft.analysisResultId,
         entities: action.draft.entities,
+        extractedText: action.draft.extractedText,
         templateForm: action.draft.templateForm,
       };
 
@@ -91,6 +95,7 @@ export function wizardReducer(
         file: action.draft.file,
         analysisResultId: action.draft.analysisResultId,
         entities: action.draft.entities ?? [],
+        extractedText: action.draft.extractedText ?? null,
         templateForm: action.draft.templateForm,
       };
 

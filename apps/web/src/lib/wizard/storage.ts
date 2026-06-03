@@ -5,6 +5,14 @@ import {
 
 const DRAFT_KEY = "template-draft:v1";
 
+export interface SaveDraftInput {
+  file: WizardDraft["file"];
+  analysisResultId?: string;
+  entities?: WizardDraft["entities"];
+  templateForm?: WizardDraft["templateForm"];
+  extractedText?: string | null;
+}
+
 /**
  * Load a draft from localStorage.
  * Returns null if no draft exists or validation fails.
@@ -29,20 +37,16 @@ export function loadDraft(): WizardDraft | null {
  * Save a draft to localStorage.
  * The draft must match the WizardDraft shape.
  */
-export function saveDraft(
-  file: WizardDraft["file"],
-  analysisResultId?: string,
-  entities?: WizardDraft["entities"],
-  templateForm?: WizardDraft["templateForm"]
-): void {
+export function saveDraft(input: SaveDraftInput): void {
   if (typeof window === "undefined") return;
 
   const draft: WizardDraft = {
     version: 1 as const,
-    file,
-    analysisResultId,
-    entities,
-    templateForm,
+    file: input.file,
+    analysisResultId: input.analysisResultId,
+    entities: input.entities,
+    templateForm: input.templateForm,
+    extractedText: input.extractedText,
     savedAt: new Date().toISOString(),
   };
 

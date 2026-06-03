@@ -11,3 +11,7 @@ export { WizardProvider, useWizard, STEP_PATH, stepUrl } from "./WizardContext";
 
 // Storage
 export { loadDraft, saveDraft, clearDraft } from "./storage";
+export type { SaveDraftInput } from "./storage";
+
+// Utilities
+export { renderHighlightedText } from "./highlightText";

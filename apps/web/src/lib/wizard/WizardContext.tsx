@@ -47,7 +47,11 @@ interface WizardContextValue {
   setFile: (file: WizardState["file"], fileObject?: File) => void;
   fileRef: React.MutableRefObject<File | null>;
   setEntities: (entities: WizardState["entities"]) => void;
-  setAnalysisResult: (analysisResultId: string, entities: WizardState["entities"]) => void;
+  setAnalysisResult: (
+    analysisResultId: string,
+    entities: WizardState["entities"],
+    extractedText: string | null,
+  ) => void;
   updateEntity: (entity: WizardState["entities"][number]) => void;
   setDraft: (draft: WizardState) => void;
   loadDraft: (draft: WizardState) => void;
@@ -133,8 +137,12 @@ export function WizardProvider({ children }: WizardProviderProps) {
   );
 
   const setAnalysisResult = useCallback(
-    (analysisResultId: string, entities: WizardState["entities"]) => {
-      dispatch({ type: "SET_ANALYSIS_RESULT", analysisResultId, entities });
+    (
+      analysisResultId: string,
+      entities: WizardState["entities"],
+      extractedText: string | null,
+    ) => {
+      dispatch({ type: "SET_ANALYSIS_RESULT", analysisResultId, entities, extractedText });
     },
     []
   );

@@ -35,10 +35,16 @@ describe("storage", () => {
   describe("saveDraft", () => {
     it("saves a valid draft to localStorage", () => {
       const file = { name: "contract.pdf", size: 1024, type: "application/pdf" };
-      saveDraft(file, "550e8400-e29b-41d4-a716-446655440001", [], {
-        name: "Test",
-        description: "Desc",
-        category: "Contratos",
+      saveDraft({
+        file,
+        analysisResultId: "550e8400-e29b-41d4-a716-446655440001",
+        entities: [],
+        templateForm: {
+          name: "Test",
+          description: "Desc",
+          category: "Contratos",
+        },
+        extractedText: "Texto persistido",
       });
 
       expect(localStorage.getItem("template-draft:v1")).not.toBeNull();
@@ -48,11 +54,12 @@ describe("storage", () => {
       expect(parsed.version).toBe(1);
       expect(parsed.file).toEqual(file);
       expect(parsed.analysisResultId).toBe("550e8400-e29b-41d4-a716-446655440001");
+      expect(parsed.extractedText).toBe("Texto persistido");
     });
 
     it("saves minimal draft with only file", () => {
       const file = { name: "minimal.pdf", size: 512, type: "application/pdf" };
-      saveDraft(file);
+      saveDraft({ file });
 
       const stored = localStorage.getItem("template-draft:v1")!;
       const parsed = JSON.parse(stored);
@@ -78,6 +85,7 @@ describe("storage", () => {
           description: "Description",
           category: "Contratos",
         },
+        extractedText: "Texto restaurado",
         savedAt: new Date().toISOString(),
       };
       mockStore["template-draft:v1"] = JSON.stringify(draft);
@@ -86,6 +94,22 @@ describe("storage", () => {
       expect(result).not.toBeNull();
       expect(result!.file.name).toBe("contract.pdf");
       expect(result!.analysisResultId).toBe("550e8400-e29b-41d4-a716-446655440002");
+      expect(result!.extractedText).toBe("Texto restaurado");
+    });
+
+    it("loads legacy draft without extractedText", () => {
+      const draft = {
+        version: 1 as const,
+        file: { name: "legacy.pdf", size: 1024, type: "application/pdf" },
+        analysisResultId: "550e8400-e29b-41d4-a716-446655440099",
+        entities: [] as never[],
+        savedAt: new Date().toISOString(),
+      };
+      mockStore["template-draft:v1"] = JSON.stringify(draft);
+
+      const result = loadDraft();
+      expect(result).not.toBeNull();
+      expect(result!.extractedText).toBeUndefined();
     });
 
     it("returns null and clears storage for invalid data", () => {
@@ -105,7 +129,7 @@ describe("storage", () => {
   describe("clearDraft", () => {
     it("removes draft from localStorage", () => {
       const file = { name: "contract.pdf", size: 1024, type: "application/pdf" };
-      saveDraft(file);
+      saveDraft({ file });
 
       clearDraft();
 
@@ -138,13 +162,20 @@ const entities = [
         category: "Contratos",
       };
 
-      saveDraft(file, "550e8400-e29b-41d4-a716-446655440003", entities, templateForm);
+      saveDraft({
+        file,
+        analysisResultId: "550e8400-e29b-41d4-a716-446655440003",
+        entities,
+        templateForm,
+        extractedText: "Roundtrip extracted text",
+      });
       const loaded = loadDraft();
 
       expect(loaded).not.toBeNull();
       expect(loaded!.file).toEqual(file);
       expect(loaded!.analysisResultId).toBe("550e8400-e29b-41d4-a716-446655440003");
       expect(loaded!.entities).toEqual(entities);
+      expect(loaded!.extractedText).toBe("Roundtrip extracted text");
     });
   });
 });

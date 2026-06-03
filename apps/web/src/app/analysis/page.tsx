@@ -13,12 +13,12 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout } from "@/components/wizard";
-import { useWizard, stepUrl } from "@/lib/wizard";
+import { renderHighlightedText, useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import { saveDraft } from "@/lib/wizard";
 import { AnalysisProgress, MESSAGES } from "@/components/analysis/AnalysisProgress";
 import type { AnalysisProgressProps } from "@/components/analysis/AnalysisProgress";
-import type { AnalysisResult, Entity } from "@template-ai/contracts";
+import type { AnalysisResult } from "@template-ai/contracts";
 
 const POLLING_INTERVAL_MS = 800;
 const MAX_POLLING_ATTEMPTS = 60;
@@ -318,8 +318,13 @@ function AnalysisContent() {
             clearInterval(interval);
             setAnalysisResult(result);
             setWarning(null);
-            setWizardAnalysisResult(documentId, result.entities);
-            saveDraft(state.file!, documentId, result.entities);
+            setWizardAnalysisResult(documentId, result.entities, result.extractedText);
+            saveDraft({
+              file: state.file!,
+              analysisResultId: documentId,
+              entities: result.entities,
+              extractedText: result.extractedText,
+            });
             setIsUploading(false);
             return;
           }
@@ -390,8 +395,13 @@ function AnalysisContent() {
             if (!isStaleRef.current) {
               setAnalysisResult(fullResult);
               setWarning(null);
-              setWizardAnalysisResult(documentId, fullResult.entities);
-              saveDraft(state.file!, documentId, fullResult.entities);
+              setWizardAnalysisResult(documentId, fullResult.entities, fullResult.extractedText);
+              saveDraft({
+                file: state.file!,
+                analysisResultId: documentId,
+                entities: fullResult.entities,
+                extractedText: fullResult.extractedText,
+              });
               setIsUploading(false);
             }
           } else if (statusData.status === "failed") {
@@ -475,49 +485,6 @@ function AnalysisContent() {
       };
     },
     [state.file, setWizardAnalysisResult, abortInFlightRequests, fetchWithRetry],
-  );
-
-  const renderHighlightedText = useCallback(
-    (text: string, entities: Entity[]): React.ReactNode => {
-      const sorted = entities
-        .filter((e) => e.sourceSpan)
-        .sort((a, b) => (a.sourceSpan!.start - b.sourceSpan!.start));
-
-      if (sorted.length === 0) {
-        return <span>{text}</span>;
-      }
-
-      const segments: React.ReactNode[] = [];
-      let lastEnd = 0;
-
-      for (const entity of sorted) {
-        const span = entity.sourceSpan!;
-        if (span.start > lastEnd) {
-          segments.push(
-            <span key={`text-${lastEnd}`}>{text.slice(lastEnd, span.start)}</span>,
-          );
-        }
-        const colorClass =
-          entity.confidence === "ALTA"
-            ? "bg-success/20 border-b-2 border-success/50"
-            : "bg-warning/20 border-b-2 border-warning/50";
-        segments.push(
-          <mark
-            key={entity.id}
-            className={`rounded px-0.5 ${colorClass} cursor-help`}
-            title={`${entity.label}: ${entity.value}`}
-          >
-            {text.slice(span.start, span.end)}
-          </mark>,
-        );
-        lastEnd = span.end;
-      }
-      if (lastEnd < text.length) {
-        segments.push(<span key={`text-${lastEnd}`}>{text.slice(lastEnd)}</span>);
-      }
-      return <>{segments}</>;
-    },
-    [],
   );
 
   const handleContinue = useCallback(() => {
@@ -779,54 +746,83 @@ function AnalysisContent() {
               )}
             </section>
 
-            {/* RIGHT COLUMN: Previews */}
-            <section className="col-span-12 grid gap-6 lg:col-span-9 lg:grid-cols-2">
-              {/* Document preview */}
-              <div className="flex min-h-[500px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                <div className="flex items-center gap-2 border-b border-border bg-background p-4">
-                  <FileText className="h-4 w-4 text-text-disabled" />
-                  <span className="text-[10px] font-bold uppercase tracking-tight text-text-secondary">
-                    Vista previa del documento
-                  </span>
+            {isCompleted ? (
+              <section className="col-span-12 lg:col-span-9">
+                <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-6 rounded-xl border border-border bg-surface p-10 text-center shadow-sm">
+                  <CheckCircle2 className="h-12 w-12 text-success" />
+                  <div className="space-y-2">
+                    <h2 className="font-headline text-2xl font-bold text-text-primary">
+                      Análisis completado correctamente
+                    </h2>
+                    <p className="font-body text-sm text-text-secondary">
+                      Revisá los datos detectados antes de guardar la plantilla.
+                    </p>
+                  </div>
+
+                  {analysisResult && (
+                    <div className="w-full rounded-lg border border-border bg-background p-4 text-left">
+                      <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
+                        Resumen de confianza
+                      </p>
+                      <div className="space-y-2 text-sm text-text-primary">
+                        <p>ALTA: {altaCount} campos</p>
+                        <p>BAJA: {bajaCount} campos</p>
+                        <p>Total detectado: {analysisResult.entities.length} campos</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleContinue}
+                    className="w-full rounded-lg bg-accent px-8 py-4 text-base font-bold text-white transition-colors hover:bg-accent-hover"
+                  >
+                    Ir a Revisión
+                  </button>
                 </div>
-                <div className="flex-grow space-y-6 p-8">
-                  {showWaitingUI ? (
-                    <AnalysisProgress
-                      status={status as AnalysisProgressProps["status"]}
-                      progress={progress}
-                      fileName={state.file?.name}
-                      fileSize={state.file?.size}
-                      analyzingElapsed={analyzingElapsed}
-                      currentMessageIndex={messageIndex}
-                    />
-                  ) : isCompleted && analysisResult ? (
-                    analysisResult.extractedText ? (
-                      <div className="space-y-4">
-                        <div className="prose prose-sm max-w-none whitespace-pre-wrap font-body text-sm leading-relaxed text-text-primary">
-                          {renderHighlightedText(
-                            analysisResult.extractedText,
-                            analysisResult.entities,
-                          )}
-                        </div>
-                        {state.file && (
-                          <div className="rounded-lg border border-border bg-background p-4">
-                            <p className="text-xs font-medium text-text-primary">
-                              {state.file.name}
-                            </p>
-                            <p className="text-xs text-text-secondary">
-                              {formatBytes(state.file.size)}
-                            </p>
-                          </div>
+              </section>
+            ) : (
+              <section className="col-span-12 grid gap-6 lg:col-span-9 lg:grid-cols-2">
+                {/* Document preview */}
+                <div className="flex min-h-[500px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-border bg-background p-4">
+                    <FileText className="h-4 w-4 text-text-disabled" />
+                    <span className="text-[10px] font-bold uppercase tracking-tight text-text-secondary">
+                      Vista previa del documento
+                    </span>
+                  </div>
+                  <div className="flex-grow space-y-6 p-8">
+                    {showWaitingUI ? (
+                      <AnalysisProgress
+                        status={status as AnalysisProgressProps["status"]}
+                        progress={progress}
+                        fileName={state.file?.name}
+                        fileSize={state.file?.size}
+                        analyzingElapsed={analyzingElapsed}
+                        currentMessageIndex={messageIndex}
+                      />
+                    ) : analysisResult?.extractedText ? (
+                      <div className="prose prose-sm max-w-none whitespace-pre-wrap font-body text-sm leading-relaxed text-text-primary">
+                        {renderHighlightedText(
+                          analysisResult.extractedText,
+                          analysisResult.entities,
                         )}
                       </div>
                     ) : (
-                      <div className="flex h-full flex-col items-center justify-center gap-3 py-12">
-                        <FileText className="h-8 w-8 text-text-disabled" />
-                        <p className="text-sm text-text-secondary">
-                          Vista previa no disponible para este documento
-                        </p>
+                      <>
+                        <div className="h-8 w-3/4 rounded bg-border/30" />
+                        <div className="space-y-3">
+                          <div className="h-4 w-full rounded bg-border/30" />
+                          <div className="h-4 w-full rounded bg-border/30" />
+                          <div className="h-4 w-5/6 rounded bg-border/30" />
+                          <div className="h-4 w-full rounded bg-border/30" />
+                        </div>
+                        <div className="h-48 w-full rounded-lg border border-dashed border-border bg-border/20" />
+                        <div className="space-y-3">
+                          <div className="h-4 w-full rounded bg-border/30" />
+                          <div className="h-4 w-4/6 rounded bg-border/30" />
+                        </div>
                         {state.file && (
-                          <div className="mt-2 rounded-lg border border-border bg-background p-4">
+                          <div className="mt-4 rounded-lg border border-border bg-background p-4">
                             <p className="text-xs font-medium text-text-primary">
                               {state.file.name}
                             </p>
@@ -835,109 +831,61 @@ function AnalysisContent() {
                             </p>
                           </div>
                         )}
-                      </div>
-                    )
-                  ) : (
-                    <>
-                      <div className="h-8 w-3/4 rounded bg-border/30" />
-                      <div className="space-y-3">
-                        <div className="h-4 w-full rounded bg-border/30" />
-                        <div className="h-4 w-full rounded bg-border/30" />
-                        <div className="h-4 w-5/6 rounded bg-border/30" />
-                        <div className="h-4 w-full rounded bg-border/30" />
-                      </div>
-                      <div className="h-48 w-full rounded-lg border border-dashed border-border bg-border/20" />
-                      <div className="space-y-3">
-                        <div className="h-4 w-full rounded bg-border/30" />
-                        <div className="h-4 w-4/6 rounded bg-border/30" />
-                      </div>
-                      {state.file && (
-                        <div className="mt-4 rounded-lg border border-border bg-background p-4">
-                          <p className="text-xs font-medium text-text-primary">
-                            {state.file.name}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {formatBytes(state.file.size)}
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Entity detection */}
-              <div className="flex min-h-[500px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
-                <div className="flex items-center gap-2 border-b border-border bg-background p-4">
-                  <Database className="h-4 w-4 text-text-disabled" />
-                  <span className="text-[10px] font-bold uppercase tracking-tight text-text-secondary">
-                    Extracción de datos
-                  </span>
-                </div>
-                <div className="flex-grow space-y-8 p-6">
-                  {showWaitingUI ? (
-                    <>
-                      <div className="space-y-3">
-                        <div className="h-3 w-20 animate-pulse rounded bg-border" />
-                        <div className="flex h-10 items-center rounded border border-border bg-background px-4">
-                          <div className="h-4 w-32 animate-pulse rounded bg-border" />
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-3 w-24 animate-pulse rounded bg-border" />
-                        <div className="flex h-10 items-center rounded border border-border bg-background px-4">
-                          <div className="h-4 w-48 animate-pulse rounded bg-border" />
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-3 w-16 animate-pulse rounded bg-border" />
-                        <div className="h-24 rounded border border-border bg-background p-4">
-                          <div className="mb-2 h-3 w-full animate-pulse rounded bg-border" />
-                          <div className="mb-2 h-3 w-5/6 animate-pulse rounded bg-border" />
-                          <div className="h-3 w-4/6 animate-pulse rounded bg-border" />
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="h-3 w-32 animate-pulse rounded bg-border" />
-                        <div className="flex h-10 items-center rounded border border-border bg-background px-4">
-                          <div className="h-4 w-16 animate-pulse rounded bg-border" />
-                        </div>
-                      </div>
-                    </>
-                  ) : isCompleted && analysisResult ? (
-                    <>
-                      {analysisResult.entities.slice(0, 6).map((entity) => (
-                        <div key={entity.id} className="space-y-1">
-                          <div className="h-3 w-16 rounded bg-border/30" />
-                          <div className="flex items-center justify-between rounded border border-border bg-background px-4 py-2">
-                            <span className="text-xs font-medium text-text-secondary">
-                              {entity.label}
-                            </span>
-                            <span className="text-sm font-bold text-text-primary">
-                              {entity.value.length > 20
-                                ? entity.value.slice(0, 20) + "..."
-                                : entity.value}
-                            </span>
+                {/* Entity detection */}
+                <div className="flex min-h-[500px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-border bg-background p-4">
+                    <Database className="h-4 w-4 text-text-disabled" />
+                    <span className="text-[10px] font-bold uppercase tracking-tight text-text-secondary">
+                      Extracción de datos
+                    </span>
+                  </div>
+                  <div className="flex-grow space-y-8 p-6">
+                    {showWaitingUI ? (
+                      <>
+                        <div className="space-y-3">
+                          <div className="h-3 w-20 animate-pulse rounded bg-border" />
+                          <div className="flex h-10 items-center rounded border border-border bg-background px-4">
+                            <div className="h-4 w-32 animate-pulse rounded bg-border" />
                           </div>
                         </div>
-                      ))}
-                      {analysisResult.entities.length > 6 && (
-                        <p className="text-xs text-text-secondary">
-                          + {analysisResult.entities.length - 6} campos más
+                        <div className="space-y-3">
+                          <div className="h-3 w-24 animate-pulse rounded bg-border" />
+                          <div className="flex h-10 items-center rounded border border-border bg-background px-4">
+                            <div className="h-4 w-48 animate-pulse rounded bg-border" />
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="h-3 w-16 animate-pulse rounded bg-border" />
+                          <div className="h-24 rounded border border-border bg-background p-4">
+                            <div className="mb-2 h-3 w-full animate-pulse rounded bg-border" />
+                            <div className="mb-2 h-3 w-5/6 animate-pulse rounded bg-border" />
+                            <div className="h-3 w-4/6 animate-pulse rounded bg-border" />
+                          </div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="h-3 w-32 animate-pulse rounded bg-border" />
+                          <div className="flex h-10 items-center rounded border border-border bg-background px-4">
+                            <div className="h-4 w-16 animate-pulse rounded bg-border" />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex h-full flex-col items-center justify-center gap-3">
+                        <CheckCircle2 className="h-8 w-8 text-success" />
+                        <p className="text-sm text-text-secondary">
+                          Esperando análisis...
                         </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-3">
-                      <CheckCircle2 className="h-8 w-8 text-success" />
-                      <p className="text-sm text-text-secondary">
-                        Esperando análisis...
-                      </p>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
           </div>
 
           {/* Page footer */}

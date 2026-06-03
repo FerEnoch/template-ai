@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { AnalysisResultSchema, EntitySchema } from "./schemas.js";
+import {
+  AnalysisResultSchema,
+  EntitySchema,
+  WizardDraftSchema,
+} from "./schemas.js";
 
 describe("EntitySchema", () => {
   const validEntity = {
@@ -103,5 +107,33 @@ describe("AnalysisResultSchema", () => {
       extractedText: 123,
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("WizardDraftSchema", () => {
+  const baseDraft = {
+    version: 1 as const,
+    file: { name: "contract.pdf", size: 2048, type: "application/pdf" },
+    analysisResultId: "550e8400-e29b-41d4-a716-446655440001",
+    entities: [],
+    savedAt: new Date().toISOString(),
+  };
+
+  it("parses extractedText when present", () => {
+    const result = WizardDraftSchema.safeParse({
+      ...baseDraft,
+      extractedText: "Texto extraído del documento",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.extractedText).toBe("Texto extraído del documento");
+    }
+  });
+
+  it("tolerates legacy drafts without extractedText", () => {
+    const result = WizardDraftSchema.safeParse(baseDraft);
+
+    expect(result.success).toBe(true);
   });
 });
