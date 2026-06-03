@@ -52,7 +52,16 @@ export class TemplatesController {
       );
     }
 
-    const parsed = CreateTemplateBody.safeParse(body);
+    // Normalize: Zod v4 .optional() rejects null — convert null → undefined.
+    const raw = body as Record<string, unknown>;
+    if (Array.isArray(raw.entities)) {
+      raw.entities = (raw.entities as Record<string, unknown>[]).map((e) => ({
+        ...e,
+        sourceSpan: e.sourceSpan ?? undefined,
+      }));
+    }
+
+    const parsed = CreateTemplateBody.safeParse(raw);
 
     if (!parsed.success) {
       const firstError = parsed.error.issues[0];

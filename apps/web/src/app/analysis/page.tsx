@@ -487,13 +487,21 @@ function AnalysisContent() {
           }
 
           // Non-transient polling failure — but the worker may have finished
-          // in the background. Do one final status check before showing error.
+          // in the background. Retry with backoff before giving up.
           try {
-            const finalCheck = await fetch(`/api/analysis/${documentId}/status`);
+            const finalCheck = await fetchWithRetry(
+              `/api/analysis/${documentId}/status`,
+              {},
+              { staleRef: isStaleRef, retries: 3, timeoutMs: REQUEST_TIMEOUT_MS },
+            );
             if (finalCheck.ok) {
               const finalStatus = await finalCheck.json();
               if (finalStatus.status === "completed") {
-                const fullResponse = await fetch(`/api/analysis/${documentId}`);
+                const fullResponse = await fetchWithRetry(
+                  `/api/analysis/${documentId}`,
+                  {},
+                  { staleRef: isStaleRef, retries: 2, timeoutMs: REQUEST_TIMEOUT_MS },
+                );
                 if (fullResponse.ok) {
                   const fullResult: AnalysisResult = await fullResponse.json();
                   if (!isStaleRef.current) {

@@ -27,7 +27,7 @@ export interface AnalysisEntity {
   value: string;
   group: string;
   confidence: string;
-  sourceSpan: { start: number; end: number } | null;
+  sourceSpan: { start: number; end: number } | null | undefined;
   reviewed: boolean;
   excluded: boolean;
 }
@@ -239,7 +239,7 @@ export class AnalysisService {
         value: e.value,
         group: e.group,
         confidence: e.confidence,
-        sourceSpan: e.sourceSpan,
+        sourceSpan: e.sourceSpan ?? undefined,
         reviewed: e.reviewed,
         excluded: e.excluded,
       })),

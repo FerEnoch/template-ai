@@ -61,7 +61,7 @@ export class AnalysisProcessor extends WorkerHost {
         value: entity.value,
         group: entity.group,
         confidence: entity.confidence,
-        sourceSpan: entity.sourceSpan,
+        sourceSpan: entity.sourceSpan ?? undefined,
       }));
 
       if (entityInputs.length > 0) {
