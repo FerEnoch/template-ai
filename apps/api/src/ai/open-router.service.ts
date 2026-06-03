@@ -159,11 +159,16 @@ export class OpenRouterService {
     const cacheKey = createHash("sha256").update(documentText).digest("hex");
     const cached = this.responseCache.get(cacheKey);
     if (cached) {
-      this.logger.log(`Cache hit for document (${cached.entities.length} entities, sha256=${cacheKey.slice(0, 12)}…)`);
+      this.logger.warn(
+        `⚡ CACHE HIT — skipping OpenRouter call (${cached.entities.length} entities, sha256=${cacheKey.slice(0, 12)}…)`,
+      );
       return cached;
     }
 
     try {
+      this.logger.warn(
+        `🟡 API CALL — calling OpenRouter model "${model}" (cache miss, sha256=${cacheKey.slice(0, 12)}…)`,
+      );
       const result = await this.callModel(model, documentText);
       // Cache successful result for future identical documents
       this.responseCache.set(cacheKey, result);
