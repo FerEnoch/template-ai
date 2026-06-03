@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
 import { AI_CONFIG } from "../config/ai.js";
@@ -125,6 +126,15 @@ export class OpenRouterService {
   private readonly client: OpenAI;
   private readonly logger = new Logger(OpenRouterService.name);
 
+  /**
+   * In-memory response cache to avoid redundant OpenRouter API calls during
+   * development/testing. Keyed by SHA-256 of the document text so identical
+   * documents hit the cache even when re-uploaded under different filenames.
+   *
+   * Cleared on process restart — no persistence needed (testing purpose only).
+   */
+  private readonly responseCache = new Map<string, ExtractEntitiesResult>();
+
   constructor() {
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
@@ -145,8 +155,19 @@ export class OpenRouterService {
       );
     }
 
+    // Check in-memory cache before calling OpenRouter
+    const cacheKey = createHash("sha256").update(documentText).digest("hex");
+    const cached = this.responseCache.get(cacheKey);
+    if (cached) {
+      this.logger.log(`Cache hit for document (${cached.entities.length} entities, sha256=${cacheKey.slice(0, 12)}…)`);
+      return cached;
+    }
+
     try {
-      return await this.callModel(model, documentText);
+      const result = await this.callModel(model, documentText);
+      // Cache successful result for future identical documents
+      this.responseCache.set(cacheKey, result);
+      return result;
     } catch (error) {
       // Fallback: retry with secondary model on MODEL_NOT_FOUND or RATE_LIMIT
       if (

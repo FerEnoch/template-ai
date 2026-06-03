@@ -186,9 +186,30 @@ function AnalysisContent() {
     }
   }, [searchParams, state.file, router, setStep]);
 
-  // Start analysis when page mounts with file
+  // Restore analysis result from wizard state when navigating back to this page
+  // after a completed analysis (prevents re-triggering + dead buttons).
   useEffect(() => {
-    if (!state.file || isUploading || analysisResult) return;
+    if (state.entities.length > 0 && state.analysisResultId && !analysisResult) {
+      setAnalysisResult({
+        documentId: state.analysisResultId,
+        status: "completed",
+        progress: 100,
+        entities: state.entities,
+        extractedText: state.extractedText,
+      } as AnalysisResult);
+      setIsUploading(false);
+    }
+  }, [state.entities, state.analysisResultId, state.extractedText, analysisResult]);
+
+  // Start analysis when page mounts with file.
+  // Guard prevents re-triggering when:
+  // - No file in wizard state
+  // - Already uploading
+  // - Analysis already completed (local state)
+  // - Analysis was already done in a previous visit (wizard state has entities)
+  useEffect(() => {
+    const hasPreviousAnalysis = state.entities.length > 0 && state.analysisResultId;
+    if (!state.file || isUploading || analysisResult || hasPreviousAnalysis) return;
 
     let cancelled = false;
     setIsUploading(true);
@@ -234,7 +255,7 @@ function AnalysisContent() {
         // The backend's atomic guard prevents duplicate AI calls from concurrent polls.
         pollingCleanupRef.current = pollForAnalysis(document.id);
       } catch (fetchError) {
-        if (!cancelled && !isAbortError(fetchError)) setError("Error de conexión");
+        if (!cancelled && !isAbortError(fetchError)) setError("Error de conexión al iniciar el análisis. ¿Está corriendo el backend?");
         setIsUploading(false);
       }
     };
@@ -465,9 +486,35 @@ function AnalysisContent() {
             return;
           }
 
+          // Non-transient polling failure — but the worker may have finished
+          // in the background. Do one final status check before showing error.
+          try {
+            const finalCheck = await fetch(`/api/analysis/${documentId}/status`);
+            if (finalCheck.ok) {
+              const finalStatus = await finalCheck.json();
+              if (finalStatus.status === "completed") {
+                const fullResponse = await fetch(`/api/analysis/${documentId}`);
+                if (fullResponse.ok) {
+                  const fullResult: AnalysisResult = await fullResponse.json();
+                  if (!isStaleRef.current) {
+                    setAnalysisResult(fullResult);
+                    setWarning(null);
+                    setWizardAnalysisResult(documentId, fullResult.entities);
+                    saveDraft(state.file!, documentId, fullResult.entities);
+                    setIsUploading(false);
+                    clearInterval(interval);
+                  }
+                  return;
+                }
+              }
+            }
+          } catch (_) {
+            // Final check failed too — fall through to error
+          }
+
           isStaleRef.current = true;
           clearInterval(interval);
-          setError("Error de conexión");
+          setError("Error de conexión durante el análisis. El worker puede haber completado — revisá el documento en la biblioteca.");
           setIsUploading(false);
         } finally {
           statusRequestActive = false;

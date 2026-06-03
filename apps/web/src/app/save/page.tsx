@@ -71,7 +71,6 @@ function SaveContent({
             category: values.category,
             documentId: state.analysisResultId,
             entities: state.entities,
-            status: "draft",
           }),
         });
 

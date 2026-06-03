@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
 import { TemplateSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
@@ -9,6 +9,8 @@ const CreateTemplateBody = TemplateSchema.omit({ id: true, createdAt: true, stat
 
 @Controller("templates")
 export class TemplatesController {
+  private readonly logger = new Logger(TemplatesController.name);
+
   public constructor(private readonly templatesService: TemplatesService) {}
 
   /**
@@ -39,11 +41,28 @@ export class TemplatesController {
    */
   @Post()
   public async create(@Body() body: unknown): Promise<TemplateResponse> {
+    // Debug: log what body the controller actually receives
+    this.logger.debug(
+      `POST /api/templates body type=${typeof body}, isNull=${body === null}, isArray=${Array.isArray(body)}`,
+    );
+
+    if (body === null || body === undefined || typeof body !== "object" || Array.isArray(body)) {
+      throw new BadRequestException(
+        "El cuerpo de la solicitud está vacío o no es un objeto JSON válido. Verificá que estés enviando los datos del formulario.",
+      );
+    }
+
     const parsed = CreateTemplateBody.safeParse(body);
 
     if (!parsed.success) {
       const firstError = parsed.error.issues[0];
-      throw new BadRequestException(firstError?.message ?? "Validation error");
+      // Map Zod error paths to user-friendly Spanish messages
+      const path = firstError.path.join(".");
+      const zodMessage = firstError.message;
+      this.logger.warn(`Template validation failed: path=${path}, message=${zodMessage}`);
+      throw new BadRequestException(
+        `Error de validación${path ? ` en "${path}"` : ""}: ${zodMessage}`,
+      );
     }
 
     const data: CreateTemplateData = {
