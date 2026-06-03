@@ -70,8 +70,22 @@ describe("renderHighlightedText", () => {
       createEntity("2", 4, 9, "BAJA"),
     ];
 
-    render(<div>{renderHighlightedText(text, entities)}</div>);
+    const { container } = render(<div>{renderHighlightedText(text, entities)}</div>);
 
     expect(document.querySelectorAll("mark")).toHaveLength(2);
+    expect(container.textContent).toBe(text);
+  });
+
+  it("skips fully contained spans without duplicating text", () => {
+    const text = "ABCDEFGHIJ";
+    const entities: Entity[] = [
+      createEntity("1", 0, 8, "ALTA"),
+      createEntity("2", 2, 5, "MEDIA"),
+    ];
+
+    const { container } = render(<div>{renderHighlightedText(text, entities)}</div>);
+
+    expect(document.querySelectorAll("mark")).toHaveLength(1);
+    expect(container.textContent).toBe(text);
   });
 });

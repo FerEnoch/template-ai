@@ -387,5 +387,24 @@ describe("DocumentAnalysisService", () => {
 
       expect(corrected[0].sourceSpan).toBeUndefined();
     });
+
+    it("should return new entity objects without mutating input", () => {
+      const entities = [
+        {
+          label: "COMPRADOR",
+          value: "Juan Pérez",
+          group: "PARTES",
+          confidence: "ALTA",
+          sourceSpan: { start: 0, end: 10 },
+        },
+      ];
+
+      const corrected = validateAndCorrectSpans(entities, "Contrato entre Juan Pérez y María López");
+
+      expect(corrected).not.toBe(entities);
+      expect(corrected[0]).not.toBe(entities[0]);
+      expect(entities[0].sourceSpan).toEqual({ start: 0, end: 10 });
+      expect(corrected[0].sourceSpan).toEqual({ start: 15, end: 25 });
+    });
   });
 });
