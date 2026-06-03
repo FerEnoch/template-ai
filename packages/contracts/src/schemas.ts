@@ -72,6 +72,7 @@ export const WizardDraftSchema = z.object({
       category: z.string(),
     })
     .optional(),
+  extractedText: z.string().nullable().optional(),
   savedAt: z.string().datetime(),
 });
 
