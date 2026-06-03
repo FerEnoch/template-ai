@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout, EntityInspector } from "@/components/wizard";
-import { useWizard, stepUrl } from "@/lib/wizard";
+import { renderHighlightedText, useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import type { Entity } from "@template-ai/contracts";
 
@@ -123,80 +123,15 @@ function ReviewInner() {
             {/* Document canvas */}
             <div className="flex flex-1 justify-center overflow-y-auto bg-background p-12">
               <article className="min-h-[1200px] w-full max-w-3xl bg-surface p-16 font-body leading-relaxed text-text-primary shadow-sm">
-                <h1 className="mb-12 text-center font-headline text-xl font-bold uppercase tracking-widest">
-                  Contrato de Arrendamiento de Vivienda
-                </h1>
-
-                <p className="mb-6">En Madrid, a 15 de Octubre de 2023.</p>
-                <p className="mb-6 font-bold">REUNIDOS</p>
-                <p className="mb-6">
-                  De una parte, como{" "}
-                  <span
-                    className="rounded-sm px-1"
-                    style={{
-                      backgroundColor: "rgba(34, 197, 94, 0.1)",
-                      borderBottom: "2px solid rgba(34, 197, 94, 0.4)",
-                    }}
-                  >
-                    ARRENDADOR
-                  </span>
-                  , el Sr. Don Julián Ruiz de Azúa, mayor de edad, con DNI
-                  12345678X y domicilio en{" "}
-                  <span
-                    className="rounded-sm px-1"
-                    style={{
-                      backgroundColor: "rgba(245, 158, 11, 0.1)",
-                      borderBottom: "2px solid rgba(245, 158, 11, 0.4)",
-                    }}
-                  >
-                    Calle Mayor 12
-                  </span>
-                  , 2º Izquierda, 28013, Madrid.
-                </p>
-                <p className="mb-6">
-                  De otra parte, como ARRENDATARIO, la Sra. Doña Elena Blanco
-                  Marín, con DNI 87654321Y, y con domicilio a efectos de
-                  notificaciones en la propia vivienda objeto del presente
-                  contrato.
-                </p>
-                <p className="mb-6 font-bold">ESTIPULACIONES</p>
-                <p className="mb-6">
-                  <span className="font-bold">PRIMERA. Objeto.</span> El
-                  Arrendador cede en arrendamiento al Arrendatario la vivienda
-                  sita en la{" "}
-                  <span
-                    className="rounded-sm px-1"
-                    style={{
-                      backgroundColor: "rgba(245, 158, 11, 0.1)",
-                      borderBottom: "2px solid rgba(245, 158, 11, 0.4)",
-                    }}
-                  >
-                    Calle Mayor 12
-                  </span>{" "}
-                  de Madrid, para ser destinada exclusivamente a vivienda
-                  permanente del Arrendatario y su familia.
-                </p>
-                <p className="mb-6">
-                  <span className="font-bold">SEGUNDA. Renta.</span> La renta
-                  mensual acordada por las partes es de{" "}
-                  <span
-                    className="rounded-sm px-1 font-bold"
-                    style={{
-                      backgroundColor: "rgba(245, 158, 11, 0.1)",
-                      borderBottom: "2px solid rgba(245, 158, 11, 0.4)",
-                    }}
-                  >
-                    2.500€
-                  </span>{" "}
-                  (dos mil quinientos euros), pagaderos dentro de los cinco
-                  primeros días de cada mes mediante transferencia bancaria.
-                </p>
-                <p className="mb-12">
-                  <span className="font-bold">TERCERA. Duración.</span> El
-                  presente contrato tendrá una duración de un (1) año, prorrogable
-                  según los plazos establecidos en la Ley de Arrendamientos
-                  Urbanos vigente.
-                </p>
+                {state.extractedText ? (
+                  <div className="prose prose-sm max-w-none whitespace-pre-wrap font-body text-sm leading-relaxed text-text-primary">
+                    {renderHighlightedText(state.extractedText, state.entities)}
+                  </div>
+                ) : (
+                  <p className="text-sm text-text-secondary">
+                    Vista previa no disponible para este documento
+                  </p>
+                )}
 
                 {/* Page footer */}
                 <div className="mt-20 flex justify-between border-t border-border pt-4 text-xs text-text-disabled">
