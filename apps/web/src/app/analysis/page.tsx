@@ -499,8 +499,13 @@ function AnalysisContent() {
                   if (!isStaleRef.current) {
                     setAnalysisResult(fullResult);
                     setWarning(null);
-                    setWizardAnalysisResult(documentId, fullResult.entities);
-                    saveDraft(state.file!, documentId, fullResult.entities);
+                    setWizardAnalysisResult(documentId, fullResult.entities, fullResult.extractedText ?? null);
+                    saveDraft({
+                      file: state.file!,
+                      analysisResultId: documentId,
+                      entities: fullResult.entities,
+                      extractedText: fullResult.extractedText,
+                    });
                     setIsUploading(false);
                     clearInterval(interval);
                   }
@@ -535,20 +540,26 @@ function AnalysisContent() {
   );
 
   const handleContinue = useCallback(() => {
-    if (analysisResult?.status === "completed") {
+    const hasWizardResult = state.entities.length > 0 && state.analysisResultId;
+    if (analysisResult?.status === "completed" || hasWizardResult) {
       nextStep();
     }
-  }, [analysisResult, nextStep]);
+  }, [analysisResult, nextStep, state.entities.length, state.analysisResultId]);
 
-  const progress = analysisResult?.progress ?? 0;
-  const status = analysisResult?.status ?? "processing";
+  // Derive display state from local state first, fall back to wizard state
+  // so buttons work immediately after navigating back (before restore effect fires).
+  const hasWizardResult = state.entities.length > 0 && state.analysisResultId;
+  const progress = analysisResult?.progress ?? (hasWizardResult ? 100 : 0);
+  const status = analysisResult?.status ?? (hasWizardResult ? "completed" : "processing");
   const isCompleted = status === "completed";
   const isProcessing = status === "processing";
   const isAnalyzing = status === "analyzing";
   const showWaitingUI = isProcessing || isAnalyzing;
+  const displayEntities = analysisResult?.entities ?? (hasWizardResult ? state.entities : []);
+  const displayExtractedText = analysisResult?.extractedText ?? (hasWizardResult ? state.extractedText : null);
 
-  const altaCount = analysisResult?.entities.filter((e) => e.confidence === "ALTA").length ?? 0;
-  const bajaCount = analysisResult?.entities.filter((e) => e.confidence === "BAJA").length ?? 0;
+  const altaCount = displayEntities.filter((e) => e.confidence === "ALTA").length;
+  const bajaCount = displayEntities.filter((e) => e.confidence === "BAJA").length;
 
   return (
     <AppShell footer={false} activeSidebarItem="Nuevo Documento">
@@ -754,7 +765,7 @@ function AnalysisContent() {
               )}
 
               {/* Confidence card */}
-              {isCompleted && analysisResult && (
+              {isCompleted && (
                 <div className="mt-10 rounded-lg border border-border bg-background p-4">
                   <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                     Nivel de Confianza
@@ -768,7 +779,7 @@ function AnalysisContent() {
                         <div
                           className="h-full rounded-full bg-success"
                           style={{
-                            width: `${Math.round((altaCount / (analysisResult.entities.length || 1)) * 100)}%`,
+                            width: `${Math.round((altaCount / (displayEntities.length || 1)) * 100)}%`,
                           }}
                         />
                       </div>
@@ -782,7 +793,7 @@ function AnalysisContent() {
                           <div
                             className="h-full rounded-full bg-warning"
                             style={{
-                              width: `${Math.round((bajaCount / (analysisResult.entities.length || 1)) * 100)}%`,
+                              width: `${Math.round((bajaCount / (displayEntities.length || 1)) * 100)}%`,
                             }}
                           />
                         </div>
@@ -806,7 +817,7 @@ function AnalysisContent() {
                     </p>
                   </div>
 
-                  {analysisResult && (
+                  {isCompleted && (
                     <div className="w-full rounded-lg border border-border bg-background p-4 text-left">
                       <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-text-secondary">
                         Resumen de confianza
@@ -814,7 +825,7 @@ function AnalysisContent() {
                       <div className="space-y-2 text-sm text-text-primary">
                         <p>ALTA: {altaCount} campos</p>
                         <p>BAJA: {bajaCount} campos</p>
-                        <p>Total detectado: {analysisResult.entities.length} campos</p>
+                        <p>Total detectado: {displayEntities.length} campos</p>
                       </div>
                     </div>
                   )}
@@ -847,11 +858,11 @@ function AnalysisContent() {
                         analyzingElapsed={analyzingElapsed}
                         currentMessageIndex={messageIndex}
                       />
-                    ) : analysisResult?.extractedText ? (
+                    ) : displayExtractedText ? (
                       <div className="prose prose-sm max-w-none whitespace-pre-wrap font-body text-sm leading-relaxed text-text-primary">
                         {renderHighlightedText(
-                          analysisResult.extractedText,
-                          analysisResult.entities,
+                          displayExtractedText,
+                          displayEntities,
                         )}
                       </div>
                     ) : (
