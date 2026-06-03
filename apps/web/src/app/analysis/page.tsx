@@ -318,8 +318,13 @@ function AnalysisContent() {
             clearInterval(interval);
             setAnalysisResult(result);
             setWarning(null);
-            setWizardAnalysisResult(documentId, result.entities);
-            saveDraft(state.file!, documentId, result.entities);
+            setWizardAnalysisResult(documentId, result.entities, result.extractedText);
+            saveDraft({
+              file: state.file!,
+              analysisResultId: documentId,
+              entities: result.entities,
+              extractedText: result.extractedText,
+            });
             setIsUploading(false);
             return;
           }
@@ -390,8 +395,13 @@ function AnalysisContent() {
             if (!isStaleRef.current) {
               setAnalysisResult(fullResult);
               setWarning(null);
-              setWizardAnalysisResult(documentId, fullResult.entities);
-              saveDraft(state.file!, documentId, fullResult.entities);
+              setWizardAnalysisResult(documentId, fullResult.entities, fullResult.extractedText);
+              saveDraft({
+                file: state.file!,
+                analysisResultId: documentId,
+                entities: fullResult.entities,
+                extractedText: fullResult.extractedText,
+              });
               setIsUploading(false);
             }
           } else if (statusData.status === "failed") {

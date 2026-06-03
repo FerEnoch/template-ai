@@ -64,6 +64,22 @@ describe("wizardReducer", () => {
     });
   });
 
+  describe("SET_ANALYSIS_RESULT", () => {
+    it("stores extractedText with analysis result", () => {
+      const action = {
+        type: "SET_ANALYSIS_RESULT",
+        analysisResultId: "analysis-123",
+        entities: [mockEntity],
+        extractedText: "Texto completo del contrato",
+      } as WizardAction;
+
+      const result = wizardReducer(initialWizardState, action);
+      expect((result as { extractedText?: string | null }).extractedText).toBe(
+        "Texto completo del contrato",
+      );
+    });
+  });
+
   describe("UPDATE_ENTITY", () => {
     it("updates an existing entity by id", () => {
       const stateWithEntities: WizardState = {
@@ -93,19 +109,23 @@ describe("wizardReducer", () => {
 
   describe("SET_DRAFT", () => {
     it("applies draft state replacing relevant fields (currentStep unchanged)", () => {
-      const draft: WizardState = {
+      const draft = {
         currentStep: WizardStep.REVIEW,
         file: { name: "draft.pdf", size: 2048, type: "application/pdf" },
         analysisResultId: "draft-analysis-id",
         entities: [mockEntity],
         templateForm: { name: "Draft", description: "A draft", category: "Contratos" },
-      };
+        extractedText: "Borrador extraído",
+      } as WizardState;
       const action: WizardAction = { type: "SET_DRAFT", draft };
       const result = wizardReducer(initialWizardState, action);
       expect(result.file).toEqual(draft.file);
       expect(result.analysisResultId).toBe("draft-analysis-id");
       expect(result.entities).toHaveLength(1);
       expect(result.templateForm).toEqual(draft.templateForm);
+      expect((result as { extractedText?: string | null }).extractedText).toBe(
+        "Borrador extraído",
+      );
       // currentStep stays as initial (upload) since SET_DRAFT doesn't update it
       expect(result.currentStep).toBe(initialWizardState.currentStep);
     });
@@ -120,15 +140,17 @@ describe("wizardReducer", () => {
         file: { name: "old.pdf", size: 999, type: "application/pdf" },
         analysisResultId: "old-analysis",
         entities: [mockEntity],
+        extractedText: "Texto anterior",
         templateForm: { name: "Old", description: "Old desc", category: "Laboral" },
       };
-      const draft: WizardState = {
+      const draft = {
         currentStep: WizardStep.REVIEW,
         file: { name: "draft.pdf", size: 2048, type: "application/pdf" },
         analysisResultId: "draft-analysis-id",
         entities: [mockEntity, mockEntity2],
         templateForm: { name: "Draft", description: "A draft", category: "Contratos" },
-      };
+        extractedText: "Texto cargado",
+      } as WizardState;
       const action: WizardAction = { type: "LOAD_DRAFT", draft };
       const result = wizardReducer(stateWithData, action);
       // currentStep is NOT restored from draft (keeps initialWizardState value)
@@ -137,6 +159,7 @@ describe("wizardReducer", () => {
       expect(result.analysisResultId).toBe("draft-analysis-id");
       expect(result.entities).toHaveLength(2);
       expect(result.templateForm).toEqual(draft.templateForm);
+      expect((result as { extractedText?: string | null }).extractedText).toBe("Texto cargado");
     });
 
     it("handles draft with no entities", () => {
@@ -144,6 +167,7 @@ describe("wizardReducer", () => {
         ...initialWizardState,
         file: { name: "draft.pdf", size: 2048, type: "application/pdf" },
         entities: [],
+        extractedText: null,
       };
       const action: WizardAction = { type: "LOAD_DRAFT", draft };
       const result = wizardReducer(initialWizardState, action);
@@ -153,29 +177,32 @@ describe("wizardReducer", () => {
 
   describe("RESET", () => {
     it("returns to initial state", () => {
-      const dirtyState: WizardState = {
+      const dirtyState = {
         currentStep: WizardStep.SAVE,
         file: { name: "dirty.pdf", size: 9999, type: "application/pdf" },
         analysisResultId: "dirty-analysis-id",
         entities: [mockEntity, mockEntity2],
         templateForm: { name: "Dirty", description: "Dirty desc", category: "Corporativo" },
-      };
+        extractedText: "Texto sucio",
+      } as WizardState;
       const action: WizardAction = { type: "RESET" };
       const result = wizardReducer(dirtyState, action);
       expect(result).toEqual(initialWizardState);
+      expect((result as { extractedText?: string | null }).extractedText).toBeNull();
     });
   });
 });
 
 describe("SET_STEP with clearDownstream", () => {
     it("clears analysisResultId, entities, and templateForm when going back to UPLOAD", () => {
-      const stateWithData: WizardState = {
+      const stateWithData = {
         currentStep: WizardStep.REVIEW,
         file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
         analysisResultId: "analysis-123",
         entities: [mockEntity, mockEntity2],
         templateForm: { name: "Template", description: "Desc", category: "Contratos" },
-      };
+        extractedText: "Texto para limpiar",
+      } as WizardState;
       const action: WizardAction = {
         type: "SET_STEP",
         step: WizardStep.UPLOAD,
@@ -187,6 +214,7 @@ describe("SET_STEP with clearDownstream", () => {
       expect(result.analysisResultId).toBeNull();
       expect(result.entities).toEqual([]);
       expect(result.templateForm).toBeNull();
+      expect((result as { extractedText?: string | null }).extractedText).toBeNull();
     });
 
     it("clears templateForm when going back to ANALYSIS", () => {
@@ -195,6 +223,7 @@ describe("SET_STEP with clearDownstream", () => {
         file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
         analysisResultId: "analysis-123",
         entities: [mockEntity],
+        extractedText: "Texto",
         templateForm: { name: "Template", description: "Desc", category: "Contratos" },
       };
       const action: WizardAction = {
@@ -216,6 +245,7 @@ describe("SET_STEP with clearDownstream", () => {
         file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
         analysisResultId: "analysis-123",
         entities: [mockEntity],
+        extractedText: "Texto",
         templateForm: { name: "Template", description: "Desc", category: "Contratos" },
       };
       const action: WizardAction = {
@@ -236,6 +266,7 @@ describe("SET_STEP with clearDownstream", () => {
         file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
         analysisResultId: "analysis-123",
         entities: [mockEntity],
+        extractedText: "Texto",
         templateForm: { name: "Template", description: "Desc", category: "Contratos" },
       };
       const action: WizardAction = {
@@ -257,6 +288,7 @@ describe("SET_STEP with clearDownstream", () => {
         file: null,
         analysisResultId: "old-analysis",
         entities: [mockEntity],
+        extractedText: "Texto viejo",
         templateForm: null,
       };
       const action: WizardAction = {
@@ -278,6 +310,7 @@ describe("SET_STEP with clearDownstream", () => {
         file: { name: "contract.pdf", size: 1024, type: "application/pdf" },
         analysisResultId: "result-abc",
         entities: [mockEntity, mockEntity2],
+        extractedText: "Texto en review",
         templateForm: null,
       };
 
@@ -336,6 +369,7 @@ describe("initialWizardState", () => {
     expect(initialWizardState.file).toBeNull();
     expect(initialWizardState.analysisResultId).toBeNull();
     expect(initialWizardState.entities).toEqual([]);
+    expect(initialWizardState.extractedText).toBeNull();
     expect(initialWizardState.templateForm).toBeNull();
   });
 });

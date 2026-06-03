@@ -25,7 +25,7 @@ function UploadContent() {
   const handleFileAccepted = useCallback(
     (file: { name: string; size: number; type: string }, fileObject: File) => {
       setFile(file, fileObject);
-      saveDraft(file);
+      saveDraft({ file });
     },
     [setFile]
   );

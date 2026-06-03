@@ -18,6 +18,7 @@ export interface WizardState {
   } | null;
   analysisResultId: string | null;
   entities: Entity[];
+  extractedText: string | null;
   templateForm: {
     name: string;
     description: string;
@@ -30,7 +31,12 @@ export type WizardAction =
   | { type: "SET_STEP"; step: WizardStep; clearDownstream?: boolean }
   | { type: "SET_FILE"; file: WizardState["file"] }
   | { type: "SET_ENTITIES"; entities: Entity[] }
-  | { type: "SET_ANALYSIS_RESULT"; analysisResultId: string; entities: Entity[] }
+  | {
+      type: "SET_ANALYSIS_RESULT";
+      analysisResultId: string;
+      entities: Entity[];
+      extractedText: string | null;
+    }
   | { type: "UPDATE_ENTITY"; entity: Entity }
   | { type: "SET_DRAFT"; draft: WizardState }
   | { type: "LOAD_DRAFT"; draft: WizardState }
