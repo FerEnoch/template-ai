@@ -92,3 +92,6 @@ apps/api/uploads/
 home.yml
 apps/web/test-results/
 .atl/.skill-registry.cache.json
+
+# Documents for testing purposes
+testing-docs
