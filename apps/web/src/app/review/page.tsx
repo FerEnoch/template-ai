@@ -1,3 +1,5 @@
+// TODO: fix pagination message "página 1 de 12"
+
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
