@@ -46,11 +46,19 @@ export const handlers = [
    * Simulates a 1-2s upload with progress. Returns the document in
    * "processing" state to immediately kick off the analysis polling.
    *
-   * Error trigger: x-mock-error: upload-500 → returns 500
+   * Error triggers:
+   *   x-mock-error: upload-400 → returns 400 (file not processable)
+   *   x-mock-error: upload-500 → returns 500 (internal server error)
    */
   http.post("/api/documents/upload", async ({ request }) => {
     // Check for error scenario
     const mockError = getMockError(request);
+    if (mockError === "upload-400") {
+      return HttpResponse.json(
+        { error: "File could not be processed" },
+        { status: 400 }
+      );
+    }
     if (mockError === "upload-500") {
       return HttpResponse.json(
         { error: "Internal server error during file upload" },

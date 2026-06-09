@@ -15,6 +15,67 @@ import {
  */
 
 test.describe("Upload failure", () => {
+  test("shows not-processable screen when upload returns 400", async ({ page }) => {
+    // Mock the upload endpoint to return 400 (file not processable)
+    await page.route("**/api/documents/upload", async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "File could not be processed" }),
+      });
+    });
+
+    await page.goto("/upload?step=upload");
+
+    // Upload a file
+    const fileInput = page.locator("#file-input");
+    await fileInput.setInputFiles({
+      name: "contrato-escaneado.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("fake-pdf-content"),
+    });
+    await expect(page.getByText("Listo")).toBeVisible({ timeout: 10000 });
+
+    // Click "Continuar al análisis"
+    await page.getByRole("button", { name: /continuar al análisis/i }).click();
+
+    await expect(page).toHaveURL(/\/analysis/);
+
+    // Verify the not-processable error screen renders with correct content
+    await expect(
+      page.getByRole("heading", { name: /no pudimos analizar este archivo/i })
+    ).toBeVisible({ timeout: 15000 });
+
+    // Verify subtitle
+    await expect(
+      page.getByText(/dificultades técnicas/i)
+    ).toBeVisible();
+
+    // Verify "Motivos posibles" section with bullet points
+    await expect(
+      page.getByText(/imagen escaneada/i)
+    ).toBeVisible();
+    await expect(
+      page.getByText(/resolución es demasiado baja/i)
+    ).toBeVisible();
+    await expect(
+      page.getByText(/no se reconoce la estructura/i)
+    ).toBeVisible();
+
+    // Verify action buttons
+    await expect(
+      page.getByRole("button", { name: /subir otro archivo/i })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /reintentar con este archivo/i })
+    ).toBeVisible();
+
+    // Verify "Volver al inicio" link
+    await expect(
+      page.getByRole("button", { name: /volver al inicio/i })
+    ).toBeVisible();
+  });
+
   test("shows error when upload returns 500", async ({ page }) => {
     // Mock the upload endpoint to return 500
     await page.route("**/api/documents/upload", async (route) => {
