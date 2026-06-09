@@ -6,7 +6,7 @@ WAIT_SLEEP ?= 2
 
 .PHONY: \
 	env-dev-init env-test-init env-init preflight-env-dev preflight-env-test \
-	wait-postgres-dev wait-postgres-test wait-redis-dev \
+	wait-postgres-dev wait-postgres-test wait-redis-dev wait-redis-test \
 	dev dev-down dev-logs dev-ps db-dev-shell db-dev-reset \
 	test-db-up test-db-down test-db-logs test-db-ps db-test-shell db-test-reset \
 	smoke test help
@@ -55,12 +55,12 @@ help:
 	@printf "  make dev-ps         # Show dev stack status\n"
 	@printf "  make db-dev-shell   # Open psql in dev DB\n"
 	@printf "  make db-dev-reset   # Recreate dev DB + Redis storage\n"
-	@printf "  make test-db-up     # Start test PostgreSQL stack\n"
+	@printf "  make test-db-up     # Start test PostgreSQL + Redis stack\n"
 	@printf "  make test-db-down   # Stop test stack\n"
-	@printf "  make test-db-logs   # Show test PostgreSQL logs\n"
+	@printf "  make test-db-logs   # Show test PostgreSQL + Redis logs\n"
 	@printf "  make test-db-ps     # Show test stack status\n"
 	@printf "  make db-test-shell  # Open psql in test DB\n"
-	@printf "  make db-test-reset  # Recreate test DB storage\n"
+	@printf "  make db-test-reset  # Recreate test DB + Redis storage\n"
 	@printf "  make smoke          # Run local PostgreSQL smoke contract checks\n"
 	@printf "  make preflight-env-dev  # Verify .env.dev exists\n"
 	@printf "  make preflight-env-test # Verify .env.test exists\n"
@@ -108,6 +108,9 @@ wait-postgres-test: preflight-env-test
 wait-redis-dev: preflight-env-dev
 	$(call wait_for_redis,$(COMPOSE_DEV),dev)
 
+wait-redis-test: preflight-env-test
+	$(call wait_for_redis,$(COMPOSE_TEST),test)
+
 dev: preflight-env-dev
 	$(COMPOSE_DEV) up -d postgres redis
 	$(MAKE) wait-postgres-dev
@@ -132,14 +135,15 @@ db-dev-reset: preflight-env-dev
 	$(MAKE) wait-redis-dev
 
 test-db-up: preflight-env-test
-	$(COMPOSE_TEST) up -d postgres
+	$(COMPOSE_TEST) up -d postgres redis
 	$(MAKE) wait-postgres-test
+	$(MAKE) wait-redis-test
 
 test-db-down: preflight-env-test
 	$(COMPOSE_TEST) down
 
 test-db-logs: preflight-env-test
-	$(COMPOSE_TEST) logs postgres
+	$(COMPOSE_TEST) logs postgres redis
 
 test-db-ps: preflight-env-test
 	$(COMPOSE_TEST) ps
@@ -149,8 +153,9 @@ db-test-shell: preflight-env-test
 
 db-test-reset: preflight-env-test
 	$(COMPOSE_TEST) down -v
-	$(COMPOSE_TEST) up -d postgres
+	$(COMPOSE_TEST) up -d postgres redis
 	$(MAKE) wait-postgres-test
+	$(MAKE) wait-redis-test
 
 test:
 	@printf "test runner not implemented yet. Use make test-db-up for local DB setup.\n" >&2
