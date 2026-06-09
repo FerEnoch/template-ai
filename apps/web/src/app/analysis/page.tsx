@@ -17,6 +17,7 @@ import { renderHighlightedText, useWizard, stepUrl } from "@/lib/wizard";
 import { WizardStep } from "@/lib/wizard";
 import { saveDraft } from "@/lib/wizard";
 import { AnalysisProgress, MESSAGES } from "@/components/analysis/AnalysisProgress";
+import { NotProcessableScreen } from "@/components/analysis/NotProcessableScreen";
 import type { AnalysisProgressProps } from "@/components/analysis/AnalysisProgress";
 import type { AnalysisResult } from "@template-ai/contracts";
 
@@ -150,6 +151,8 @@ function AnalysisContent() {
   const [pollingAttempts, setPollingAttempts] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadErrorType, setUploadErrorType] = useState<"not-processable" | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [warning, setWarning] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [analyzingElapsed, setAnalyzingElapsed] = useState(0);
@@ -241,7 +244,24 @@ function AnalysisContent() {
         if (cancelled) return;
 
         if (!uploadResponse.ok) {
-          setError("Error al subir el archivo");
+          // Discriminate: 4xx client errors → file not processable (show dedicated screen)
+          // 5xx server errors → generic error message
+          if (
+            uploadResponse.status === 400 ||
+            uploadResponse.status === 415 ||
+            uploadResponse.status === 422
+          ) {
+            // Read error body for potential future use (e.g., logging)
+            try {
+              const errorBody = await uploadResponse.json();
+              void errorBody; // captured for debugging; screen shows fixed messaging
+            } catch {
+              // Body may not be JSON — ignore
+            }
+            setUploadErrorType("not-processable");
+          } else {
+            setError("Error al subir el archivo");
+          }
           setIsUploading(false);
           return;
         }
@@ -271,7 +291,7 @@ function AnalysisContent() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.file]);
+  }, [state.file, retryToken]);
 
   // Timer + rotating messages management
   useEffect(() => {
@@ -568,6 +588,30 @@ function AnalysisContent() {
 
   const altaCount = displayEntities.filter((e) => e.confidence === "ALTA").length;
   const bajaCount = displayEntities.filter((e) => e.confidence === "BAJA").length;
+
+  // ── Not-processable error screen (HTTP 400/415/422) ──
+  if (uploadErrorType === "not-processable") {
+    return (
+      <AppShell footer={false} activeSidebarItem="Nuevo Documento">
+        <NotProcessableScreen
+          file={{ name: state.file?.name ?? "" }}
+          onRetry={() => {
+            setUploadErrorType(null);
+            setError(null);
+            setAnalysisResult(null);
+            setPollingAttempts(0);
+            setRetryToken((t) => t + 1);
+          }}
+          onGoBack={() => {
+            router.push(stepUrl(WizardStep.UPLOAD));
+          }}
+          onGoHome={() => {
+            router.push("/");
+          }}
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell footer={false} activeSidebarItem="Nuevo Documento">
