@@ -35,6 +35,26 @@ function randomBuffer(): Buffer {
   return Buffer.from("this is not a valid file of any type");
 }
 
+function textBuffer(): Buffer {
+  return Buffer.from("Este es el contenido de un archivo de texto plano.\n");
+}
+
+function binaryBuffer(): Buffer {
+  // Binary-looking data with null bytes — should fail text/plain check
+  const buf = Buffer.alloc(20);
+  buf[0] = 0x00;
+  buf[1] = 0x01;
+  buf[2] = 0x02;
+  buf[3] = 0xff;
+  buf[4] = 0xfe;
+  return buf;
+}
+
+function invalidUtf8Buffer(): Buffer {
+  // Invalid UTF-8 sequence: 0xFF is never valid as a first byte
+  return Buffer.from([0xff, 0xfe, 0xfd]);
+}
+
 function makeFile(overrides: Partial<Express.Multer.File>): Express.Multer.File {
   return {
     fieldname: "file",
@@ -64,6 +84,7 @@ describe("SmartFileValidator", () => {
       expect(msg).toContain("PDF");
       expect(msg).toContain("DOCX");
       expect(msg).toContain("JPEG");
+      expect(msg).toContain("TXT");
     });
   });
 
@@ -101,8 +122,30 @@ describe("SmartFileValidator", () => {
       expect(validator.isValid(file)).toBe(false);
     });
 
-    it("rejects a totally unknown file type", () => {
-      const file = makeFile({ mimetype: "text/plain", buffer: randomBuffer() });
+    it("rejects a totally unknown file type with binary content", () => {
+      const file = makeFile({ mimetype: "application/x-msdownload", buffer: binaryBuffer() });
+      expect(validator.isValid(file)).toBe(false);
+    });
+
+    // ── text/plain ──
+
+    it("accepts a valid UTF-8 text file with text/plain MIME", () => {
+      const file = makeFile({ mimetype: "text/plain", buffer: textBuffer() });
+      expect(validator.isValid(file)).toBe(true);
+    });
+
+    it("accepts a text file with wrong MIME but valid UTF-8 content (lenient fallback)", () => {
+      const file = makeFile({ mimetype: "application/octet-stream", buffer: textBuffer() });
+      expect(validator.isValid(file)).toBe(true);
+    });
+
+    it("rejects a binary file claiming to be text/plain", () => {
+      const file = makeFile({ mimetype: "text/plain", buffer: binaryBuffer() });
+      expect(validator.isValid(file)).toBe(false);
+    });
+
+    it("rejects a file with invalid UTF-8 claiming to be text/plain", () => {
+      const file = makeFile({ mimetype: "text/plain", buffer: invalidUtf8Buffer() });
       expect(validator.isValid(file)).toBe(false);
     });
   });
