@@ -1,5 +1,5 @@
-// TODO: fix pagination message "página 1 de 12"
-
+// TODO: review-page - fix pagination message "página 1 de 12"
+// TODO: review-page - fix "85% IA Confidence"
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
