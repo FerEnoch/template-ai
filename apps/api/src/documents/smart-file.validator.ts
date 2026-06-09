@@ -34,6 +34,22 @@ const MAGIC_DB: { mime: string; check: (header: Buffer) => boolean }[] = [
       header[1] === 0xd8 &&
       header[2] === 0xff, // \xFF\xD8\xFF
   },
+  {
+    mime: "text/plain",
+    check: (header) => {
+      // Text files have no magic bytes. Validate that content is valid
+      // UTF-8 text — reject binary garbage masquerading as text/plain.
+      if (header.length === 0) return false;
+      // Null bytes strongly indicate binary content
+      if (header.includes(0x00)) return false;
+      try {
+        new TextDecoder("utf-8", { fatal: true }).decode(header);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  },
 ];
 
 const ALLOWED_MIMES: string[] = MAGIC_DB.map((e) => e.mime);
@@ -50,7 +66,7 @@ export class SmartFileValidator extends FileValidator {
   }
 
   buildMessage(): string {
-    return "Unsupported file type. Accepted formats: PDF, DOCX, JPEG";
+    return "Unsupported file type. Accepted formats: PDF, DOCX, JPEG, TXT/MD";
   }
 
   buildErrorMessage(_file: Express.Multer.File): string {
