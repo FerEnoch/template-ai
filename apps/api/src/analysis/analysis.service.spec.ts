@@ -101,6 +101,10 @@ function createMockPostgresService(setup: {
       // UPDATE analysis_results — incrementProgress (has LEAST)
       if (sql.includes("UPDATE analysis_results") && sql.includes("LEAST")) {
         const record = setup.incrementedRecord ?? analysisRecords[0];
+        // Mutate in-place so Phase 2 SELECT returns the updated state
+        if (analysisRecords.length > 0) {
+          analysisRecords[0] = { ...analysisRecords[0], ...record };
+        }
         return Promise.resolve({
           rowCount: 1,
           rows: [
@@ -144,14 +148,24 @@ function createMockPostgresService(setup: {
           return Promise.resolve({ rowCount: 0, rows: [] });
         }
         const record = analysisRecords[0];
+        const updatedStatus = "analyzing";
+        const updatedProgress = Math.min(record.progress + 25, 100);
+        // Mutate in-place so Phase 2 SELECT returns the updated state
+        if (analysisRecords.length > 0) {
+          analysisRecords[0] = {
+            ...analysisRecords[0],
+            status: updatedStatus,
+            progress: updatedProgress,
+          };
+        }
         return Promise.resolve({
           rowCount: 1,
           rows: [
             {
               id: record.id,
               document_id: record.documentId,
-              status: "analyzing",
-              progress: Math.min(record.progress + 25, 100),
+              status: updatedStatus,
+              progress: updatedProgress,
               started_at: record.startedAt,
               completed_at: null,
               retry_count: record.retryCount ?? 0,

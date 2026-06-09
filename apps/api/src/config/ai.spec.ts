@@ -9,6 +9,8 @@ beforeEach(() => {
   process.env.NODE_ENV = "test";
   process.env.DATABASE_URL = "postgres://template_ai_dev:template_ai_dev@localhost:5432/template_ai_dev";
   process.env.OPENROUTER_API_KEY = "sk-or-test-key-123";
+  process.env.REDIS_HOST = "localhost";
+  process.env.REDIS_PORT = "6379";
 });
 
 afterEach(() => {
