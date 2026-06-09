@@ -49,7 +49,7 @@ describe("bootstrap boundaries", () => {
     await expect(pathExists(resolve(workspaceRoot, "apps/api/compose.yaml"))).resolves.toBe(false);
     await expect(pathExists(resolve(workspaceRoot, "apps/web/compose.yaml"))).resolves.toBe(false);
     await expect(pathExists(resolve(workspaceRoot, ".github/workflows"))).resolves.toBe(false);
-    await expect(pathExists(resolve(workspaceRoot, "packages"))).resolves.toBe(false);
+    await expect(pathExists(resolve(workspaceRoot, "packages"))).resolves.toBe(true);
     await expect(pathExists(resolve(workspaceRoot, "apps/api/src/auth"))).resolves.toBe(false);
     await expect(pathExists(resolve(workspaceRoot, "apps/web/src/features"))).resolves.toBe(false);
   });
@@ -57,7 +57,17 @@ describe("bootstrap boundaries", () => {
   it("keeps web root on bootstrap shell assets", async () => {
     const appEntries = (await readdir(resolve(workspaceRoot, "apps/web/src/app"))).sort();
 
-    expect(appEntries).toEqual(["bootstrap-shell.spec.ts", "layout.tsx", "page.tsx"]);
+    expect(appEntries).toEqual([
+      "analysis",
+      "biblioteca",
+      "client-layout.tsx",
+      "globals.css",
+      "layout.tsx",
+      "page.tsx",
+      "review",
+      "save",
+      "upload",
+    ]);
   });
 
   it("keeps API root on bootstrap runtime assets", async () => {
@@ -72,11 +82,11 @@ describe("bootstrap boundaries", () => {
   });
 
   it("keeps infra ownership guidance explicit in agents doc", async () => {
-    const agentsDoc = await readFile(resolve(workspaceRoot, ".atl/agents.md"), "utf8");
+    const agentsDoc = await readFile(resolve(workspaceRoot, ".atl/AGENTS.md"), "utf8");
     const infraDoc = await readFile(resolve(workspaceRoot, "docs/local-operational-infra.md"), "utf8");
 
-    expect(agentsDoc).toContain("Makefile como interfaz SOLO para PostgreSQL/local infra");
-    expect(agentsDoc).toContain("Comandos de apps (dev/start/lint/typecheck): `pnpm`");
+    expect(agentsDoc).toContain("Makefile as interface ONLY for PostgreSQL/local infra");
+    expect(agentsDoc).toContain("App commands (dev/start/lint/typecheck): `pnpm`");
     expect(infraDoc).toContain("`make`: PostgreSQL + Docker Compose lifecycle only.");
     expect(infraDoc).toContain("`pnpm`: workspace/app lifecycle commands.");
     expect(infraDoc).toContain("make smoke");
