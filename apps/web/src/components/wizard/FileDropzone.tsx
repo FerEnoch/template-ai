@@ -13,7 +13,19 @@ const ACCEPTED_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/jpeg",
+  "text/plain",
 ];
+
+/**
+ * Extension → canonical MIME type fallback.
+ * Browsers often report empty `file.type` for .md and sometimes for .txt,
+ * so we resolve the type from the extension when the MIME is missing/unknown.
+ */
+const EXTENSION_MIME_MAP: Record<string, string> = {
+  ".txt": "text/plain",
+  ".md": "text/plain",
+  ".markdown": "text/plain",
+};
 
 const MAX_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
 
@@ -30,8 +42,30 @@ function getTypeLabel(mimeType: string): string {
     "application/pdf": "PDF",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "DOCX",
     "image/jpeg": "JPG",
+    "text/plain": "TXT",
   };
   return map[mimeType] ?? mimeType;
+}
+
+/**
+ * Resolve the effective MIME type for a file.
+ * Uses the browser-reported type first; falls back to extension-based
+ * lookup when the type is empty or unknown (common for .md / .txt files).
+ */
+function resolveMimeType(file: File): string {
+  // If the browser gives us a known type, use it directly
+  if (file.type && ACCEPTED_TYPES.includes(file.type)) {
+    return file.type;
+  }
+
+  // Extension-based fallback for text files
+  const ext = file.name.toLowerCase().match(/\.[a-z]+$/)?.[0];
+  if (ext && EXTENSION_MIME_MAP[ext]) {
+    return EXTENSION_MIME_MAP[ext];
+  }
+
+  // Return the original type (will be rejected by validateAndAccept)
+  return file.type;
 }
 
 export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: FileDropzoneProps) {
@@ -43,8 +77,10 @@ export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: Fi
     (file: File) => {
       setError(null);
 
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        setError("Formato no soportado. Usá PDF, DOCX o JPG.");
+      const resolvedType = resolveMimeType(file);
+
+      if (!ACCEPTED_TYPES.includes(resolvedType)) {
+        setError("Formato no soportado. Usá PDF, DOCX, JPG, TXT o MD.");
         return;
       }
 
@@ -56,7 +92,7 @@ export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: Fi
       const fileData = {
         name: file.name,
         size: file.size,
-        type: file.type,
+        type: resolvedType,
       };
 
       setState("uploaded");
@@ -131,6 +167,7 @@ export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: Fi
         >
           <input
             id="file-input"
+            data-testid="file-input"
             type="file"
             accept={[...ACCEPTED_TYPES].join(",")}
             onChange={handleInputChange}
@@ -146,7 +183,7 @@ export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: Fi
           </div>
 
           <h3 className="mb-2 font-headline text-xl text-text-primary">
-            {dragover ? "Solotá el archivo" : "Arrastrá tu archivo aquí o hacé clic para buscar"}
+            {dragover ? "Soltá el archivo" : "Arrastrá tu archivo aquí o hacé clic para buscar"}
           </h3>
 
           <p className="mx-auto mb-8 max-w-xs font-body text-text-secondary">
@@ -162,6 +199,9 @@ export function FileDropzone({ onFileAccepted, onFileRemoved, acceptedFile }: Fi
             </span>
             <span className="rounded border border-border bg-background px-2 py-1 text-[10px] font-bold uppercase text-text-secondary">
               JPG
+            </span>
+             <span className="rounded border border-border bg-background px-2 py-1 text-[10px] font-bold uppercase text-text-secondary">
+              TXT, MD
             </span>
           </div>
 
