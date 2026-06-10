@@ -11,6 +11,7 @@ export interface EntityRecord {
   sourceSpan: { start: number; end: number } | null;
   reviewed: boolean;
   excluded: boolean;
+  userCreated: boolean;
 }
 
 export interface CreateEntityInput {
@@ -21,6 +22,7 @@ export interface CreateEntityInput {
   group: string;
   confidence: string;
   sourceSpan?: { start: number; end: number };
+  userCreated?: boolean;
 }
 
 export interface UpdateEntityInput {
@@ -45,6 +47,7 @@ function rowToEntity(row: Record<string, unknown>): EntityRecord {
     sourceSpan: row["source_span"] as { start: number; end: number } | null,
     reviewed: row["reviewed"] as boolean,
     excluded: row["excluded"] as boolean,
+    userCreated: (row["user_created"] as boolean) ?? false,
   };
 }
 
@@ -54,9 +57,9 @@ export class EntitiesRepository {
   async create(input: CreateEntityInput): Promise<EntityRecord> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence, source_span)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded
+        INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence, source_span, user_created)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
       `,
       [
         input.analysisResultId,
@@ -66,6 +69,7 @@ export class EntitiesRepository {
         input.group,
         input.confidence,
         input.sourceSpan ? JSON.stringify(input.sourceSpan) : null,
+        input.userCreated ?? false,
       ],
     );
 
@@ -83,8 +87,8 @@ export class EntitiesRepository {
     const placeholders: string[] = [];
 
     for (let i = 0; i < inputs.length; i++) {
-      const offset = i * 7;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
+      const offset = i * 8;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`);
       values.push(
         inputs[i].analysisResultId,
         inputs[i].documentId,
@@ -93,14 +97,15 @@ export class EntitiesRepository {
         inputs[i].group,
         inputs[i].confidence,
         inputs[i].sourceSpan ? JSON.stringify(inputs[i].sourceSpan) : null,
+        inputs[i].userCreated ?? false,
       );
     }
 
     const result = await this.client.query<Record<string, unknown>>(
       `
-        INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence, source_span)
+        INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence, source_span, user_created)
         VALUES ${placeholders.join(", ")}
-        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded
+        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
       `,
       values,
     );
@@ -111,7 +116,7 @@ export class EntitiesRepository {
   async findById(id: string): Promise<EntityRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded
+        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
         FROM entities
         WHERE id = $1
       `,
@@ -128,7 +133,7 @@ export class EntitiesRepository {
   async findByAnalysisResultId(analysisResultId: string): Promise<EntityRecord[]> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded
+        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
         FROM entities
         WHERE analysis_result_id = $1
         ORDER BY label
@@ -184,7 +189,7 @@ export class EntitiesRepository {
         UPDATE entities
         SET ${setClauses.join(", ")}
         WHERE id = $${paramIdx}
-        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded
+        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
       `,
       values,
     );
@@ -203,5 +208,18 @@ export class EntitiesRepository {
     );
 
     return result.rowCount ?? 0;
+  }
+
+  /**
+   * Count user-created (manual) entities for a given document.
+   * Used to enforce the per-document manual entity cap.
+   */
+  async countUserCreated(documentId: string): Promise<number> {
+    const result = await this.client.query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM entities WHERE document_id = $1 AND user_created = true`,
+      [documentId],
+    );
+
+    return Number(result.rows[0]?.count ?? 0);
   }
 }
