@@ -3,6 +3,9 @@ import {
   AnalysisResultSchema,
   EntitySchema,
   WizardDraftSchema,
+  ClassifySpanRequestSchema,
+  ClassifySpanResponseSchema,
+  MANUAL_ENTITY_LIMIT,
 } from "./schemas.js";
 
 describe("EntitySchema", () => {
@@ -135,5 +138,144 @@ describe("WizardDraftSchema", () => {
     const result = WizardDraftSchema.safeParse(baseDraft);
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe("EntitySchema userCreated", () => {
+  const validEntity = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    label: "COMPRADOR",
+    value: "María González López",
+    group: "PARTES" as const,
+    confidence: "ALTA" as const,
+    reviewed: false,
+  };
+
+  it("defaults userCreated to false", () => {
+    const result = EntitySchema.safeParse(validEntity);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.userCreated).toBe(false);
+    }
+  });
+
+  it("accepts userCreated: true explicitly", () => {
+    const result = EntitySchema.safeParse({
+      ...validEntity,
+      userCreated: true,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.userCreated).toBe(true);
+    }
+  });
+
+  it("rejects non-boolean userCreated", () => {
+    const result = EntitySchema.safeParse({
+      ...validEntity,
+      userCreated: "yes",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("MANUAL_ENTITY_LIMIT", () => {
+  it("is set to 5", () => {
+    expect(MANUAL_ENTITY_LIMIT).toBe(5);
+  });
+});
+
+describe("ClassifySpanRequestSchema", () => {
+  it("parses a valid request", () => {
+    const result = ClassifySpanRequestSchema.safeParse({
+      text: "Juan Pérez",
+      sourceSpan: { start: 34, end: 44 },
+      context: "...entre Juan Pérez y María López...",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty text", () => {
+    const result = ClassifySpanRequestSchema.safeParse({
+      text: "",
+      sourceSpan: { start: 0, end: 5 },
+      context: "context",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects negative start offset", () => {
+    const result = ClassifySpanRequestSchema.safeParse({
+      text: "hello",
+      sourceSpan: { start: -1, end: 5 },
+      context: "context",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects end offset less than 1", () => {
+    const result = ClassifySpanRequestSchema.safeParse({
+      text: "hello",
+      sourceSpan: { start: 0, end: 0 },
+      context: "context",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-integer offsets", () => {
+    const result = ClassifySpanRequestSchema.safeParse({
+      text: "hello",
+      sourceSpan: { start: 0.5, end: 5 },
+      context: "context",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing context", () => {
+    const result = ClassifySpanRequestSchema.safeParse({
+      text: "hello",
+      sourceSpan: { start: 0, end: 5 },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("ClassifySpanResponseSchema", () => {
+  it("parses a valid response", () => {
+    const result = ClassifySpanResponseSchema.safeParse({
+      label: "COMPRADOR",
+      group: "PARTES",
+      value: "Juan Pérez",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty label", () => {
+    const result = ClassifySpanResponseSchema.safeParse({
+      label: "",
+      group: "PARTES",
+      value: "Juan Pérez",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid group", () => {
+    const result = ClassifySpanResponseSchema.safeParse({
+      label: "COMPRADOR",
+      group: "INVALID",
+      value: "Juan Pérez",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts all valid groups", () => {
+    for (const group of ["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]) {
+      const result = ClassifySpanResponseSchema.safeParse({
+        label: "FIELD",
+        group,
+        value: "some value",
+      });
+      expect(result.success).toBe(true);
+    }
   });
 });
