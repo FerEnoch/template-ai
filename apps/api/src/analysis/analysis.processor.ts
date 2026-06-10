@@ -8,7 +8,12 @@ import { DocumentsRepository } from "../infrastructure/postgres/repositories/doc
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
 import { ANALYSIS_QUEUE, type AnalysisJobPayload } from "./analysis.queue";
 
-@Processor(ANALYSIS_QUEUE, { concurrency: 2 })
+@Processor(ANALYSIS_QUEUE, {
+  concurrency: 2,
+  lockDuration: 120_000, // 2 min — default 30s causes stalls on slow AI calls
+  stalledInterval: 60_000, // Check for stalls every 60s instead of default 30s
+  maxStalledCount: 1, // Allow 1 stall before failing (default 0 fails immediately)
+})
 export class AnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(AnalysisProcessor.name);
 
