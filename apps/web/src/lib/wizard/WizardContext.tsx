@@ -53,6 +53,7 @@ interface WizardContextValue {
     extractedText: string | null,
   ) => void;
   updateEntity: (entity: WizardState["entities"][number]) => void;
+  addEntity: (entity: WizardState["entities"][number]) => void;
   setDraft: (draft: WizardState) => void;
   loadDraft: (draft: WizardState) => void;
   reset: () => void;
@@ -154,6 +155,13 @@ export function WizardProvider({ children }: WizardProviderProps) {
     []
   );
 
+  const addEntity = useCallback(
+    (entity: WizardState["entities"][number]) => {
+      dispatch({ type: "ADD_ENTITY", entity });
+    },
+    []
+  );
+
   const setDraft = useCallback(
     (draft: WizardState) => {
       dispatch({ type: "SET_DRAFT", draft });
@@ -190,6 +198,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
         setEntities,
         setAnalysisResult,
         updateEntity,
+        addEntity,
         setDraft,
         loadDraft,
         reset,

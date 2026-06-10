@@ -144,7 +144,7 @@ describe("storage", () => {
   describe("round-trip", () => {
     it("save then load returns equivalent data", () => {
       const file = { name: "roundtrip.pdf", size: 3333, type: "application/pdf" };
-const entities = [
+ const entities = [
          {
            id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
            label: "COMPRADOR",
@@ -154,6 +154,7 @@ const entities = [
            sourceSpan: { start: 10, end: 25 },
            reviewed: false,
            excluded: false,
+           userCreated: false,
          },
        ];
       const templateForm = {

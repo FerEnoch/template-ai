@@ -175,6 +175,72 @@ describe("wizardReducer", () => {
     });
   });
 
+  describe("ADD_ENTITY", () => {
+    it("appends a new entity to state.entities", () => {
+      const newEntity: Entity = {
+        id: "manual-entity-1",
+        label: "Arrendatario",
+        value: "María García",
+        group: "PARTES",
+        confidence: "ALTA",
+        sourceSpan: { start: 50, end: 62 },
+        reviewed: false,
+        excluded: false,
+        userCreated: true,
+      };
+      const stateWithEntities: WizardState = {
+        ...initialWizardState,
+        entities: [mockEntity],
+      };
+      const action: WizardAction = { type: "ADD_ENTITY", entity: newEntity };
+      const result = wizardReducer(stateWithEntities, action);
+      expect(result.entities).toHaveLength(2);
+      expect(result.entities[1]).toEqual(newEntity);
+    });
+
+    it("preserves existing entities when adding a new one", () => {
+      const newEntity: Entity = {
+        id: "manual-entity-2",
+        label: "Dirección",
+        value: "Av. Corrientes 1234",
+        group: "INMUEBLE",
+        confidence: "ALTA",
+        sourceSpan: { start: 100, end: 120 },
+        reviewed: false,
+        excluded: false,
+        userCreated: true,
+      };
+      const stateWithEntities: WizardState = {
+        ...initialWizardState,
+        entities: [mockEntity, mockEntity2],
+      };
+      const action: WizardAction = { type: "ADD_ENTITY", entity: newEntity };
+      const result = wizardReducer(stateWithEntities, action);
+      expect(result.entities).toHaveLength(3);
+      expect(result.entities[0]).toEqual(mockEntity);
+      expect(result.entities[1]).toEqual(mockEntity2);
+      expect(result.entities[2]).toEqual(newEntity);
+    });
+
+    it("adds entity to empty state", () => {
+      const newEntity: Entity = {
+        id: "manual-entity-3",
+        label: "Fecha",
+        value: "15/03/2024",
+        group: "FECHAS",
+        confidence: "ALTA",
+        sourceSpan: { start: 200, end: 210 },
+        reviewed: false,
+        excluded: false,
+        userCreated: true,
+      };
+      const action: WizardAction = { type: "ADD_ENTITY", entity: newEntity };
+      const result = wizardReducer(initialWizardState, action);
+      expect(result.entities).toHaveLength(1);
+      expect(result.entities[0]).toEqual(newEntity);
+    });
+  });
+
   describe("RESET", () => {
     it("returns to initial state", () => {
       const dirtyState = {
