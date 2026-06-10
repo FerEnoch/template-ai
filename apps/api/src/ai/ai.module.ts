@@ -4,6 +4,6 @@ import { DocumentAnalysisService } from "./document-analysis.service.js";
 
 @Module({
   providers: [OpenRouterService, DocumentAnalysisService],
-  exports: [DocumentAnalysisService],
+  exports: [DocumentAnalysisService, OpenRouterService],
 })
 export class AiModule {}

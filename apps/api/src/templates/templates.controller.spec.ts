@@ -100,7 +100,7 @@ describe("TemplatesController", () => {
         description: "Standard lease agreement template",
         documentId: VALID_UUID,
         entities: [
-          { id: ENTITY_UUID, label: "COMPRADOR", value: "Juan Pérez", group: "PARTES" as const, confidence: "ALTA" as const, reviewed: false, excluded: false },
+          { id: ENTITY_UUID, label: "COMPRADOR", value: "Juan Pérez", group: "PARTES" as const, confidence: "ALTA" as const, reviewed: false, excluded: false, userCreated: false },
         ],
         category: "legal",
         status: "draft" as const,
