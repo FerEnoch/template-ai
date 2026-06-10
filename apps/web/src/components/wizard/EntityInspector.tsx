@@ -10,8 +10,10 @@ import {
   ChevronUp,
   AlertCircle,
   Ban,
+  Plus,
 } from "lucide-react";
 import type { Entity } from "@template-ai/contracts";
+import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
 import { EntityEditModal } from "./EntityEditModal";
 
 type Confidence = "ALTA" | "MEDIA" | "BAJA";
@@ -19,6 +21,9 @@ type Confidence = "ALTA" | "MEDIA" | "BAJA";
 interface EntityInspectorProps {
   entities: Entity[];
   onEntityUpdate?: (entity: Entity) => void;
+  onAddEntity?: () => void;
+  manualEntityCount?: number;
+  manualEntityLimit?: number;
 }
 
 const GROUP_CONFIG: Record<
@@ -57,7 +62,13 @@ const CONFIDENCE_STYLES: Record<
 
 type Group = "PARTES" | "INMUEBLE" | "FECHAS" | "ANEXOS";
 
-export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorProps) {
+export function EntityInspector({
+  entities,
+  onEntityUpdate,
+  onAddEntity,
+  manualEntityCount = 0,
+  manualEntityLimit = MANUAL_ENTITY_LIMIT,
+}: EntityInspectorProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<Group>>(
     new Set(["PARTES"])
   );
@@ -65,6 +76,8 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showExcluded, setShowExcluded] = useState(false);
+
+  const isLimitReached = manualEntityCount >= manualEntityLimit;
 
   const toggleGroup = (group: Group) => {
     setExpandedGroups((prev) => {
@@ -212,9 +225,9 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
               key={group}
               className="overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
             >
-              <button
+              <div
                 onClick={() => toggleGroup(group)}
-                className="flex w-full items-center justify-between px-4 py-3 transition-colors hover:bg-background"
+                className="flex w-full cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-background"
               >
                 <div className="flex items-center gap-2">
                   <GroupIcon className={`text-xl ${config.color}`} />
@@ -225,12 +238,38 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
                     {groupEntities.length}
                   </span>
                 </div>
-                {isExpanded ? (
-                  <ChevronUp className="h-5 w-5 text-text-secondary" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-text-secondary" />
-                )}
-              </button>
+                <div className="flex items-center gap-2">
+                  {onAddEntity && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isLimitReached) {
+                          onAddEntity();
+                        }
+                      }}
+                      disabled={isLimitReached}
+                      title={
+                        isLimitReached
+                          ? `Límite de ${manualEntityLimit} campos manuales alcanzado`
+                          : undefined
+                      }
+                      className={`flex items-center gap-1 rounded px-2 py-1 text-[10px] font-bold transition-colors ${
+                        isLimitReached
+                          ? "cursor-not-allowed text-text-disabled"
+                          : "text-accent hover:bg-accent/10"
+                      }`}
+                    >
+                      <Plus className="h-3 w-3" />
+                      AGREGAR CAMPO
+                    </button>
+                  )}
+                  {isExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-text-secondary" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-text-secondary" />
+                  )}
+                </div>
+              </div>
 
               {isExpanded && (
                 <div className="divide-y divide-border border-t border-border">
@@ -285,15 +324,49 @@ export function EntityInspector({ entities, onEntityUpdate }: EntityInspectorPro
           );
         })}
 
-        {/* Empty group state for Anexos */}
-        {groupedEntities.ANEXOS.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-surface/50 p-6">
-            <Paperclip className="text-3xl text-text-disabled opacity-40" />
-            <p className="text-[11px] font-medium text-text-secondary">
-              No se han detectado anexos
-            </p>
-          </div>
-        )}
+        {/* Empty group states */}
+        {(Object.keys(groupedEntities) as Group[]).map((group) => {
+          const groupEntities = groupedEntities[group];
+          if (groupEntities.length > 0) return null;
+
+          const config = GROUP_CONFIG[group];
+          const GroupIcon = config.icon;
+
+          return (
+            <div
+              key={group}
+              className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-surface/50 p-6"
+            >
+              <GroupIcon className="text-3xl text-text-disabled opacity-40" />
+              <p className="text-[11px] font-medium text-text-secondary">
+                No se han detectado {config.label.toLowerCase()}
+              </p>
+              {onAddEntity && (
+                <button
+                  onClick={() => {
+                    if (!isLimitReached) {
+                      onAddEntity();
+                    }
+                  }}
+                  disabled={isLimitReached}
+                  title={
+                    isLimitReached
+                      ? `Límite de ${manualEntityLimit} campos manuales alcanzado`
+                      : undefined
+                  }
+                  className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-bold transition-colors ${
+                    isLimitReached
+                      ? "cursor-not-allowed border-border text-text-disabled"
+                      : "border-accent text-accent hover:bg-accent/5"
+                  }`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  AGREGAR CAMPO
+                </button>
+              )}
+            </div>
+          );
+        })}
       </section>
 
       {/* Show excluded toggle */}
