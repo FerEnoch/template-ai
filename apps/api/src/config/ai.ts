@@ -29,6 +29,33 @@ export const AI_CONFIG = {
   temperature: 0.1,
 } as const;
 
+// ---------------------------------------------------------------------------
+// Cache configuration: Redis-backed AI response and text extraction cache.
+// AI_CACHE_ENABLED gates all cache operations (default: false).
+// TTLs default to 7 days (604800s). Max entry size: 1MB.
+// ---------------------------------------------------------------------------
+const responseCacheTtlRaw = process.env.AI_RESPONSE_CACHE_TTL?.trim();
+const responseCacheTtlEnv = responseCacheTtlRaw !== undefined && responseCacheTtlRaw !== ""
+  ? Number(responseCacheTtlRaw)
+  : 604800;
+
+const textCacheTtlRaw = process.env.AI_TEXT_CACHE_TTL?.trim();
+const textCacheTtlEnv = textCacheTtlRaw !== undefined && textCacheTtlRaw !== ""
+  ? Number(textCacheTtlRaw)
+  : 604800;
+
+const cacheMaxBytesRaw = process.env.AI_CACHE_MAX_ENTRY_BYTES?.trim();
+const cacheMaxBytesEnv = cacheMaxBytesRaw !== undefined && cacheMaxBytesRaw !== ""
+  ? Number(cacheMaxBytesRaw)
+  : 1048576;
+
+export const CACHE_CONFIG = {
+  enabled: env.AI_CACHE_ENABLED,
+  responseCacheTtl: responseCacheTtlEnv,
+  textCacheTtl: textCacheTtlEnv,
+  maxEntryBytes: cacheMaxBytesEnv,
+} as const;
+
 export const UPLOAD_DIR = process.env.UPLOAD_DIR ?? join(process.cwd(), "uploads");
 
 // Ensure upload directory exists at import time
