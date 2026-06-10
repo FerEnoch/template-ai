@@ -33,6 +33,7 @@ const sampleRow: Record<string, unknown> = {
   source_span: { start: 0, end: 10 },
   reviewed: false,
   excluded: false,
+  user_created: false,
 };
 
 const sampleInput: CreateEntityInput = {
@@ -66,6 +67,7 @@ describe("EntitiesRepository", () => {
         sourceSpan: { start: 0, end: 10 },
         reviewed: false,
         excluded: false,
+        userCreated: false,
       } satisfies EntityRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
@@ -234,6 +236,71 @@ describe("EntitiesRepository", () => {
       expect(querySpy).toHaveBeenCalledWith(
         expect.stringContaining("DELETE FROM entities"),
         ["770e8400-e29b-41d4-a716-446655440002"],
+      );
+    });
+  });
+
+  describe("countUserCreated", () => {
+    it("returns the count of user-created entities for a document", async () => {
+      const { client, querySpy } = mockPoolClient([]);
+      querySpy.mockResolvedValueOnce({
+        rows: [{ count: "3" }],
+        rowCount: 1,
+      });
+      repo = new EntitiesRepository(client);
+
+      const count = await repo.countUserCreated(
+        "770e8400-e29b-41d4-a716-446655440002",
+      );
+      expect(count).toBe(3);
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("COUNT(*)"),
+        ["770e8400-e29b-41d4-a716-446655440002"],
+      );
+    });
+
+    it("returns 0 when no user-created entities exist", async () => {
+      const { client, querySpy } = mockPoolClient([]);
+      querySpy.mockResolvedValueOnce({
+        rows: [{ count: "0" }],
+        rowCount: 1,
+      });
+      repo = new EntitiesRepository(client);
+
+      const count = await repo.countUserCreated(
+        "770e8400-e29b-41d4-a716-446655440002",
+      );
+      expect(count).toBe(0);
+    });
+  });
+
+  describe("create with userCreated", () => {
+    it("inserts an entity with userCreated: true", async () => {
+      const userCreatedRow = { ...sampleRow, user_created: true };
+      const { client, querySpy } = mockPoolClient([userCreatedRow]);
+      repo = new EntitiesRepository(client);
+
+      const input: CreateEntityInput = {
+        ...sampleInput,
+        userCreated: true,
+      };
+
+      const result = await repo.create(input);
+      expect(result.userCreated).toBe(true);
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("user_created"),
+        expect.arrayContaining([true]),
+      );
+    });
+
+    it("defaults userCreated to false when not provided", async () => {
+      const { client, querySpy } = mockPoolClient([sampleRow]);
+      repo = new EntitiesRepository(client);
+
+      await repo.create(sampleInput);
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("user_created"),
+        expect.arrayContaining([false]),
       );
     });
   });
