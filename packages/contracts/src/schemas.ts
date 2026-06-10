@@ -30,6 +30,27 @@ export const EntitySchema = z.object({
     .optional(),
   reviewed: z.boolean().default(false),
   excluded: z.boolean().default(false),
+  userCreated: z.boolean().default(false),
+});
+
+// Maximum number of manual (user-created) entities per document
+export const MANUAL_ENTITY_LIMIT = 5;
+
+// Classify span request: text selection sent for AI classification
+export const ClassifySpanRequestSchema = z.object({
+  text: z.string().min(1),
+  sourceSpan: z.object({
+    start: z.number().int().min(0),
+    end: z.number().int().min(1),
+  }),
+  context: z.string(),
+});
+
+// Classify span response: AI-inferred entity fields
+export const ClassifySpanResponseSchema = z.object({
+  label: z.string().min(1),
+  group: z.enum(["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]),
+  value: z.string(),
 });
 
 // Analysis result schema: outcome of document analysis job
@@ -82,3 +103,5 @@ export type Entity = z.infer<typeof EntitySchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 export type Template = z.infer<typeof TemplateSchema>;
 export type WizardDraft = z.infer<typeof WizardDraftSchema>;
+export type ClassifySpanRequest = z.infer<typeof ClassifySpanRequestSchema>;
+export type ClassifySpanResponse = z.infer<typeof ClassifySpanResponseSchema>;
