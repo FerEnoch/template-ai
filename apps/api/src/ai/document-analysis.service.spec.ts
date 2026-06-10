@@ -10,6 +10,12 @@ vi.mock("../config/ai.js", () => ({
     maxTokens: 8192,
     temperature: 0.1,
   },
+  CACHE_CONFIG: {
+    enabled: false,
+    responseCacheTtl: 604800,
+    textCacheTtl: 604800,
+    maxEntryBytes: 1048576,
+  },
 }));
 
 import {
@@ -19,6 +25,7 @@ import {
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import type { AnalyzeResult } from "./document-analysis.service.js";
 import type { AiEntity } from "./open-router.service.js";
+import type { CachePort } from "../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -31,6 +38,16 @@ function createMockOpenRouterService(): OpenRouterService {
   return {
     extractEntities: mockExtractEntities,
   } as unknown as OpenRouterService;
+}
+
+function createMockCachePort(): CachePort {
+  return {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => {}),
+    getOrSet: vi.fn(async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
+      factory(),
+    ),
+  };
 }
 
 vi.mock("node:fs", () => ({
@@ -54,11 +71,13 @@ vi.mock("mammoth", () => ({
 describe("DocumentAnalysisService", () => {
   let service: DocumentAnalysisService;
   let mockOpenRouter: OpenRouterService;
+  let mockCachePort: CachePort;
 
   beforeEach(() => {
     vi.resetAllMocks();
     mockOpenRouter = createMockOpenRouterService();
-    service = new DocumentAnalysisService(mockOpenRouter);
+    mockCachePort = createMockCachePort();
+    service = new DocumentAnalysisService(mockOpenRouter, mockCachePort);
   });
 
   describe("analyze", () => {
