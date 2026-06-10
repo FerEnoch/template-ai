@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
+import type { CachePort } from "../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -27,8 +28,24 @@ vi.mock("../config/ai.js", () => ({
     maxTokens: 8192,
     temperature: 0.1,
   },
+  CACHE_CONFIG: {
+    enabled: false,
+    responseCacheTtl: 604800,
+    textCacheTtl: 604800,
+    maxEntryBytes: 1048576,
+  },
   UPLOAD_DIR: "/tmp/test-uploads",
 }));
+
+function createMockCachePort(): CachePort {
+  return {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => {}),
+    getOrSet: vi.fn(async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
+      factory(),
+    ),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -36,10 +53,12 @@ vi.mock("../config/ai.js", () => ({
 
 describe("OpenRouterService", () => {
   let service: OpenRouterService;
+  let mockCachePort: CachePort;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new OpenRouterService();
+    mockCachePort = createMockCachePort();
+    service = new OpenRouterService(mockCachePort);
   });
 
   describe("extractEntities", () => {

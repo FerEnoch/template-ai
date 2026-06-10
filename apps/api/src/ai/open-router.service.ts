@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
-import { AI_CONFIG } from "../config/ai.js";
+import { AI_CONFIG, CACHE_CONFIG } from "../config/ai.js";
+import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
 // Schema for validating AI response entities
@@ -162,16 +163,7 @@ export class OpenRouterService {
   private readonly client: OpenAI;
   private readonly logger = new Logger(OpenRouterService.name);
 
-  /**
-   * In-memory response cache to avoid redundant OpenRouter API calls during
-   * development/testing. Keyed by SHA-256 of the document text so identical
-   * documents hit the cache even when re-uploaded under different filenames.
-   *
-   * Cleared on process restart — no persistence needed (testing purpose only).
-   */
-  private readonly responseCache = new Map<string, ExtractEntitiesResult>();
-
-  constructor() {
+  constructor(@Inject(CACHE_PORT) private readonly cachePort: CachePort) {
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: AI_CONFIG.apiKey,
@@ -191,26 +183,29 @@ export class OpenRouterService {
       );
     }
 
-    // Check in-memory cache before calling OpenRouter
     const cacheKey = createHash("sha256").update(documentText).digest("hex");
-    const cached = this.responseCache.get(cacheKey);
-    if (cached) {
-      this.logger.warn(
-        `⚡ CACHE HIT — skipping OpenRouter call (${cached.entities.length} entities, sha256=${cacheKey.slice(0, 12)}…)`,
+
+    if (CACHE_CONFIG.enabled) {
+      return this.cachePort.getOrSet(
+        `ai:resp:${cacheKey}`,
+        CACHE_CONFIG.responseCacheTtl,
+        () => this.callModelWithFallback(model, documentText),
       );
-      return cached;
     }
 
+    return this.callModelWithFallback(model, documentText);
+  }
+
+  /**
+   * Call the primary model with fallback to secondary on MODEL_NOT_FOUND or RATE_LIMIT.
+   */
+  private async callModelWithFallback(
+    model: string,
+    documentText: string,
+  ): Promise<ExtractEntitiesResult> {
     try {
-      this.logger.warn(
-        `🟡 API CALL — calling OpenRouter model "${model}" (cache miss, sha256=${cacheKey.slice(0, 12)}…)`,
-      );
-      const result = await this.callModel(model, documentText);
-      // Cache successful result for future identical documents
-      this.responseCache.set(cacheKey, result);
-      return result;
+      return await this.callModel(model, documentText);
     } catch (error) {
-      // Fallback: retry with secondary model on MODEL_NOT_FOUND or RATE_LIMIT
       if (
         error instanceof OpenRouterError &&
         (error.code === "MODEL_NOT_FOUND" || error.code === "RATE_LIMIT") &&
@@ -222,7 +217,6 @@ export class OpenRouterService {
         );
         return await this.callModel(AI_CONFIG.modelFallback, documentText);
       }
-
       throw error;
     }
   }

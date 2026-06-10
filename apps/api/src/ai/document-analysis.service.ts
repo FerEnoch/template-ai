@@ -1,7 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
+import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
+import { CACHE_CONFIG } from "../config/ai.js";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
@@ -77,13 +79,31 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export class DocumentAnalysisService {
   private readonly logger = new Logger(DocumentAnalysisService.name);
 
-  constructor(private readonly openRouterService: OpenRouterService) {}
+  constructor(
+    private readonly openRouterService: OpenRouterService,
+    @Inject(CACHE_PORT) private readonly cachePort: CachePort,
+  ) {}
 
   /**
    * Extracts text content from a file based on its extension.
-   * Supports PDF (via pdf-parse), DOCX (via mammoth), and plain text formats.
+   * When cache is enabled and contentHash is provided, checks Redis before running extractors.
    */
-  private async extractText(filePath: string): Promise<string> {
+  private async extractText(filePath: string, contentHash?: string): Promise<string> {
+    if (CACHE_CONFIG.enabled && contentHash) {
+      return this.cachePort.getOrSet(
+        `ai:text:${contentHash}`,
+        CACHE_CONFIG.textCacheTtl,
+        () => this.doExtractText(filePath),
+      );
+    }
+    return this.doExtractText(filePath);
+  }
+
+  /**
+   * Runs the actual text extraction (pdf-parse, mammoth, or raw read).
+   * Called directly on cache miss or when caching is disabled.
+   */
+  private async doExtractText(filePath: string): Promise<string> {
     const ext = extname(filePath).toLowerCase();
 
     if (ext === ".pdf") {
@@ -124,6 +144,7 @@ export class DocumentAnalysisService {
    */
   async analyze(
     filePath: string | null,
+    contentHash?: string,
   ): Promise<AnalyzeResult> {
     if (!filePath) {
       return { success: false, error: "File not found" };
@@ -132,7 +153,7 @@ export class DocumentAnalysisService {
     // Extract text based on file type
     let fileContent: string;
     try {
-      fileContent = await this.extractText(filePath);
+      fileContent = await this.extractText(filePath, contentHash);
     } catch (error) {
       return {
         success: false,
