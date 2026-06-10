@@ -9,6 +9,7 @@ type Confidence = "ALTA" | "BAJA";
 interface EntityEditModalProps {
   entity: Entity | null;
   isOpen: boolean;
+  mode?: "edit" | "create";
   onSave: (entity: Entity) => Promise<void> | void;
   onClose: () => void;
 }
@@ -29,20 +30,27 @@ const CONFIDENCE_OPTIONS: { value: Confidence; label: string; activeClass: strin
 export function EntityEditModal({
   entity,
   isOpen,
+  mode = "edit",
   onSave,
   onClose,
 }: EntityEditModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [value, setValue] = useState("");
+  const [label, setLabel] = useState("");
+  const [group, setGroup] = useState<Entity["group"]>("PARTES");
   const [confidence, setConfidence] = useState<Confidence>("ALTA");
   const [excluded, setExcluded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isCreateMode = mode === "create";
+
   // Sync local state when entity changes or modal opens
   useEffect(() => {
     if (entity) {
       setValue(entity.value);
+      setLabel(entity.label);
+      setGroup(entity.group as Entity["group"]);
       setConfidence(entity.confidence === "MEDIA" ? "ALTA" : (entity.confidence as Confidence));
       setExcluded(entity.excluded ?? false);
       setError(null);
@@ -85,10 +93,13 @@ export function EntityEditModal({
     try {
       const updated: Entity = {
         ...entity,
+        label: isCreateMode ? label : entity.label,
+        group: isCreateMode ? group : entity.group,
         value,
-        confidence,
-        excluded,
+        confidence: isCreateMode ? "ALTA" : confidence,
+        excluded: isCreateMode ? false : excluded,
         reviewed: true,
+        userCreated: isCreateMode ? true : entity.userCreated,
       };
       await onSave(updated);
     } catch (err) {
@@ -98,7 +109,7 @@ export function EntityEditModal({
     } finally {
       setSaving(false);
     }
-  }, [entity, value, confidence, excluded, onSave]);
+  }, [entity, value, label, group, confidence, excluded, isCreateMode, onSave]);
 
   const handleToggleExcluded = useCallback(() => {
     setExcluded((prev) => !prev);
@@ -128,10 +139,12 @@ export function EntityEditModal({
         <div className="mb-5 flex items-start justify-between">
           <div>
             <h2 className="font-headline text-lg font-bold text-text-primary">
-              Editar entidad
+              {isCreateMode ? "Agregar entidad" : "Editar entidad"}
             </h2>
             <p className="mt-0.5 text-xs text-text-secondary">
-              Modificá el valor o la confianza de esta entidad detectada
+              {isCreateMode
+                ? "Confirmá los datos detectados por IA"
+                : "Modificá el valor o la confianza de esta entidad detectada"}
             </p>
           </div>
           <button
@@ -143,15 +156,57 @@ export function EntityEditModal({
           </button>
         </div>
 
-        {/* Entity Label (read-only) */}
+        {/* Entity Label */}
         <div className="mb-5">
-          <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-text-secondary">
+          <label
+            htmlFor={isCreateMode ? "entity-label" : undefined}
+            className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-text-secondary"
+          >
             Etiqueta
           </label>
-          <div className="rounded-md border border-border bg-background px-4 py-2.5 text-sm font-bold text-text-primary">
-            {entity.label}
-          </div>
+          {isCreateMode ? (
+            <input
+              id="entity-label"
+              type="text"
+              value={label}
+              onChange={(e) => {
+                setLabel(e.target.value);
+                setError(null);
+              }}
+              className="w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm font-bold text-text-primary transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          ) : (
+            <div className="rounded-md border border-border bg-background px-4 py-2.5 text-sm font-bold text-text-primary">
+              {entity.label}
+            </div>
+          )}
         </div>
+
+        {/* Group Dropdown (create mode only) */}
+        {isCreateMode && (
+          <div className="mb-5">
+            <label
+              htmlFor="entity-group"
+              className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-text-secondary"
+            >
+              Grupo
+            </label>
+            <select
+              id="entity-group"
+              value={group}
+              onChange={(e) => {
+                setGroup(e.target.value as Entity["group"]);
+                setError(null);
+              }}
+              className="w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm font-bold text-text-primary transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              <option value="PARTES">Partes</option>
+              <option value="INMUEBLE">Inmueble</option>
+              <option value="FECHAS">Fechas</option>
+              <option value="ANEXOS">Anexos</option>
+            </select>
+          </div>
+        )}
 
         {/* Entity Value (editable) */}
         <div className="mb-5">
@@ -178,51 +233,64 @@ export function EntityEditModal({
           <label className="mb-1.5 block font-label text-[10px] font-bold uppercase tracking-widest text-text-secondary">
             Confianza
           </label>
-          <div className="flex gap-2">
-            {CONFIDENCE_OPTIONS.map((opt) => (
+          {isCreateMode ? (
+            <div className="flex gap-2">
               <button
-                key={opt.value}
-                onClick={() => {
-                  setConfidence(opt.value);
-                  setError(null);
-                }}
-                className={`flex-1 rounded-md border px-3 py-2 text-xs font-bold transition-all ${
-                  confidence === opt.value
-                    ? opt.activeClass
-                    : "border-border bg-background text-text-secondary hover:border-text-secondary/30"
-                }`}
+                disabled
+                className="flex-1 rounded-md border border-success bg-success/10 px-3 py-2 text-xs font-bold text-success cursor-not-allowed"
               >
-                {opt.label}
+                ALTA
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              {CONFIDENCE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    setConfidence(opt.value);
+                    setError(null);
+                  }}
+                  className={`flex-1 rounded-md border px-3 py-2 text-xs font-bold transition-all ${
+                    confidence === opt.value
+                      ? opt.activeClass
+                      : "border-border bg-background text-text-secondary hover:border-text-secondary/30"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Exclude / Restore */}
-        <div className="mb-5">
-          {excluded ? (
-            <button
-              onClick={handleRestore}
-              className="flex items-center gap-1.5 rounded-md border border-success/30 bg-success/5 px-3 py-2 text-xs font-bold text-success transition-colors hover:bg-success/10"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Restaurar entidad
-            </button>
-          ) : (
-            <button
-              onClick={handleToggleExcluded}
-              className="flex items-center gap-1.5 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-bold text-danger transition-colors hover:bg-danger/10"
-            >
-              <AlertTriangle className="h-3.5 w-3.5" />
-              Excluir entidad
-            </button>
-          )}
-          {excluded && (
-            <p className="mt-1.5 text-[11px] italic text-text-secondary">
-              Esta entidad será excluida del documento final
-            </p>
-          )}
-        </div>
+        {/* Exclude / Restore (edit mode only) */}
+        {!isCreateMode && (
+          <div className="mb-5">
+            {excluded ? (
+              <button
+                onClick={handleRestore}
+                className="flex items-center gap-1.5 rounded-md border border-success/30 bg-success/5 px-3 py-2 text-xs font-bold text-success transition-colors hover:bg-success/10"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restaurar entidad
+              </button>
+            ) : (
+              <button
+                onClick={handleToggleExcluded}
+                className="flex items-center gap-1.5 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-bold text-danger transition-colors hover:bg-danger/10"
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Excluir entidad
+              </button>
+            )}
+            {excluded && (
+              <p className="mt-1.5 text-[11px] italic text-text-secondary">
+                Esta entidad será excluida del documento final
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Error State */}
         {error && (
@@ -249,7 +317,13 @@ export function EntityEditModal({
                 : "bg-accent text-white hover:bg-accent-hover"
             }`}
           >
-            {saving ? "Guardando..." : "Guardar cambios"}
+            {saving
+              ? isCreateMode
+                ? "Agregando..."
+                : "Guardando..."
+              : isCreateMode
+                ? "Agregar"
+                : "Guardar cambios"}
           </button>
         </div>
       </div>
