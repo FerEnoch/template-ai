@@ -155,9 +155,9 @@ The analysis step MUST render an in-page stepper with 4 sub-phases (Validating f
 
 ### Requirement: Review entity interaction
 
-The review step MUST display entity groups in expand/collapse panels. Each entity MUST show a confidence badge (ALTA, MEDIA, BAJA). The system MUST filter entities by confidence level. Entity rows MUST be clickable to open the edit modal. Excluded entities MUST be visually distinguished (strikethrough or dimmed) and filtered out by default. The review step MUST also render `state.extractedText` with entity highlights overlaid, reusing the same `renderHighlightedText()` utility (or a shared equivalent) for consistency. When `extractedText` is `null` or empty, the document preview area MUST show a fallback message ("Vista previa no disponible") instead of any hardcoded template.
+The review step MUST display entity groups in expand/collapse panels. Each group header MUST include a "+ AGREGAR CAMPO" button. The button MUST trigger text selection mode when below the manual entity limit, and MUST be disabled with a tier-upgrade tooltip when the limit is reached. Each entity MUST show a confidence badge (ALTA, MEDIA, BAJA). The system MUST filter entities by confidence level. Entity rows MUST be clickable to open the edit modal. Excluded entities MUST be visually distinguished (strikethrough or dimmed) and filtered out by default. The review step MUST also render `state.extractedText` with entity highlights overlaid, reusing the same `renderHighlightedText()` utility for consistency. When `extractedText` is `null` or empty, the document preview area MUST show a fallback message ("Vista previa no disponible").
 
-(Previously: Entity rows were display-only with no click interaction or exclusion state; document preview used a hardcoded template)
+(Previously: entity groups had no manual creation button; text selection did not exist)
 
 #### Scenario: Entity group expands on click
 
@@ -189,11 +189,11 @@ The review step MUST display entity groups in expand/collapse panels. Each entit
 - WHEN the review step renders
 - THEN the document area shows the extracted text with `sourceSpan` characters highlighted
 
-#### Scenario: Review reuses the same highlighter
+#### Scenario: "+ AGREGAR CAMPO" present in every group header
 
-- GIVEN the project has a `renderHighlightedText()` utility
-- WHEN the review step renders highlights
-- THEN it invokes the same function (or a shared equivalent)
+- GIVEN any entity group (PARTES, INMUEBLE, FECHAS, ANEXOS) is rendered
+- WHEN the review step displays the group header
+- THEN "+ AGREGAR CAMPO" button is visible
 
 #### Scenario: Fallback when extractedText is missing
 
@@ -287,3 +287,47 @@ The analysis page MUST treat the `completed` status as a final summary state. Wh
 - WHEN the user clicks "Continuar a Revisión"
 - THEN the wizard advances to review
 - AND `state.extractedText` is available for the review page
+
+### Requirement: ADD_ENTITY reducer action
+
+The wizard reducer MUST handle an `ADD_ENTITY` action that appends a new entity to `state.entities`. The action payload MUST be a complete `Entity` object. Manual entity count MUST be derivable from state (entities where `sourceSpan` exists and entity was not produced by AI analysis).
+
+#### Scenario: ADD_ENTITY appends entity to state
+
+- GIVEN `state.entities` has 3 AI-detected entities
+- WHEN `ADD_ENTITY` is dispatched with a new manual entity
+- THEN `state.entities` length is 4
+- AND the new entity is the last in the array
+
+#### Scenario: Manual entity count derives from state
+
+- GIVEN 2 entities with `sourceSpan` exist (user-created, no AI analysis association)
+- WHEN the manual entity count is computed
+- THEN the count is 2
+
+### Requirement: addEntity() context method
+
+`WizardContext` MUST expose `addEntity(entity: Entity)` that dispatches `ADD_ENTITY` and triggers draft persistence. The method MUST be callable from the review page component.
+
+#### Scenario: addEntity persists entity to draft
+
+- GIVEN `addEntity(newEntity)` is called
+- WHEN draft is read from localStorage
+- THEN the new entity is present in `entities[]`
+
+### Requirement: Text selection mode state
+
+Text selection mode MUST be tracked in the review page component (local state, not wizard global state). Entering selection mode MUST set a visual cue. Exiting selection mode MUST clear the cue. On text selection, the component MUST capture `window.getSelection()` offsets against `extractedText`.
+
+#### Scenario: Selection mode activates visual cue
+
+- GIVEN "+ AGREGAR CAMPO" is clicked
+- WHEN selection mode state is set
+- THEN document preview shows a highlight hint cursor
+- AND existing `<mark>` elements are temporarily non-interactive
+
+#### Scenario: Selection of existing highlight is detected
+
+- GIVEN the user selects text overlapping an existing `<mark>` element
+- WHEN `window.getSelection()` is captured
+- THEN the component warns the user about overlap
