@@ -7,6 +7,7 @@ const ENV_KEYS = [
   "OPENROUTER_API_KEY",
   "REDIS_HOST",
   "REDIS_PORT",
+  "AI_CACHE_ENABLED",
 ] as const;
 const BASE_ENV = {
   PORT: "3001",
@@ -15,6 +16,7 @@ const BASE_ENV = {
   OPENROUTER_API_KEY: "sk-or-test-key-123",
   REDIS_HOST: "localhost",
   REDIS_PORT: "6379",
+  AI_CACHE_ENABLED: "false",
 } as const;
 
 const originalEnv = { ...process.env };
@@ -66,6 +68,7 @@ describe("getApiEnv", () => {
       OPENROUTER_API_KEY: "sk-or-test-key-123",
       REDIS_HOST: "localhost",
       REDIS_PORT: 6379,
+      AI_CACHE_ENABLED: false,
     });
   });
 

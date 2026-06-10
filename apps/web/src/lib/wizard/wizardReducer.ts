@@ -79,6 +79,13 @@ export function wizardReducer(
       return { ...state, entities };
     }
 
+    case "ADD_ENTITY": {
+      return {
+        ...state,
+        entities: [...state.entities, action.entity],
+      };
+    }
+
     case "SET_DRAFT":
       return {
         ...state,

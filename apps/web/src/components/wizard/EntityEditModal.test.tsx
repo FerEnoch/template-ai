@@ -179,4 +179,111 @@ describe("EntityEditModal", () => {
 
     expect(container.innerHTML).toBe("");
   });
+
+  describe("create mode", () => {
+    const createEntity: Entity = {
+      id: "create-entity-1",
+      label: "Arrendatario",
+      value: "María García",
+      group: "PARTES",
+      confidence: "ALTA",
+      sourceSpan: { start: 50, end: 62 },
+      reviewed: false,
+      excluded: false,
+      userCreated: true,
+    };
+
+    const createProps = {
+      ...defaultProps,
+      entity: createEntity,
+      mode: "create" as const,
+    };
+
+    it("renders create mode title and subtitle", () => {
+      render(<EntityEditModal {...createProps} />);
+
+      expect(screen.getByText("Agregar entidad")).toBeInTheDocument();
+      expect(
+        screen.getByText("Confirmá los datos detectados por IA")
+      ).toBeInTheDocument();
+    });
+
+    it("renders label as editable text input in create mode", () => {
+      render(<EntityEditModal {...createProps} />);
+
+      // Label should be an input field, not read-only div
+      const labelInput = screen.getByDisplayValue("Arrendatario");
+      expect(labelInput.tagName).toBe("INPUT");
+      expect(labelInput).not.toHaveAttribute("readonly");
+    });
+
+    it("renders group dropdown in create mode", () => {
+      render(<EntityEditModal {...createProps} />);
+
+      // Group dropdown should be visible
+      const groupSelect = screen.getByRole("combobox");
+      expect(groupSelect).toBeInTheDocument();
+
+      // All group options should be available
+      expect(screen.getByText("Partes")).toBeInTheDocument();
+      expect(screen.getByText("Inmueble")).toBeInTheDocument();
+      expect(screen.getByText("Fechas")).toBeInTheDocument();
+      expect(screen.getByText("Anexos")).toBeInTheDocument();
+    });
+
+    it("locks confidence to ALTA in create mode (disabled toggle)", () => {
+      render(<EntityEditModal {...createProps} />);
+
+      // ALTA should be shown but not clickable (or visually disabled)
+      const altaButton = screen.getByText("ALTA").closest("button");
+      expect(altaButton).toBeDisabled();
+
+      // BAJA option should not be present in create mode
+      expect(screen.queryByText("BAJA")).not.toBeInTheDocument();
+    });
+
+    it("does not show exclude button in create mode", () => {
+      render(<EntityEditModal {...createProps} />);
+
+      expect(screen.queryByText("Excluir entidad")).not.toBeInTheDocument();
+      expect(screen.queryByText("Restaurar entidad")).not.toBeInTheDocument();
+    });
+
+    it("calls onSave with entity data when Agregar is clicked", async () => {
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      render(<EntityEditModal {...createProps} onSave={onSave} />);
+
+      // Change label
+      const labelInput = screen.getByDisplayValue("Arrendatario");
+      fireEvent.change(labelInput, { target: { value: "Arrendador" } });
+
+      // Change group
+      const groupSelect = screen.getByRole("combobox");
+      fireEvent.change(groupSelect, { target: { value: "INMUEBLE" } });
+
+      // Click Agregar button
+      const addBtn = screen.getByText("Agregar");
+      fireEvent.click(addBtn);
+
+      await waitFor(() => {
+        expect(onSave).toHaveBeenCalledOnce();
+      });
+
+      const savedEntity = onSave.mock.calls[0][0] as Entity;
+      expect(savedEntity.label).toBe("Arrendador");
+      expect(savedEntity.group).toBe("INMUEBLE");
+      expect(savedEntity.confidence).toBe("ALTA");
+      expect(savedEntity.userCreated).toBe(true);
+    });
+
+    it("shows Cancelar button that calls onClose", () => {
+      const onClose = vi.fn();
+      render(<EntityEditModal {...createProps} onClose={onClose} />);
+
+      const cancelBtn = screen.getByText("Cancelar");
+      fireEvent.click(cancelBtn);
+
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
 });

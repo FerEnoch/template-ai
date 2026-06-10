@@ -1,5 +1,13 @@
 import { http, HttpResponse, delay } from "msw";
-import type { Document, AnalysisResult, Entity, Template } from "@template-ai/contracts";
+import type {
+  Document,
+  AnalysisResult,
+  Entity,
+  Template,
+  ClassifySpanRequest,
+  ClassifySpanResponse,
+} from "@template-ai/contracts";
+import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
 import {
   SAMPLE_DOCUMENT,
   SAMPLE_ENTITIES,
@@ -294,4 +302,137 @@ export const handlers = [
 
     return HttpResponse.json(newTemplate, { status: 201 });
   }),
+
+  /**
+   * POST /api/review/:documentId/entities/classify-span
+   * Classifies selected text via AI and returns entity suggestion.
+   * Simulates 2-3s AI processing time.
+   *
+   * Error triggers:
+   *   x-mock-error: classify-limit-reached → returns 403 (manual entity limit reached)
+   *   x-mock-error: classify-timeout → returns 408 (AI timeout)
+   *   x-mock-error: classify-failed → returns 422 (classification failed)
+   */
+  http.post(
+    "/api/review/:documentId/entities/classify-span",
+    async ({ request }) => {
+      const mockError = getMockError(request);
+
+      // Check for limit reached scenario
+      if (mockError === "classify-limit-reached") {
+        return HttpResponse.json(
+          {
+            error: "Manual entity limit reached",
+            code: "MANUAL_ENTITY_LIMIT_REACHED",
+          },
+          { status: 403 }
+        );
+      }
+
+      // Check for timeout scenario
+      if (mockError === "classify-timeout") {
+        await delay(10000); // Simulate timeout
+        return HttpResponse.json(
+          {
+            error: "AI classification timeout",
+            code: "AI_TIMEOUT",
+          },
+          { status: 408 }
+        );
+      }
+
+      // Check for classification failure
+      if (mockError === "classify-failed") {
+        return HttpResponse.json(
+          {
+            error: "AI classification failed",
+            code: "CLASSIFICATION_FAILED",
+          },
+          { status: 422 }
+        );
+      }
+
+      // Simulate AI processing time (2-3s)
+      await delay(2000 + Math.random() * 1000);
+
+      const body = (await request.json()) as ClassifySpanRequest;
+
+      // Simple mock classification logic
+      const response: ClassifySpanResponse = {
+        label: inferLabel(body.text),
+        group: inferGroup(body.text),
+        value: body.text,
+      };
+
+      return HttpResponse.json(response, { status: 200 });
+    }
+  ),
+
+  /**
+   * POST /api/review/:documentId/entities
+   * Creates a new manual entity. Validates manual entity limit.
+   *
+   * Error trigger: x-mock-error: create-limit-reached → returns 403
+   */
+  http.post("/api/review/:documentId/entities", async ({ request }) => {
+    const mockError = getMockError(request);
+
+    // Check for limit reached scenario
+    if (mockError === "create-limit-reached") {
+      return HttpResponse.json(
+        {
+          error: "Manual entity limit reached",
+          code: "MANUAL_ENTITY_LIMIT_REACHED",
+        },
+        { status: 403 }
+      );
+    }
+
+    await delay(300);
+
+    const body = (await request.json()) as Entity;
+
+    // Add to stored entities
+    storedEntities.push(body);
+
+    return HttpResponse.json(body, { status: 201 });
+  }),
+
+  /**
+   * GET /api/review/:documentId/entities/manual-count
+   * Returns the count of manual (user-created) entities for a document.
+   */
+  http.get("/api/review/:documentId/entities/manual-count", () => {
+    const manualCount = storedEntities.filter((e) => e.userCreated).length;
+    return HttpResponse.json({ count: manualCount }, { status: 200 });
+  }),
 ];
+
+// Helper functions for mock classification
+function inferLabel(text: string): string {
+  const lower = text.toLowerCase();
+  if (lower.includes("juan") || lower.includes("maría") || lower.includes("pérez")) {
+    return "Arrendatario";
+  }
+  if (lower.includes("av.") || lower.includes("calle") || lower.includes("dirección")) {
+    return "Dirección";
+  }
+  if (lower.includes("2024") || lower.includes("2023") || lower.includes("enero")) {
+    return "Fecha";
+  }
+  return "Campo Personalizado";
+}
+
+function inferGroup(text: string): "PARTES" | "INMUEBLE" | "FECHAS" | "ANEXOS" {
+  const lower = text.toLowerCase();
+  if (lower.includes("juan") || lower.includes("maría") || lower.includes("pérez")) {
+    return "PARTES";
+  }
+  if (lower.includes("av.") || lower.includes("calle") || lower.includes("dirección")) {
+    return "INMUEBLE";
+  }
+  if (lower.includes("2024") || lower.includes("2023") || lower.includes("enero")) {
+    return "FECHAS";
+  }
+  return "ANEXOS";
+}
