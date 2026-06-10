@@ -139,10 +139,17 @@ function handleFatalError(message: string): never {
   process.exit(1);
 }
 
-// Trap startup errors to guarantee non-zero exit
-process.on("uncaughtException", (err) => {
-  if (err.message.includes("[api env]")) {
-    handleFatalError(err.message.replace("[api env] ", ""));
-  }
-  process.exit(1);
-});
+// Trap startup errors to guarantee non-zero exit.
+// Guarded to prevent duplicate listeners when the module is re-imported
+// (e.g., across test files in the same pool).
+let fatalErrorHandlerRegistered = false;
+
+if (!fatalErrorHandlerRegistered) {
+  fatalErrorHandlerRegistered = true;
+  process.on("uncaughtException", (err) => {
+    if (err.message.includes("[api env]")) {
+      handleFatalError(err.message.replace("[api env] ", ""));
+    }
+    process.exit(1);
+  });
+}
