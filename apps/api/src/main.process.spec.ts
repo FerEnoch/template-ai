@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { resolve } from "node:path";
 
+// Process-spawning tests are expensive (~3-4s each).
+// Run opt-in with: RUN_PROCESS_TESTS=true pnpm --filter @template-ai/api test
+const RUN_PROCESS_TESTS = process.env.RUN_PROCESS_TESTS === "true";
+
 const workspaceRoot = resolve(__dirname, "../../..");
 const originalEnv = { ...process.env };
 
@@ -50,7 +54,7 @@ afterEach(() => {
   process.env = { ...originalEnv };
 });
 
-describe("API bootstrap process contract", () => {
+describe.runIf(RUN_PROCESS_TESTS)("API bootstrap process contract", () => {
   it("starts from valid env on configured port and keeps /health live while /ready is not ready", async () => {
     const port = randomPort();
     const child = createApiProcess({

@@ -3,20 +3,24 @@
  *
  * Validates the full HTTP cycle: multipart upload → Document response shape.
  * When DATABASE_URL is not set, the suite is skipped silently.
- * Run with DATABASE_URL set to execute against a real PostgreSQL instance.
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, afterEach } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import type { Pool } from "pg";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Shared state
 // ---------------------------------------------------------------------------
 
 let pool: Pool | null = null;
+let app: INestApplication | null = null;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 async function setupPool(): Promise<Pool | null> {
   if (!DATABASE_URL) return null;
@@ -72,95 +76,86 @@ describe("Documents integration: POST /api/documents/upload", () => {
     if (!DATABASE_URL) return;
     pool = await setupPool();
     if (!pool) return;
+
+    // Bootstrap NestJS app ONCE — shared across all tests
+    const { Test } = await import("@nestjs/testing");
+    const { DocumentsModule } = await import("./documents.module.js");
+
+    const moduleFixture = await Test.createTestingModule({
+      imports: [DocumentsModule],
+    }).compile();
+    app = moduleFixture.createNestApplication({ logger: false });
+    app.setGlobalPrefix("api");
+    await app.init();
+
     await cleanDocumentsTable();
   });
 
+  afterEach(async () => {
+    if (pool) await cleanDocumentsTable();
+  });
+
   afterAll(async () => {
+    if (app) {
+      await app.close();
+      app = null;
+    }
     if (pool) {
       await cleanDocumentsTable();
       await pool.end();
+      pool = null;
     }
   });
 
   it("returns Document shape on successful upload", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { DocumentsModule } = await import("./documents.module.js");
     const request = (await import("supertest")).default;
 
-    // Create a user for RLS
     await createUserAs(0, {
       email: "doc-upload-int@example.com",
       displayName: "Doc Upload Int",
       externalSubject: "subj_doc_upload_int",
     });
 
-    // Bootstrap NestJS app with DocumentsModule
-    const moduleFixture = await Test.createTestingModule({
-      imports: [DocumentsModule],
-    }).compile();
-    const app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
-
-    try {
-      // Upload a file via multipart
-      const filePath = Buffer.from("test file content");
-      const response = await request(app.getHttpServer())
-        .post("/api/documents/upload")
-        .attach("file", filePath, {
-          filename: "test-contract.pdf",
-          contentType: "application/pdf",
-        });
-
-      expect(response.status).toBe(201);
-      expect(response.body).toMatchObject({
-        id: expect.any(String),
+    const filePath = Buffer.from("test file content");
+    const response = await request(app.getHttpServer())
+      .post("/api/documents/upload")
+      .attach("file", filePath, {
         filename: "test-contract.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: expect.any(Number),
-        status: "processing",
-        uploadedAt: expect.any(String),
+        contentType: "application/pdf",
       });
 
-      // Verify the uploadedAt is a valid ISO date
-      expect(new Date(response.body.uploadedAt).toISOString()).toBe(response.body.uploadedAt);
-    } finally {
-      await app.close();
-      await cleanDocumentsTable();
-    }
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      id: expect.any(String),
+      filename: "test-contract.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: expect.any(Number),
+      status: "processing",
+      uploadedAt: expect.any(String),
+    });
+
+    // Verify the uploadedAt is a valid ISO date
+    expect(new Date(response.body.uploadedAt).toISOString()).toBe(response.body.uploadedAt);
   });
 
   it("returns 400 when no file is provided", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { DocumentsModule } = await import("./documents.module.js");
     const request = (await import("supertest")).default;
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [DocumentsModule],
-    }).compile();
-    const app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const response = await request(app.getHttpServer())
+      .post("/api/documents/upload");
 
-    try {
-      const response = await request(app.getHttpServer())
-        .post("/api/documents/upload");
-
-      expect(response.status).toBe(400);
-      expect(response.body).toMatchObject({
-        message: expect.stringContaining("No file uploaded"),
-      });
-    } finally {
-      await app.close();
-    }
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      message: expect.stringContaining("No file uploaded"),
+    });
   });
 
   it("returns 500 when database fails", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
     const { Test } = await import("@nestjs/testing");
     const { DocumentsModule } = await import("./documents.module.js");
@@ -168,6 +163,7 @@ describe("Documents integration: POST /api/documents/upload", () => {
     const { DatabaseModule } = await import("../infrastructure/postgres/database.module.js");
     const request = (await import("supertest")).default;
 
+    // This test must create its own app because it overrides providers
     const moduleFixture = await Test.createTestingModule({
       imports: [DocumentsModule, DatabaseModule],
     })
@@ -180,13 +176,13 @@ describe("Documents integration: POST /api/documents/upload", () => {
       })
       .compile();
 
-    const app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const errorApp = moduleFixture.createNestApplication({ logger: false });
+    errorApp.setGlobalPrefix("api");
+    await errorApp.init();
 
     try {
       const filePath = Buffer.from("test file content");
-      const response = await request(app.getHttpServer())
+      const response = await request(errorApp.getHttpServer())
         .post("/api/documents/upload")
         .attach("file", filePath, {
           filename: "broken.pdf",
@@ -198,7 +194,7 @@ describe("Documents integration: POST /api/documents/upload", () => {
         message: expect.stringContaining("Internal server error during file upload"),
       });
     } finally {
-      await app.close();
+      await errorApp.close();
     }
   });
 });

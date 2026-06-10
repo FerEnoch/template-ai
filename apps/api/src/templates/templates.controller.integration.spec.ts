@@ -7,17 +7,22 @@
  * Run with DATABASE_URL set to execute against a real PostgreSQL instance.
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, afterEach } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import type { Pool } from "pg";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Shared state
 // ---------------------------------------------------------------------------
 
 let pool: Pool | null = null;
+let app: INestApplication | null = null;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 async function setupPool(): Promise<Pool | null> {
   if (!DATABASE_URL) return null;
@@ -98,21 +103,40 @@ describe("Templates integration: GET + POST /api/templates", () => {
     if (!DATABASE_URL) return;
     pool = await setupPool();
     if (!pool) return;
+
+    // Bootstrap NestJS app ONCE — shared across all tests
+    const { Test } = await import("@nestjs/testing");
+    const { TemplatesModule } = await import("./templates.module.js");
+
+    const moduleFixture = await Test.createTestingModule({
+      imports: [TemplatesModule],
+    }).compile();
+    app = moduleFixture.createNestApplication({ logger: false });
+    app.setGlobalPrefix("api");
+    await app.init();
+
     await cleanTemplatesTables();
   });
 
+  afterEach(async () => {
+    if (pool) await cleanTemplatesTables();
+  });
+
   afterAll(async () => {
+    if (app) {
+      await app.close();
+      app = null;
+    }
     if (pool) {
       await cleanTemplatesTables();
       await pool.end();
+      pool = null;
     }
   });
 
   it("returns empty array when no templates exist", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { TemplatesModule } = await import("./templates.module.js");
     const request = (await import("supertest")).default;
 
     await createUserAs(0, {
@@ -121,32 +145,18 @@ describe("Templates integration: GET + POST /api/templates", () => {
       externalSubject: "subj_tmpl_list_int",
     });
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [TemplatesModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const res = await request(app.getHttpServer())
+      .get("/api/templates");
 
-    try {
-      const res = await request(app.getHttpServer())
-        .get("/api/templates");
-
-      expect(res.status).toBe(200);
-      expect(res.body).toEqual([]);
-    } finally {
-      await app.close();
-    }
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
   });
 
   it("creates a template and returns it with id and createdAt", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { TemplatesModule } = await import("./templates.module.js");
     const request = (await import("supertest")).default;
 
-    await cleanTemplatesTables();
     await createUserAs(0, {
       email: "tmpl-create-int@example.com",
       displayName: "Tmpl Create Int",
@@ -155,101 +165,73 @@ describe("Templates integration: GET + POST /api/templates", () => {
 
     const documentId = await insertDocumentForTemplates();
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [TemplatesModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
-
-    try {
-      const res = await request(app.getHttpServer())
-        .post("/api/templates")
-        .send({
-          name: "Contrato de Arrendamiento",
-          description: "A standard lease agreement",
-          documentId,
-          entities: [
-            {
-              id: "770e8400-e29b-41d4-a716-446655440002",
-              label: "COMPRADOR",
-              value: "Juan Pérez",
-              group: "PARTES",
-              confidence: "ALTA",
-              reviewed: false,
-              excluded: false,
-            },
-          ],
-          category: "legal",
-          status: "draft",
-        });
-
-      expect(res.status).toBe(201);
-      expect(res.body).toMatchObject({
-        id: expect.any(String),
+    const res = await request(app.getHttpServer())
+      .post("/api/templates")
+      .send({
         name: "Contrato de Arrendamiento",
         description: "A standard lease agreement",
         documentId,
+        entities: [
+          {
+            id: "770e8400-e29b-41d4-a716-446655440002",
+            label: "COMPRADOR",
+            value: "Juan Pérez",
+            group: "PARTES",
+            confidence: "ALTA",
+            reviewed: false,
+            excluded: false,
+          },
+        ],
         category: "legal",
         status: "draft",
-        createdAt: expect.any(String),
-      });
-      expect(res.body.entities).toHaveLength(1);
-      expect(res.body.entities[0]).toMatchObject({
-        label: "COMPRADOR",
-        value: "Juan Pérez",
-        group: "PARTES",
-        confidence: "ALTA",
       });
 
-      // Verify createdAt is a valid ISO date
-      expect(new Date(res.body.createdAt).toISOString()).toBe(res.body.createdAt);
-    } finally {
-      await app.close();
-      await cleanTemplatesTables();
-    }
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      id: expect.any(String),
+      name: "Contrato de Arrendamiento",
+      description: "A standard lease agreement",
+      documentId,
+      category: "legal",
+      status: "draft",
+      createdAt: expect.any(String),
+    });
+    expect(res.body.entities).toHaveLength(1);
+    expect(res.body.entities[0]).toMatchObject({
+      label: "COMPRADOR",
+      value: "Juan Pérez",
+      group: "PARTES",
+      confidence: "ALTA",
+    });
+
+    // Verify createdAt is a valid ISO date
+    expect(new Date(res.body.createdAt).toISOString()).toBe(res.body.createdAt);
   });
 
   it("returns 400 when name is too short", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { TemplatesModule } = await import("./templates.module.js");
     const request = (await import("supertest")).default;
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [TemplatesModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const res = await request(app.getHttpServer())
+      .post("/api/templates")
+      .send({
+        name: "ab",
+        description: "Too short",
+        documentId: "660e8400-e29b-41d4-a716-446655440001",
+        entities: [],
+        category: "legal",
+        status: "draft",
+      });
 
-    try {
-      const res = await request(app.getHttpServer())
-        .post("/api/templates")
-        .send({
-          name: "ab",
-          description: "Too short",
-          documentId: "660e8400-e29b-41d4-a716-446655440001",
-          entities: [],
-          category: "legal",
-          status: "draft",
-        });
-
-      expect(res.status).toBe(400);
-    } finally {
-      await app.close();
-    }
+    expect(res.status).toBe(400);
   });
 
   it("returns 409 when creating a template with a duplicate name", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { TemplatesModule } = await import("./templates.module.js");
     const request = (await import("supertest")).default;
 
-    await cleanTemplatesTables();
     await createUserAs(0, {
       email: "tmpl-dup-int@example.com",
       displayName: "Tmpl Dup Int",
@@ -258,44 +240,32 @@ describe("Templates integration: GET + POST /api/templates", () => {
 
     const documentId = await insertDocumentForTemplates();
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [TemplatesModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    // Create first template
+    const res1 = await request(app.getHttpServer())
+      .post("/api/templates")
+      .send({
+        name: "Duplicate Name Test",
+        description: "First one",
+        documentId,
+        entities: [],
+        category: "legal",
+        status: "draft",
+      });
 
-    try {
-      // Create first template
-      const res1 = await request(app.getHttpServer())
-        .post("/api/templates")
-        .send({
-          name: "Duplicate Name Test",
-          description: "First one",
-          documentId,
-          entities: [],
-          category: "legal",
-          status: "draft",
-        });
+    expect(res1.status).toBe(201);
 
-      expect(res1.status).toBe(201);
+    // Try to create second template with same name
+    const res2 = await request(app.getHttpServer())
+      .post("/api/templates")
+      .send({
+        name: "Duplicate Name Test",
+        description: "Second one, should conflict",
+        documentId,
+        entities: [],
+        category: "legal",
+        status: "draft",
+      });
 
-      // Try to create second template with same name
-      const res2 = await request(app.getHttpServer())
-        .post("/api/templates")
-        .send({
-          name: "Duplicate Name Test",
-          description: "Second one, should conflict",
-          documentId,
-          entities: [],
-          category: "legal",
-          status: "draft",
-        });
-
-      expect(res2.status).toBe(409);
-    } finally {
-      await app.close();
-      await cleanTemplatesTables();
-    }
+    expect(res2.status).toBe(409);
   });
 });
