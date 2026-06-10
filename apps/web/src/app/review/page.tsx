@@ -10,6 +10,8 @@ import {
   Shield,
   AlertTriangle,
   Loader2,
+  RotateCcw,
+  Pencil,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout, EntityInspector } from "@/components/wizard";
@@ -37,6 +39,7 @@ function ReviewInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const articleRef = useRef<HTMLElement>(null);
+  const classifyFnRef = useRef<(() => Promise<void>) | null>(null);
 
   const [pendingBajaCount, setPendingBajaCount] = useState(0);
   const [isConfirmEnabled, setIsConfirmEnabled] = useState(false);
@@ -174,6 +177,7 @@ function ReviewInner() {
       }
     };
 
+    classifyFnRef.current = classifySpan;
     classifySpan();
   }, [selection, state.analysisResultId, clearSelection]);
 
@@ -288,13 +292,48 @@ function ReviewInner() {
             {/* Classification error toast */}
             {classificationError && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-danger bg-danger/10 px-4 py-3 text-xs font-bold text-danger shadow-lg">
-                {classificationError}
-                <button
-                  onClick={() => setClassificationError(null)}
-                  className="ml-3 text-danger hover:underline"
-                >
-                  Cerrar
-                </button>
+                <span>{classificationError}</span>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => {
+                      setClassificationError(null);
+                      classifyFnRef.current?.();
+                    }}
+                    className="flex items-center gap-1 rounded border border-danger/30 px-2 py-1 text-[10px] font-bold text-danger hover:bg-danger/10 transition-colors"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reintentar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setClassificationError(null);
+                      const newEntity: Entity = {
+                        id: crypto.randomUUID(),
+                        label: "",
+                        value: selection?.text ?? "",
+                        group: "PARTES",
+                        confidence: "ALTA",
+                        sourceSpan: selection?.sourceSpan ?? { start: 0, end: 0 },
+                        reviewed: false,
+                        excluded: false,
+                        userCreated: true,
+                      };
+                      setCreateModalEntity(newEntity);
+                      setIsCreateModalOpen(true);
+                      clearSelection();
+                    }}
+                    className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] font-bold text-text-secondary hover:bg-border/30 transition-colors"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    Agregar manualmente
+                  </button>
+                  <button
+                    onClick={() => setClassificationError(null)}
+                    className="ml-auto rounded px-2 py-1 text-[10px] font-bold text-text-secondary hover:underline"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
             )}
           </section>
