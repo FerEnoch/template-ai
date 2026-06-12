@@ -5,6 +5,7 @@ import {
   WizardDraftSchema,
   ClassifySpanRequestSchema,
   ClassifySpanResponseSchema,
+  UploadResponseSchema,
   MANUAL_ENTITY_LIMIT,
 } from "./schemas.js";
 
@@ -277,5 +278,51 @@ describe("ClassifySpanResponseSchema", () => {
       });
       expect(result.success).toBe(true);
     }
+  });
+});
+
+describe("UploadResponseSchema", () => {
+  const validResponse = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    filename: "contract.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 2048,
+    status: "completed",
+    uploadedAt: new Date().toISOString(),
+  };
+
+  it("parses a valid upload response without cachedFromDocumentId", () => {
+    const result = UploadResponseSchema.safeParse(validResponse);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cachedFromDocumentId).toBeUndefined();
+    }
+  });
+
+  it("parses a valid upload response with cachedFromDocumentId", () => {
+    const result = UploadResponseSchema.safeParse({
+      ...validResponse,
+      cachedFromDocumentId: "660e8400-e29b-41d4-a716-446655440001",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.cachedFromDocumentId).toBe(
+        "660e8400-e29b-41d4-a716-446655440001",
+      );
+    }
+  });
+
+  it("rejects when required fields are missing", () => {
+    const { id, ...withoutId } = validResponse;
+    const result = UploadResponseSchema.safeParse(withoutId);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid uuid for cachedFromDocumentId", () => {
+    const result = UploadResponseSchema.safeParse({
+      ...validResponse,
+      cachedFromDocumentId: "not-a-uuid",
+    });
+    expect(result.success).toBe(false);
   });
 });

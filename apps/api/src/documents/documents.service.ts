@@ -47,7 +47,12 @@ export class DocumentsService {
 
         if (cached) {
           this.logger.log(
-            `Upload cache HIT: contentHash=${input.contentHash} → documentId=${cached.document.id}`,
+            {
+              cache_layer: "upload_dedup",
+              key: input.contentHash.substring(0, 16),
+              hit: true,
+            },
+            "Cache hit",
           );
           return {
             document: cached.document,
@@ -60,7 +65,12 @@ export class DocumentsService {
       } catch (error) {
         // Dedup failure must not break the upload — fall through to normal flow
         this.logger.warn(
-          `Dedup check failed for contentHash=${input.contentHash}: ${error instanceof Error ? error.message : String(error)}`,
+          {
+            cache_layer: "upload_dedup",
+            key: input.contentHash.substring(0, 16),
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Dedup check failed",
         );
       }
     }
@@ -96,7 +106,12 @@ export class DocumentsService {
     });
 
     this.logger.log(
-      `Upload cache MISS: contentHash=${input.contentHash} → documentId=${result.document.id}`,
+      {
+        cache_layer: "upload_dedup",
+        key: input.contentHash.substring(0, 16),
+        hit: false,
+      },
+      "Cache miss",
     );
 
     return {

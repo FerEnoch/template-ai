@@ -90,11 +90,33 @@ export class DocumentAnalysisService {
    */
   private async extractText(filePath: string, contentHash?: string): Promise<string> {
     if (CACHE_CONFIG.enabled && contentHash) {
-      return this.cachePort.getOrSet(
-        `ai:text:${contentHash}`,
-        CACHE_CONFIG.textCacheTtl,
-        () => this.doExtractText(filePath),
+      const truncatedKey = contentHash.substring(0, 16);
+      const cached = await this.cachePort.get<string>(`ai:text:${contentHash}`);
+
+      if (cached !== null) {
+        this.logger.log(
+          { cache_layer: "text_extraction", key: truncatedKey, hit: true },
+          "Cache hit",
+        );
+        return cached;
+      }
+
+      this.logger.log(
+        { cache_layer: "text_extraction", key: truncatedKey, hit: false },
+        "Cache miss",
       );
+
+      const text = await this.doExtractText(filePath);
+      const sizeBytes = Buffer.byteLength(text, "utf-8");
+
+      await this.cachePort.set(`ai:text:${contentHash}`, text, CACHE_CONFIG.textCacheTtl);
+
+      this.logger.log(
+        { cache_layer: "text_extraction", key: truncatedKey, hit: false, size_bytes: sizeBytes, ttl: CACHE_CONFIG.textCacheTtl },
+        "Cache write",
+      );
+
+      return text;
     }
     return this.doExtractText(filePath);
   }

@@ -7,6 +7,7 @@ export {
   WizardDraftSchema,
   ClassifySpanRequestSchema,
   ClassifySpanResponseSchema,
+  UploadResponseSchema,
   MANUAL_ENTITY_LIMIT,
   type Document,
   type Entity,
@@ -15,4 +16,5 @@ export {
   type WizardDraft,
   type ClassifySpanRequest,
   type ClassifySpanResponse,
+  type UploadResponse,
 } from "./schemas.js";

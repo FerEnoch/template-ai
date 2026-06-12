@@ -97,6 +97,17 @@ export const WizardDraftSchema = z.object({
   savedAt: z.string().datetime(),
 });
 
+// Upload response schema: returned by POST /api/documents/upload
+export const UploadResponseSchema = z.object({
+  id: z.string().uuid(),
+  filename: z.string().min(1),
+  mimeType: z.string(),
+  sizeBytes: z.number().min(1),
+  status: z.string(),
+  uploadedAt: z.string().datetime(),
+  cachedFromDocumentId: z.string().uuid().optional(),
+});
+
 // Infer types from schemas
 export type Document = z.infer<typeof DocumentSchema>;
 export type Entity = z.infer<typeof EntitySchema>;
@@ -105,3 +116,4 @@ export type Template = z.infer<typeof TemplateSchema>;
 export type WizardDraft = z.infer<typeof WizardDraftSchema>;
 export type ClassifySpanRequest = z.infer<typeof ClassifySpanRequestSchema>;
 export type ClassifySpanResponse = z.infer<typeof ClassifySpanResponseSchema>;
+export type UploadResponse = z.infer<typeof UploadResponseSchema>;

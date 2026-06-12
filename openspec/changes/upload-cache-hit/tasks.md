@@ -52,8 +52,8 @@ Chain strategy: stacked-to-main
 
 ## PR #4: Contracts, Env, Logs
 
-- [ ] **4.1** `packages/contracts/src/schemas.ts` — add optional `cachedFromDocumentId?: string` to `UploadResponse`; update `schemas.test.ts`. ~15L.
-- [ ] **4.2** Add to `.env.dev.example` — `AI_CACHE_ENABLED=true`, TTLs (604800), `AI_CACHE_MAX_ENTRY_BYTES=1048576`. ~10L.
-- [ ] **4.3** Standardize logs in `open-router.service.ts`, `document-analysis.service.ts`, `documents.service.ts` — `logger.warn({ cache_layer, key, hit, size_bytes }, "cache event")`. ~25L.
-- [ ] **4.4** `apps/api/docs/caching.md` — three layers, flag, `X-Cache`. Links specs. ~30L.
-- [ ] **4.5** Final regression — `pnpm --filter @template-ai/api test` green; smoke: upload→complete→restart API→re-upload → HIT from Redis. 0L.
+- [x] **4.1** `packages/contracts/src/schemas.ts` — add optional `cachedFromDocumentId?: string` to `UploadResponse`; update `schemas.test.ts`. ~15L.
+- [x] **4.2** Add to `.env.dev.example` — `AI_CACHE_ENABLED=true`, TTLs (604800), `AI_CACHE_MAX_ENTRY_BYTES=1048576`. ~10L.
+- [x] **4.3** Standardize logs in `open-router.service.ts`, `document-analysis.service.ts`, `documents.service.ts` — `logger.warn({ cache_layer, key, hit, size_bytes }, "cache event")`. ~25L.
+- [x] **4.4** `apps/api/docs/caching.md` — three layers, flag, `X-Cache`. Links specs. ~30L.
+- [x] **4.5** Final regression — `pnpm --filter @template-ai/api test` green; smoke: upload→complete→restart API→re-upload → HIT from Redis. 0L.

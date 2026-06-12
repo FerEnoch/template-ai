@@ -186,11 +186,34 @@ export class OpenRouterService {
     const cacheKey = createHash("sha256").update(documentText).digest("hex");
 
     if (CACHE_CONFIG.enabled) {
-      return this.cachePort.getOrSet(
-        `ai:resp:${cacheKey}`,
-        CACHE_CONFIG.responseCacheTtl,
-        () => this.callModelWithFallback(model, documentText),
+      const truncatedKey = cacheKey.substring(0, 16);
+      const cached = await this.cachePort.get<ExtractEntitiesResult>(`ai:resp:${cacheKey}`);
+
+      if (cached !== null) {
+        this.logger.log(
+          { cache_layer: "ai_response", key: truncatedKey, hit: true },
+          "Cache hit",
+        );
+        return cached;
+      }
+
+      this.logger.log(
+        { cache_layer: "ai_response", key: truncatedKey, hit: false },
+        "Cache miss",
       );
+
+      const result = await this.callModelWithFallback(model, documentText);
+      const serialized = JSON.stringify(result);
+      const sizeBytes = Buffer.byteLength(serialized, "utf-8");
+
+      await this.cachePort.set(`ai:resp:${cacheKey}`, result, CACHE_CONFIG.responseCacheTtl);
+
+      this.logger.log(
+        { cache_layer: "ai_response", key: truncatedKey, hit: false, size_bytes: sizeBytes, ttl: CACHE_CONFIG.responseCacheTtl },
+        "Cache write",
+      );
+
+      return result;
     }
 
     return this.callModelWithFallback(model, documentText);
