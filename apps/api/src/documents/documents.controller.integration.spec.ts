@@ -10,6 +10,7 @@ import type { INestApplication } from "@nestjs/common";
 import type { Pool } from "pg";
 
 const DATABASE_URL = process.env.DATABASE_URL;
+const CACHE_ENABLED = process.env.AI_CACHE_ENABLED === "true";
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -196,5 +197,86 @@ describe("Documents integration: POST /api/documents/upload", () => {
     } finally {
       await errorApp.close();
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Upload dedup tests — only run when AI_CACHE_ENABLED=true
+  // -------------------------------------------------------------------------
+  describe("upload deduplication", () => {
+    it("returns cached result with X-Cache: HIT on re-upload of identical file", async () => {
+      if (!pool || !app || !CACHE_ENABLED) return;
+
+      const request = (await import("supertest")).default;
+      const fileContent = Buffer.from("dedup-test-file-content-bytes");
+
+      // First upload — should be a MISS
+      const firstResponse = await request(app.getHttpServer())
+        .post("/api/documents/upload")
+        .attach("file", fileContent, {
+          filename: "dedup-contract.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(firstResponse.status).toBe(200);
+      expect(firstResponse.headers["x-cache"]).toBe("MISS");
+      const firstDocId = firstResponse.body.id;
+
+      // Manually mark the analysis as completed (simulates worker finishing)
+      const analysisResults = await pool.query(
+        `SELECT id FROM analysis_results WHERE document_id = $1`,
+        [firstDocId],
+      );
+      expect(analysisResults.rows.length).toBe(1);
+      const analysisId = analysisResults.rows[0].id;
+
+      await pool.query(
+        `UPDATE analysis_results SET status = 'completed', completed_at = now() WHERE id = $1`,
+        [analysisId],
+      );
+
+      // Insert a test entity so the dedup response has entities
+      await pool.query(
+        `INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence)
+         VALUES ($1, $2, 'Company', 'Acme Corp', 'organization', '0.95')`,
+        [analysisId, firstDocId],
+      );
+
+      // Second upload — same file, should be a HIT
+      const secondResponse = await request(app.getHttpServer())
+        .post("/api/documents/upload")
+        .attach("file", fileContent, {
+          filename: "dedup-contract.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.headers["x-cache"]).toBe("HIT");
+      expect(secondResponse.body.id).toBe(firstDocId);
+      expect(secondResponse.body.status).toBe("completed");
+      expect(secondResponse.body.cachedFromDocumentId).toBe(firstDocId);
+
+      // Verify only ONE document row exists (no duplicate)
+      const docCount = await pool.query(
+        `SELECT COUNT(*) FROM documents WHERE filename = 'dedup-contract.pdf'`,
+      );
+      expect(Number(docCount.rows[0].count)).toBe(1);
+    });
+
+    it("proceeds normally when no matching content_hash exists", async () => {
+      if (!pool || !app || !CACHE_ENABLED) return;
+
+      const request = (await import("supertest")).default;
+
+      const response = await request(app.getHttpServer())
+        .post("/api/documents/upload")
+        .attach("file", Buffer.from("unique-content-no-dedup"), {
+          filename: "unique-file.pdf",
+          contentType: "application/pdf",
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers["x-cache"]).toBe("MISS");
+      expect(response.body.status).toBe("processing");
+    });
   });
 });

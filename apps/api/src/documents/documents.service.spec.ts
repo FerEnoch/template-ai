@@ -4,6 +4,22 @@ import { PostgresService, type TransactionContext } from "../infrastructure/post
 import type { DocumentRecord } from "../infrastructure/postgres/repositories/documents.repository";
 import type { AnalysisResultRecord } from "../infrastructure/postgres/repositories/analysis-results.repository";
 
+// Mock the AI config module to control CACHE_CONFIG in tests
+vi.mock("../config/ai.js", () => ({
+  CACHE_CONFIG: {
+    enabled: false,
+    responseCacheTtl: 604800,
+    textCacheTtl: 604800,
+    maxEntryBytes: 1048576,
+  },
+  UPLOAD_DIR: "/tmp/test-uploads",
+}));
+
+// Mock fs/promises to avoid actual disk writes in unit tests
+vi.mock("node:fs/promises", () => ({
+  writeFile: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -18,6 +34,7 @@ function makeDocumentRecord(overrides: Partial<DocumentRecord> = {}): DocumentRe
     status: "processing",
     uploadedAt: new Date("2025-01-15T10:30:00Z"),
     filePath: null,
+    contentHash: null,
     ...overrides,
   };
 }
@@ -84,6 +101,7 @@ function createMockPostgresService(
             status: documentRecord.status,
             uploaded_at: documentRecord.uploadedAt,
             file_path: documentRecord.filePath,
+            content_hash: documentRecord.contentHash,
           },
         ],
       });
@@ -113,7 +131,7 @@ function createMockPostgresService(
 
 describe("DocumentsService", () => {
   describe("upload", () => {
-    it("should extract metadata from file and create document + analysis_result in DB", async () => {
+    it("should create document + analysis_result and return UploadResult with cacheHit=false", async () => {
       const docRecord = makeDocumentRecord();
       const analysisRecord = makeAnalysisResultRecord({
         documentId: docRecord.id,
@@ -126,10 +144,13 @@ describe("DocumentsService", () => {
         filename: "contract.pdf",
         mimeType: "application/pdf",
         sizeBytes: 1024,
+        fileBuffer: Buffer.from("fake-pdf-content"),
+        contentHash: "sha256hash",
       });
 
-      // Verify the service returns the Document record with correct shape
-      expect(result).toMatchObject({
+      // Verify the service returns UploadResult with cacheHit=false
+      expect(result.cacheHit).toBe(false);
+      expect(result.document).toMatchObject({
         id: docRecord.id,
         filename: "contract.pdf",
         mimeType: "application/pdf",
@@ -158,6 +179,8 @@ describe("DocumentsService", () => {
         filename: "test.pdf",
         mimeType: "application/pdf",
         sizeBytes: 500,
+        fileBuffer: Buffer.from("test-content"),
+        contentHash: "testhash",
       });
 
       expect(mockPostgres.withOwnerTransaction).toHaveBeenCalledWith(0, expect.any(Function));
@@ -175,6 +198,8 @@ describe("DocumentsService", () => {
           filename: "broken.pdf",
           mimeType: "application/pdf",
           sizeBytes: 100,
+          fileBuffer: Buffer.from("broken"),
+          contentHash: "brokenhash",
         }),
       ).rejects.toThrow("DB connection failed");
     });
@@ -194,6 +219,8 @@ describe("DocumentsService", () => {
         filename: "contract.pdf",
         mimeType: "application/pdf",
         sizeBytes: 1024,
+        fileBuffer: Buffer.from("content"),
+        contentHash: "hash123",
       });
 
       // The mockClient.query should have been called with an INSERT INTO analysis_results
@@ -207,6 +234,29 @@ describe("DocumentsService", () => {
         (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("documents"),
       );
       expect(documentInsertCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should write file buffer to disk on cache miss", async () => {
+      const docRecord = makeDocumentRecord();
+      const analysisRecord = makeAnalysisResultRecord({ documentId: docRecord.id });
+
+      const { mockPostgres } = createMockPostgresService(docRecord, analysisRecord);
+      const service = new DocumentsService(mockPostgres);
+
+      const { writeFile } = await import("node:fs/promises");
+      const writeFileMock = vi.mocked(writeFile);
+      writeFileMock.mockClear();
+      const buffer = Buffer.from("file-bytes");
+
+      await service.upload({
+        filename: "test.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: buffer.length,
+        fileBuffer: buffer,
+        contentHash: "hash",
+      });
+
+      expect(writeFileMock).toHaveBeenCalledOnce();
     });
   });
 });

@@ -3,6 +3,7 @@ import { BadRequestException, InternalServerErrorException } from "@nestjs/commo
 import { DocumentsController } from "./documents.controller";
 import { DocumentsService } from "./documents.service";
 import type { DocumentRecord } from "../infrastructure/postgres/repositories/documents.repository";
+import type { UploadResult } from "./documents.service";
 
 // Mock the AI config module to avoid import-time env validation in unit tests
 vi.mock("../config/ai.js", () => ({
@@ -11,6 +12,12 @@ vi.mock("../config/ai.js", () => ({
     apiKey: "sk-or-test-key-123",
     maxTokens: 4096,
     temperature: 0.1,
+  },
+  CACHE_CONFIG: {
+    enabled: false,
+    responseCacheTtl: 604800,
+    textCacheTtl: 604800,
+    maxEntryBytes: 1048576,
   },
   UPLOAD_DIR: "/tmp/test-uploads",
 }));
@@ -29,6 +36,15 @@ function makeDocumentRecord(overrides: Partial<DocumentRecord> = {}): DocumentRe
     status: "processing",
     uploadedAt: new Date("2025-01-15T10:30:00Z"),
     filePath: null,
+    contentHash: null,
+    ...overrides,
+  };
+}
+
+function makeUploadResult(overrides: Partial<UploadResult> = {}): UploadResult {
+  return {
+    document: makeDocumentRecord(),
+    cacheHit: false,
     ...overrides,
   };
 }
@@ -41,14 +57,18 @@ function makeMockFile(
     originalname: "contract.pdf",
     encoding: "7bit",
     mimetype: "application/pdf",
-    destination: "/tmp/uploads",
-    filename: "random-hash.pdf",
-    path: "/tmp/uploads/random-hash.pdf",
+    destination: "",
+    filename: "contract.pdf",
+    path: "",
     size: 1024,
     stream: process.stdout as never,
     buffer: Buffer.from("fake-pdf-content"),
     ...overrides,
   };
+}
+
+function makeMockResponse(): { setHeader: ReturnType<typeof vi.fn> } {
+  return { setHeader: vi.fn() };
 }
 
 // ---------------------------------------------------------------------------
@@ -69,10 +89,12 @@ describe("DocumentsController", () => {
   describe("POST /upload", () => {
     it("should accept a multipart file and return Document shape", async () => {
       const record = makeDocumentRecord();
-      vi.spyOn(service, "upload").mockResolvedValue(record);
+      const uploadResult = makeUploadResult({ document: record });
+      vi.spyOn(service, "upload").mockResolvedValue(uploadResult);
 
       const file = makeMockFile();
-      const result = await controller.upload(file);
+      const res = makeMockResponse();
+      const result = await controller.upload(file, res as never);
 
       expect(result).toEqual({
         id: record.id,
@@ -87,15 +109,17 @@ describe("DocumentsController", () => {
         filename: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: file.size,
-        filePath: file.path,
+        fileBuffer: file.buffer,
+        contentHash: expect.any(String),
       });
     });
 
     it("should throw BadRequestException when no file is provided", async () => {
-      await expect(controller.upload(undefined as never)).rejects.toThrow(
+      const res = makeMockResponse();
+      await expect(controller.upload(undefined as never, res as never)).rejects.toThrow(
         BadRequestException,
       );
-      await expect(controller.upload(undefined as never)).rejects.toThrow(
+      await expect(controller.upload(undefined as never, res as never)).rejects.toThrow(
         "No file uploaded",
       );
     });
@@ -104,9 +128,10 @@ describe("DocumentsController", () => {
       vi.spyOn(service, "upload").mockRejectedValue(new Error("DB connection failed"));
 
       const file = makeMockFile();
+      const res = makeMockResponse();
 
       try {
-        await controller.upload(file);
+        await controller.upload(file, res as never);
         throw new Error("Expected upload to throw");
       } catch (error) {
         expect(error).toBeInstanceOf(InternalServerErrorException);
@@ -118,10 +143,12 @@ describe("DocumentsController", () => {
 
     it("should return Document with status 'processing' for a newly uploaded file", async () => {
       const record = makeDocumentRecord({ status: "processing" });
-      vi.spyOn(service, "upload").mockResolvedValue(record);
+      const uploadResult = makeUploadResult({ document: record, cacheHit: false });
+      vi.spyOn(service, "upload").mockResolvedValue(uploadResult);
 
       const file = makeMockFile();
-      const result = await controller.upload(file);
+      const res = makeMockResponse();
+      const result = await controller.upload(file, res as never);
 
       expect(result.status).toBe("processing");
     });
@@ -132,7 +159,8 @@ describe("DocumentsController", () => {
         mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         sizeBytes: 5242880,
       });
-      vi.spyOn(service, "upload").mockResolvedValue(record);
+      const uploadResult = makeUploadResult({ document: record });
+      vi.spyOn(service, "upload").mockResolvedValue(uploadResult);
 
       const file = makeMockFile({
         originalname: "report.docx",
@@ -140,13 +168,15 @@ describe("DocumentsController", () => {
         size: 5242880,
       });
 
-      const result = await controller.upload(file);
+      const res = makeMockResponse();
+      const result = await controller.upload(file, res as never);
 
       expect(service.upload).toHaveBeenCalledWith({
         filename: "report.docx",
         mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         sizeBytes: 5242880,
-        filePath: file.path,
+        fileBuffer: file.buffer,
+        contentHash: expect.any(String),
       });
 
       // Verify response reflects actual file metadata, not hardcoded values
@@ -155,6 +185,40 @@ describe("DocumentsController", () => {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       );
       expect(result.sizeBytes).toBe(5242880);
+    });
+
+    it("should include cachedFromDocumentId in response on cache hit", async () => {
+      const record = makeDocumentRecord({ status: "completed" });
+      const uploadResult = makeUploadResult({
+        document: record,
+        cacheHit: true,
+        cachedFromDocumentId: "original-doc-id",
+      });
+      vi.spyOn(service, "upload").mockResolvedValue(uploadResult);
+
+      const file = makeMockFile();
+      const res = makeMockResponse();
+      const result = await controller.upload(file, res as never);
+
+      expect(result.cachedFromDocumentId).toBe("original-doc-id");
+    });
+
+    it("should compute SHA-256 hash from file buffer", async () => {
+      const uploadResult = makeUploadResult();
+      vi.spyOn(service, "upload").mockResolvedValue(uploadResult);
+
+      const buffer = Buffer.from("deterministic-content");
+      const file = makeMockFile({ buffer });
+      const res = makeMockResponse();
+
+      await controller.upload(file, res as never);
+
+      const { createHash } = await import("node:crypto");
+      const expectedHash = createHash("sha256").update(buffer).digest("hex");
+
+      expect(service.upload).toHaveBeenCalledWith(
+        expect.objectContaining({ contentHash: expectedHash }),
+      );
     });
   });
 });
