@@ -43,12 +43,12 @@ Chain strategy: stacked-to-main
 
 ## PR #3: Upload Dedup
 
-- [ ] **3.1** `infrastructure/postgres/repositories/documents.repository.ts` — add `contentHash` to `DocumentRecord`+`CreateDocumentInput`; update `create()`; add `findByContentHashWithCompletedAnalysis(hash)` joining `analysis_results WHERE status='completed'`. Update spec. ~50L.
-- [ ] **3.2** `documents/documents.controller.ts` — switch multer to `memoryStorage`; compute `contentHash = SHA-256(file.buffer)`; pass buffer+hash to service. ~30L.
-- [ ] **3.3** `documents/documents.service.ts` — `UploadInput { fileBuffer, originalName, mimeType, contentHash }`; if `AI_CACHE_ENABLED` and dedup hit, return cached `{ documentId, analysisId, status, entities, cachedFromDocumentId }`; else write buffer to disk, create with `contentHash`, enqueue. Update spec. ~80L.
-- [ ] **3.4** Set `X-Cache` header in controller — `res.setHeader("X-Cache", hit?"HIT":"MISS")`; omit when flag disabled. Update spec. ~15L.
-- [ ] **3.5** Import `CacheModule` in `documents/documents.module.ts` if config needed. ~5L.
-- [ ] **3.6** Extend `documents.controller.integration.spec.ts` — upload→complete→re-upload; assert same `analysisId`+entities, `X-Cache:HIT`, one `documents` row, no new BullMQ job. ~60L.
+- [x] **3.1** `infrastructure/postgres/repositories/documents.repository.ts` — add `contentHash` to `DocumentRecord`+`CreateDocumentInput`; update `create()`; add `findByContentHashWithCompletedAnalysis(hash)` joining `analysis_results WHERE status='completed'`. Update spec. ~50L.
+- [x] **3.2** `documents/documents.controller.ts` — switch multer to `memoryStorage`; compute `contentHash = SHA-256(file.buffer)`; pass buffer+hash to service. ~30L.
+- [x] **3.3** `documents/documents.service.ts` — `UploadInput { fileBuffer, originalName, mimeType, contentHash }`; if `AI_CACHE_ENABLED` and dedup hit, return cached `{ documentId, analysisId, status, entities, cachedFromDocumentId }`; else write buffer to disk, create with `contentHash`, enqueue. Update spec. ~80L.
+- [x] **3.4** Set `X-Cache` header in controller — `res.setHeader("X-Cache", hit?"HIT":"MISS")`; omit when flag disabled. Update spec. ~15L.
+- [x] **3.5** Import `CacheModule` in `documents/documents.module.ts` if config needed. ~5L. (SKIPPED — `CACHE_CONFIG` accessed via static import, no DI needed)
+- [x] **3.6** Extend `documents.controller.integration.spec.ts` — upload→complete→re-upload; assert same `analysisId`+entities, `X-Cache:HIT`, one `documents` row, no new BullMQ job. ~60L.
 
 ## PR #4: Contracts, Env, Logs
 
