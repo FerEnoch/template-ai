@@ -5,4 +5,5 @@ export interface AnalysisJobPayload {
   documentId: string;
   ownerId: number;
   filePath: string | null;
+  contentHash?: string;
 }

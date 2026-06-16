@@ -31,6 +31,7 @@ const sampleRow: Record<string, unknown> = {
   status: "processing",
   uploaded_at: new Date("2025-01-01T00:00:00Z"),
   file_path: null,
+  content_hash: null,
 };
 
 const sampleInput: CreateDocumentInput = {
@@ -59,11 +60,12 @@ describe("DocumentsRepository", () => {
         status: "processing",
         uploadedAt: new Date("2025-01-01T00:00:00Z"),
         filePath: null,
+        contentHash: null,
       } satisfies DocumentRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO documents"),
-        [1, "contract.pdf", "application/pdf", 1024, null],
+        [1, "contract.pdf", "application/pdf", 1024, null, null],
       );
     });
 
@@ -76,16 +78,17 @@ describe("DocumentsRepository", () => {
       );
     });
 
-    it("inserts a document with filePath and returns mapped record", async () => {
-      const rowWithFilePath = { ...sampleRow, file_path: "/uploads/abc-123.pdf" };
-      const { client, querySpy } = mockPoolClient([rowWithFilePath]);
+    it("inserts a document with filePath and contentHash", async () => {
+      const rowWithHash = { ...sampleRow, file_path: "/uploads/abc-123.pdf", content_hash: "abc123hash" };
+      const { client, querySpy } = mockPoolClient([rowWithHash]);
       repo = new DocumentsRepository(client);
 
-      const inputWithFilePath: CreateDocumentInput = {
+      const inputWithHash: CreateDocumentInput = {
         ...sampleInput,
         filePath: "/uploads/abc-123.pdf",
+        contentHash: "abc123hash",
       };
-      const result = await repo.create(inputWithFilePath);
+      const result = await repo.create(inputWithHash);
 
       expect(result).toEqual({
         id: "550e8400-e29b-41d4-a716-446655440000",
@@ -96,11 +99,12 @@ describe("DocumentsRepository", () => {
         status: "processing",
         uploadedAt: new Date("2025-01-01T00:00:00Z"),
         filePath: "/uploads/abc-123.pdf",
+        contentHash: "abc123hash",
       } satisfies DocumentRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO documents"),
-        [1, "contract.pdf", "application/pdf", 1024, "/uploads/abc-123.pdf"],
+        [1, "contract.pdf", "application/pdf", 1024, "/uploads/abc-123.pdf", "abc123hash"],
       );
     });
   });
@@ -121,6 +125,7 @@ describe("DocumentsRepository", () => {
         status: "processing",
         uploadedAt: new Date("2025-01-01T00:00:00Z"),
         filePath: null,
+        contentHash: null,
       });
     });
 
@@ -209,6 +214,66 @@ describe("DocumentsRepository", () => {
 
       const result = await repo.delete("00000000-0000-0000-0000-000000000000");
       expect(result).toBe(false);
+    });
+  });
+
+  describe("findByContentHashWithCompletedAnalysis", () => {
+    it("returns document + analysis + entities when a completed analysis exists", async () => {
+      const completedRow = {
+        ...sampleRow,
+        content_hash: "sha256hash",
+        analysis_result_id: "ar-001",
+      };
+      const entityRow: Record<string, unknown> = {
+        id: "ent-001",
+        analysis_result_id: "ar-001",
+        document_id: sampleRow.id,
+        label: "Company",
+        value: "Acme Corp",
+        group: "organization",
+        confidence: "0.95",
+        source_span: null,
+        reviewed: false,
+        excluded: false,
+        user_created: false,
+      };
+
+      const querySpy = vi.fn()
+        .mockResolvedValueOnce({ rows: [completedRow], rowCount: 1 }) // JOIN query
+        .mockResolvedValueOnce({ rows: [entityRow], rowCount: 1 }); // entities query
+
+      const client = { query: querySpy, release: vi.fn() } as unknown as PoolClient;
+      repo = new DocumentsRepository(client);
+
+      const result = await repo.findByContentHashWithCompletedAnalysis("sha256hash");
+
+      expect(result).not.toBeNull();
+      expect(result!.document.contentHash).toBe("sha256hash");
+      expect(result!.analysisResultId).toBe("ar-001");
+      expect(result!.entities).toHaveLength(1);
+      expect(result!.entities[0].label).toBe("Company");
+
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("content_hash = $1"),
+        ["sha256hash"],
+      );
+    });
+
+    it("returns null when no completed analysis exists for the hash", async () => {
+      const { client } = mockPoolClient([]);
+      repo = new DocumentsRepository(client);
+
+      const result = await repo.findByContentHashWithCompletedAnalysis("nonexistent");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when analysis exists but status is not completed", async () => {
+      // The JOIN query filters by status='completed', so a processing row won't match
+      const { client } = mockPoolClient([]);
+      repo = new DocumentsRepository(client);
+
+      const result = await repo.findByContentHashWithCompletedAnalysis("processing-hash");
+      expect(result).toBeNull();
     });
   });
 });

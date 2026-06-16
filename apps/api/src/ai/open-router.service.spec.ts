@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
+import type { CachePort } from "../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -27,8 +28,24 @@ vi.mock("../config/ai.js", () => ({
     maxTokens: 8192,
     temperature: 0.1,
   },
+  CACHE_CONFIG: {
+    enabled: false,
+    responseCacheTtl: 604800,
+    textCacheTtl: 604800,
+    maxEntryBytes: 1048576,
+  },
   UPLOAD_DIR: "/tmp/test-uploads",
 }));
+
+function createMockCachePort(): CachePort {
+  return {
+    get: vi.fn(async () => null),
+    set: vi.fn(async () => {}),
+    getOrSet: vi.fn(async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
+      factory(),
+    ),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -36,10 +53,12 @@ vi.mock("../config/ai.js", () => ({
 
 describe("OpenRouterService", () => {
   let service: OpenRouterService;
+  let mockCachePort: CachePort;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new OpenRouterService();
+    mockCachePort = createMockCachePort();
+    service = new OpenRouterService(mockCachePort);
   });
 
   describe("extractEntities", () => {
@@ -276,6 +295,136 @@ describe("OpenRouterService", () => {
         expect(err).toBeInstanceOf(OpenRouterError);
         expect((err as OpenRouterError).code).toBe("INVALID_RESPONSE");
         expect((err as OpenRouterError).code).not.toBe("NETWORK_ERROR");
+      }
+    });
+  });
+
+  describe("classifySpan", () => {
+    it("should classify a text span and return label, group, value", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                label: "ARRENDATARIO",
+                group: "PARTES",
+                value: "Juan Pérez",
+              }),
+            },
+          },
+        ],
+      });
+
+      const result = await service.classifySpan(
+        "Juan Pérez",
+        "...entre Juan Pérez y María López...",
+      );
+
+      expect(result).toEqual({
+        label: "ARRENDATARIO",
+        group: "PARTES",
+        value: "Juan Pérez",
+      });
+    });
+
+    it("should use temperature 0 and max_tokens 150", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                label: "FECHA",
+                group: "FECHAS",
+                value: "20 de marzo de 2026",
+              }),
+            },
+          },
+        ],
+      });
+
+      await service.classifySpan("20 de marzo de 2026", "firmado el 20 de marzo de 2026");
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          temperature: 0,
+          max_tokens: 150,
+        }),
+      );
+    });
+
+    it("should parse JSON wrapped in markdown fences", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: '```json\n{"label": "PRECIO", "group": "INMUEBLE", "value": "$2,000,000"}\n```',
+            },
+          },
+        ],
+      });
+
+      const result = await service.classifySpan("$2,000,000", "por un precio de $2,000,000");
+
+      expect(result).toEqual({
+        label: "PRECIO",
+        group: "INMUEBLE",
+        value: "$2,000,000",
+      });
+    });
+
+    it("should throw OpenRouterError with INVALID_RESPONSE on malformed JSON", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: "I cannot classify this text.",
+            },
+          },
+        ],
+      });
+
+      try {
+        await service.classifySpan("some text", "context");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OpenRouterError);
+        expect((err as OpenRouterError).code).toBe("INVALID_RESPONSE");
+      }
+    });
+
+    it("should throw OpenRouterError with INVALID_RESPONSE on invalid group", async () => {
+      mockCreate.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                label: "FIELD",
+                group: "INVALID_GROUP",
+                value: "some value",
+              }),
+            },
+          },
+        ],
+      });
+
+      try {
+        await service.classifySpan("some text", "context");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OpenRouterError);
+        expect((err as OpenRouterError).code).toBe("INVALID_RESPONSE");
+      }
+    });
+
+    it("should throw NETWORK_ERROR on connection failure", async () => {
+      mockCreate.mockRejectedValue(new Error("Connection refused"));
+
+      try {
+        await service.classifySpan("text", "context");
+        expect.unreachable("Should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OpenRouterError);
+        expect((err as OpenRouterError).code).toBe("NETWORK_ERROR");
       }
     });
   });

@@ -168,7 +168,7 @@ describe("AnalysisProcessor", () => {
 
     await processor.process(job);
 
-    expect(analyze).toHaveBeenCalledWith("/uploads/test.pdf");
+    expect(analyze).toHaveBeenCalledWith("/uploads/test.pdf", undefined);
     expect(query).toHaveBeenCalledWith(expect.stringContaining("INSERT INTO entities"), expect.any(Array));
     expect(query).toHaveBeenCalledWith(
       expect.stringContaining("SET extracted_text = $2"),
@@ -257,6 +257,6 @@ describe("AnalysisProcessor", () => {
 
     await processor.process(job);
 
-    expect(analyze).toHaveBeenCalledWith("/uploads/from-db.pdf");
+    expect(analyze).toHaveBeenCalledWith("/uploads/from-db.pdf", undefined);
   });
 });

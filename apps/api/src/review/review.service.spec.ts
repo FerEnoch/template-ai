@@ -1,7 +1,31 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { NotFoundException } from "@nestjs/common";
+import { NotFoundException, ForbiddenException } from "@nestjs/common";
+
+// Mock AI config before importing service (OpenRouterService triggers env loading)
+vi.mock("../config/ai.js", () => ({
+  AI_CONFIG: {
+    model: "test-model",
+    modelFallback: undefined,
+    apiKey: "test-api-key",
+    maxTokens: 8192,
+    temperature: 0.1,
+  },
+  UPLOAD_DIR: "/tmp/test-uploads",
+}));
+
+vi.mock("../config/env.js", () => ({
+  getApiEnv: () => ({
+    PORT: 3000,
+    OPENROUTER_API_KEY: "test-key",
+    DATABASE_URL: "postgresql://test",
+    AUTH0_DOMAIN: "test.auth0.com",
+    AUTH0_AUDIENCE: "test-audience",
+  }),
+}));
+
 import { ReviewService } from "./review.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
+import { OpenRouterService, OpenRouterError } from "../ai/open-router.service";
 import type { EntityRecord } from "../infrastructure/postgres/repositories/entities.repository";
 
 // ---------------------------------------------------------------------------
@@ -20,15 +44,18 @@ function makeEntityRecord(overrides: Partial<EntityRecord> = {}): EntityRecord {
     sourceSpan: { start: 142, end: 163 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
     ...overrides,
   };
 }
 
 function createMockPostgresService(setup: {
-  entityRecord: EntityRecord | null;
+  entityRecord?: EntityRecord | null;
   updatedRecord?: EntityRecord | null;
+  createdRecord?: EntityRecord | null;
+  manualEntityCount?: number;
 }): PostgresService {
-  const { entityRecord, updatedRecord } = setup;
+  const { entityRecord = null, updatedRecord, createdRecord, manualEntityCount = 0 } = setup;
 
   const mockClient = {
     query: vi.fn((sql: string, _params?: unknown[]) => {
@@ -39,6 +66,29 @@ function createMockPostgresService(setup: {
       // BEGIN/COMMIT/ROLLBACK
       if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
         return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+
+      // COUNT user_created entities
+      if (sql.includes("COUNT(*)") && sql.includes("user_created")) {
+        return Promise.resolve({
+          rowCount: 1,
+          rows: [{ count: String(manualEntityCount) }],
+        });
+      }
+
+      // SELECT analysis_results (findByDocumentId)
+      if (sql.includes("FROM analysis_results") && sql.includes("WHERE document_id")) {
+        return Promise.resolve({
+          rowCount: 1,
+          rows: [
+            {
+              id: "analysis-uuid-1",
+              document_id: "doc-1",
+              status: "completed",
+              progress: 100,
+            },
+          ],
+        });
       }
 
       // SELECT entities (findById)
@@ -60,6 +110,33 @@ function createMockPostgresService(setup: {
               source_span: entityRecord.sourceSpan ?? null,
               reviewed: entityRecord.reviewed,
               excluded: entityRecord.excluded,
+              user_created: entityRecord.userCreated,
+            },
+          ],
+        });
+      }
+
+      // INSERT entities
+      if (sql.includes("INSERT INTO entities")) {
+        const record = createdRecord ?? entityRecord;
+        if (record === null) {
+          return Promise.resolve({ rowCount: 0, rows: [] });
+        }
+        return Promise.resolve({
+          rowCount: 1,
+          rows: [
+            {
+              id: record.id,
+              analysis_result_id: record.analysisResultId,
+              document_id: record.documentId,
+              label: record.label,
+              value: record.value,
+              group: record.group,
+              confidence: record.confidence,
+              source_span: record.sourceSpan ?? null,
+              reviewed: record.reviewed,
+              excluded: record.excluded,
+              user_created: record.userCreated,
             },
           ],
         });
@@ -85,6 +162,7 @@ function createMockPostgresService(setup: {
               source_span: record.sourceSpan ?? null,
               reviewed: record.reviewed,
               excluded: record.excluded,
+              user_created: record.userCreated,
             },
           ],
         });
@@ -114,6 +192,14 @@ function createMockPostgresService(setup: {
 // ---------------------------------------------------------------------------
 
 describe("ReviewService", () => {
+  let mockOpenRouter: OpenRouterService;
+
+  beforeEach(() => {
+    mockOpenRouter = {
+      classifySpan: vi.fn(),
+    } as unknown as OpenRouterService;
+  });
+
   describe("updateEntity", () => {
     it("should find entity by ID, merge partial update, and return updated entity", async () => {
       const existingRecord = makeEntityRecord({
@@ -135,7 +221,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       const result = await service.updateEntity("doc-1", "entity-1", {
         reviewed: true,
@@ -152,7 +238,7 @@ describe("ReviewService", () => {
       const mockPostgres = createMockPostgresService({
         entityRecord: null,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       await expect(
         service.updateEntity("doc-1", "nonexistent-id", { reviewed: true }),
@@ -179,7 +265,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       const result = await service.updateEntity("doc-2", "entity-2", {
         excluded: true,
@@ -210,7 +296,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       const result = await service.updateEntity("doc-3", "entity-3", {
         reviewed: true,
@@ -240,7 +326,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       const result = await service.updateEntity("doc-4", "entity-4", {
         reviewed: true,
@@ -267,7 +353,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       // Attacker tries to update entity-1 via a different documentId
       await expect(
@@ -295,12 +381,166 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres);
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       const result = await service.updateEntity("doc-1", "entity-1", { reviewed: true });
 
       expect(result.reviewed).toBe(true);
       expect(result.id).toBe("entity-1");
+    });
+  });
+
+  describe("classifySpan", () => {
+    it("should classify a span and return label, group, value", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      vi.spyOn(mockOpenRouter, "classifySpan").mockResolvedValue({
+        label: "ARRENDATARIO",
+        group: "PARTES",
+        value: "Juan Pérez",
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "Juan Pérez",
+        sourceSpan: { start: 34, end: 44 },
+        context: "...entre Juan Pérez y María López...",
+      });
+
+      expect(result.label).toBe("ARRENDATARIO");
+      expect(result.group).toBe("PARTES");
+      expect(result.value).toBe("Juan Pérez");
+      expect(mockOpenRouter.classifySpan).toHaveBeenCalledWith(
+        "Juan Pérez",
+        "...entre Juan Pérez y María López...",
+      );
+    });
+
+    it("should throw ForbiddenException when manual entity limit is reached", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 5,
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      await expect(
+        service.classifySpan("doc-1", {
+          text: "Juan Pérez",
+          sourceSpan: { start: 34, end: 44 },
+          context: "context",
+        }),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        service.classifySpan("doc-1", {
+          text: "Juan Pérez",
+          sourceSpan: { start: 34, end: 44 },
+          context: "context",
+        }),
+      ).rejects.toThrow("MANUAL_ENTITY_LIMIT_REACHED");
+    });
+
+    it("should retry once on network error", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      vi.spyOn(mockOpenRouter, "classifySpan")
+        .mockRejectedValueOnce(new OpenRouterError("Connection refused", "NETWORK_ERROR"))
+        .mockResolvedValueOnce({
+          label: "COMPRADOR",
+          group: "PARTES",
+          value: "Juan Pérez",
+        });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "Juan Pérez",
+        sourceSpan: { start: 0, end: 10 },
+        context: "context",
+      });
+
+      expect(result.label).toBe("COMPRADOR");
+      expect(mockOpenRouter.classifySpan).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("createEntity", () => {
+    it("should create a manual entity with userCreated: true", async () => {
+      const createdRecord = makeEntityRecord({
+        id: "new-entity-1",
+        documentId: "doc-1",
+        label: "CAMPO_CUSTOM",
+        value: "Valor Custom",
+        group: "ANEXOS",
+        confidence: "ALTA",
+        userCreated: true,
+      });
+
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 2,
+        createdRecord,
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      const result = await service.createEntity("doc-1", {
+        label: "CAMPO_CUSTOM",
+        value: "Valor Custom",
+        group: "ANEXOS",
+      });
+
+      expect(result.userCreated).toBe(true);
+      expect(result.label).toBe("CAMPO_CUSTOM");
+    });
+
+    it("should throw ForbiddenException when limit is reached", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 5,
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      await expect(
+        service.createEntity("doc-1", {
+          label: "FIELD",
+          value: "value",
+          group: "PARTES",
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe("countManualEntities", () => {
+    it("should return count, limit, and canAddMore", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 3,
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      const result = await service.countManualEntities("doc-1");
+
+      expect(result.count).toBe(3);
+      expect(result.limit).toBe(5);
+      expect(result.canAddMore).toBe(true);
+    });
+
+    it("should return canAddMore: false when at limit", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 5,
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      const result = await service.countManualEntities("doc-1");
+
+      expect(result.count).toBe(5);
+      expect(result.canAddMore).toBe(false);
     });
   });
 });

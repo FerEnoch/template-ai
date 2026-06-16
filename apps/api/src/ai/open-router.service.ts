@@ -1,8 +1,9 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
-import { AI_CONFIG } from "../config/ai.js";
+import { AI_CONFIG, CACHE_CONFIG } from "../config/ai.js";
+import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
 // Schema for validating AI response entities
@@ -118,6 +119,42 @@ const JSON_SCHEMA = {
 };
 
 // ---------------------------------------------------------------------------
+// Classification prompt for single-span entity classification
+// ---------------------------------------------------------------------------
+
+const CLASSIFY_SYSTEM_PROMPT = `Eres un asistente especializado en análisis de documentos legales mexicanos.
+Clasifica el fragmento de texto seleccionado dentro del contexto proporcionado.
+
+Responde EXCLUSIVAMENTE con un JSON object con estos campos:
+- label: nombre descriptivo del campo (ej: ARRENDATARIO, NOTARIO, FECHA_FIRMA, ESCRITURA_NUMERO)
+- group: categoría (PARTES, INMUEBLE, FECHAS, ANEXOS)
+- value: el valor exacto del fragmento seleccionado
+
+No incluyas texto adicional fuera del JSON.`;
+
+const CLASSIFY_JSON_SCHEMA = {
+  type: "object" as const,
+  additionalProperties: false,
+  properties: {
+    label: { type: "string" as const },
+    group: {
+      type: "string" as const,
+      enum: ["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"],
+    },
+    value: { type: "string" as const },
+  },
+  required: ["label", "group", "value"] as const,
+};
+
+const ClassifyResultSchema = z.object({
+  label: z.string().min(1),
+  group: z.enum(["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]),
+  value: z.string(),
+});
+
+export type ClassifyResult = z.infer<typeof ClassifyResultSchema>;
+
+// ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
@@ -126,16 +163,7 @@ export class OpenRouterService {
   private readonly client: OpenAI;
   private readonly logger = new Logger(OpenRouterService.name);
 
-  /**
-   * In-memory response cache to avoid redundant OpenRouter API calls during
-   * development/testing. Keyed by SHA-256 of the document text so identical
-   * documents hit the cache even when re-uploaded under different filenames.
-   *
-   * Cleared on process restart — no persistence needed (testing purpose only).
-   */
-  private readonly responseCache = new Map<string, ExtractEntitiesResult>();
-
-  constructor() {
+  constructor(@Inject(CACHE_PORT) private readonly cachePort: CachePort) {
     this.client = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: AI_CONFIG.apiKey,
@@ -155,26 +183,29 @@ export class OpenRouterService {
       );
     }
 
-    // Check in-memory cache before calling OpenRouter
     const cacheKey = createHash("sha256").update(documentText).digest("hex");
-    const cached = this.responseCache.get(cacheKey);
-    if (cached) {
-      this.logger.warn(
-        `⚡ CACHE HIT — skipping OpenRouter call (${cached.entities.length} entities, sha256=${cacheKey.slice(0, 12)}…)`,
+
+    if (CACHE_CONFIG.enabled) {
+      return this.cachePort.getOrSet(
+        `ai:resp:${cacheKey}`,
+        CACHE_CONFIG.responseCacheTtl,
+        () => this.callModelWithFallback(model, documentText),
       );
-      return cached;
     }
 
+    return this.callModelWithFallback(model, documentText);
+  }
+
+  /**
+   * Call the primary model with fallback to secondary on MODEL_NOT_FOUND or RATE_LIMIT.
+   */
+  private async callModelWithFallback(
+    model: string,
+    documentText: string,
+  ): Promise<ExtractEntitiesResult> {
     try {
-      this.logger.warn(
-        `🟡 API CALL — calling OpenRouter model "${model}" (cache miss, sha256=${cacheKey.slice(0, 12)}…)`,
-      );
-      const result = await this.callModel(model, documentText);
-      // Cache successful result for future identical documents
-      this.responseCache.set(cacheKey, result);
-      return result;
+      return await this.callModel(model, documentText);
     } catch (error) {
-      // Fallback: retry with secondary model on MODEL_NOT_FOUND or RATE_LIMIT
       if (
         error instanceof OpenRouterError &&
         (error.code === "MODEL_NOT_FOUND" || error.code === "RATE_LIMIT") &&
@@ -186,8 +217,109 @@ export class OpenRouterService {
         );
         return await this.callModel(AI_CONFIG.modelFallback, documentText);
       }
-
       throw error;
+    }
+  }
+
+  /**
+   * Classify a single text span with surrounding context.
+   * Uses a narrow prompt with temperature=0, max_tokens=150 for fast, deterministic results.
+   */
+  async classifySpan(text: string, context: string): Promise<ClassifyResult> {
+    const model = AI_CONFIG.model;
+    if (!model) {
+      throw new OpenRouterError(
+        "AI_MODEL is not configured. Set AI_MODEL in your environment.",
+        "MODEL_NOT_CONFIGURED",
+      );
+    }
+
+    const userMessage = `Contexto del documento:\n${context}\n\nFragmento seleccionado: "${text}"\n\nClasifica este fragmento.`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model,
+        max_tokens: 150,
+        temperature: 0,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "classify_span",
+            strict: true,
+            schema: CLASSIFY_JSON_SCHEMA,
+          },
+        },
+        messages: [
+          { role: "system", content: CLASSIFY_SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+      });
+
+      const rawResponse = response.choices[0]?.message?.content ?? "";
+
+      // Strip markdown fences — some models wrap JSON in ```json blocks
+      const stripMarkdownFences = (t: string): string => {
+        const trimmed = t.trim();
+        const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/);
+        return fenceMatch ? fenceMatch[1].trim() : trimmed;
+      };
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(stripMarkdownFences(rawResponse));
+      } catch (parseError) {
+        this.logger.error(
+          `Invalid JSON from classifySpan: ${(parseError as Error).message}`,
+        );
+        throw new OpenRouterError(
+          `Invalid JSON response from classifySpan: ${(parseError as Error).message}`,
+          "INVALID_RESPONSE",
+        );
+      }
+
+      const result = ClassifyResultSchema.safeParse(parsed);
+      if (!result.success) {
+        throw new OpenRouterError(
+          `Zod validation failed for classifySpan: ${result.error.message}`,
+          "INVALID_RESPONSE",
+        );
+      }
+
+      return result.data;
+    } catch (error) {
+      if (error instanceof OpenRouterError) {
+        throw error;
+      }
+
+      if (error instanceof SyntaxError) {
+        throw new OpenRouterError(
+          `Invalid JSON response: ${error.message}`,
+          "INVALID_RESPONSE",
+        );
+      }
+
+      const status = (error as { status?: number })?.status ?? 0;
+
+      if (status === 401) {
+        throw new OpenRouterError("Invalid OPENROUTER_API_KEY", "AUTH_ERROR");
+      }
+      if (status === 404) {
+        throw new OpenRouterError(`Model not found: ${model}`, "MODEL_NOT_FOUND");
+      }
+      if (status === 429) {
+        throw new OpenRouterError("Rate limit exceeded", "RATE_LIMIT");
+      }
+      if (status > 0) {
+        throw new OpenRouterError(
+          `OpenRouter API error: ${error instanceof Error ? error.message : String(error)}`,
+          "API_ERROR",
+        );
+      }
+
+      throw new OpenRouterError(
+        `OpenRouter API unreachable: ${error instanceof Error ? error.message : String(error)}`,
+        "NETWORK_ERROR",
+      );
     }
   }
 

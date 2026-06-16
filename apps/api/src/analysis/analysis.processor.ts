@@ -8,7 +8,12 @@ import { DocumentsRepository } from "../infrastructure/postgres/repositories/doc
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
 import { ANALYSIS_QUEUE, type AnalysisJobPayload } from "./analysis.queue";
 
-@Processor(ANALYSIS_QUEUE, { concurrency: 2 })
+@Processor(ANALYSIS_QUEUE, {
+  concurrency: 2,
+  lockDuration: 120_000, // 2 min — default 30s causes stalls on slow AI calls
+  stalledInterval: 60_000, // Check for stalls every 60s instead of default 30s
+  maxStalledCount: 1, // Allow 1 stall before failing (default 0 fails immediately)
+})
 export class AnalysisProcessor extends WorkerHost {
   private readonly logger = new Logger(AnalysisProcessor.name);
 
@@ -17,10 +22,11 @@ export class AnalysisProcessor extends WorkerHost {
     private readonly documentAnalysisService: DocumentAnalysisService,
   ) {
     super();
+    this.logger.log("AnalysisProcessor instantiated — worker should start shortly");
   }
 
   public async process(job: Job<AnalysisJobPayload>) {
-    const { analysisResultId, documentId, ownerId, filePath } = job.data;
+    const { analysisResultId, documentId, ownerId, filePath, contentHash } = job.data;
     const maxAttempts = typeof job.opts.attempts === "number" ? job.opts.attempts : 1;
     const currentAttempt = job.attemptsMade + 1;
 
@@ -33,7 +39,10 @@ export class AnalysisProcessor extends WorkerHost {
       return documentsRepo.findById(documentId);
     });
 
-    const analysisResult = await this.documentAnalysisService.analyze(document?.filePath ?? filePath ?? null);
+    const analysisResult = await this.documentAnalysisService.analyze(
+      document?.filePath ?? filePath ?? null,
+      contentHash,
+    );
 
     if (!analysisResult.success) {
       const errorMessage = analysisResult.error ?? "Unknown error";
