@@ -308,6 +308,37 @@ describe("EntityInspector", () => {
       expect(onEntityHover).toHaveBeenCalledWith("entity-no-span");
     });
 
+    it("calls onEntityHover for excluded entities", () => {
+      const onEntityHover = vi.fn();
+      const excludedEntity: Entity = {
+        id: "entity-excluded",
+        label: "EXCLUIDO",
+        value: "Valor excluido",
+        group: "PARTES",
+        confidence: "ALTA",
+        reviewed: false,
+        excluded: true,
+        userCreated: false,
+      };
+
+      render(
+        <EntityInspector
+          entities={[excludedEntity]}
+          onEntityUpdate={vi.fn()}
+          onEntityHover={onEntityHover}
+        />,
+      );
+
+      // Show excluded entities first (hidden by default)
+      const toggleButton = screen.getByText(/Mostrar entidades excluidas/);
+      fireEvent.click(toggleButton);
+
+      const entityRow = screen.getByText("Valor excluido").closest("button")!;
+      fireEvent.mouseEnter(entityRow);
+
+      expect(onEntityHover).toHaveBeenCalledWith("entity-excluded");
+    });
+
     it("does not throw when onEntityHover is not provided", () => {
       render(<EntityInspector {...defaultProps} />);
 
