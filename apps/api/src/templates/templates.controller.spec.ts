@@ -168,7 +168,7 @@ describe("TemplatesController", () => {
 
     it("should propagate ConflictException when service detects duplicate name", async () => {
       vi.spyOn(service, "create").mockRejectedValue(
-        new ConflictException("A template with this name already exists"),
+        new ConflictException('Ya existe una plantilla llamada "Duplicate Template". Elegí otro nombre.'),
       );
 
       const body = {
@@ -181,7 +181,9 @@ describe("TemplatesController", () => {
       };
 
       await expect(controller.create(body)).rejects.toThrow(ConflictException);
-      await expect(controller.create(body)).rejects.toThrow("A template with this name already exists");
+      await expect(controller.create(body)).rejects.toThrow(
+        'Ya existe una plantilla llamada "Duplicate Template". Elegí otro nombre.',
+      );
     });
   });
 });

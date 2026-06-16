@@ -8,6 +8,8 @@ import {
   Calendar,
   CheckCircle2,
   Loader2,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { WizardLayout, SaveForm } from "@/components/wizard";
@@ -234,7 +236,24 @@ function SaveContent({
                   </div>
 
                   {errorMessage && (
-                    <p className="text-sm font-medium text-danger">{errorMessage}</p>
+                    <div className="flex items-start gap-3 rounded-lg border border-danger/20 bg-danger/5 p-4">
+                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-danger">
+                          No se pudo guardar la plantilla
+                        </p>
+                        <p className="mt-1 text-sm text-text-secondary">
+                          {errorMessage}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setErrorMessage(null)}
+                        className="shrink-0 rounded p-1 text-text-disabled transition-colors hover:text-text-secondary hover:bg-border/30"
+                        aria-label="Cerrar error"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
                 </>
               )}

@@ -268,7 +268,7 @@ export const handlers = [
     const mockError = getMockError(request);
     if (mockError === "save-409") {
       return HttpResponse.json(
-        { error: "A template with this name already exists" },
+        { error: 'Ya existe una plantilla llamada "Contrato de Compraventa". Elegí otro nombre.' },
         { status: 409 }
       );
     }

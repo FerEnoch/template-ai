@@ -104,7 +104,9 @@ export class TemplatesService {
         return this.mapToResponse(record);
       } catch (error: unknown) {
         if (isUniqueViolation(error)) {
-          throw new ConflictException("A template with this name already exists");
+          throw new ConflictException(
+            `Ya existe una plantilla llamada "${data.name}". Elegí otro nombre.`,
+          );
         }
         throw error;
       }

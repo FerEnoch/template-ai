@@ -356,7 +356,7 @@ describe("TemplatesService", () => {
           category: "legal",
           status: "draft",
         }),
-      ).rejects.toThrow("A template with this name already exists");
+      ).rejects.toThrow('Ya existe una plantilla llamada "Duplicate Name". Elegí otro nombre.');
     });
 
     it("should store entities as JSONB snapshot when creating a template", async () => {

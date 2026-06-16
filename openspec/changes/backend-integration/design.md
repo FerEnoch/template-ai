@@ -267,7 +267,7 @@ async create(@Body() body: unknown) {
 |--------|---------|----------------|
 | 400 | Zod validation failure | `{ error: string }` |
 | 404 | Entity/document not found | `{ error: "Entity not found" }` |
-| 409 | Duplicate template name | `{ error: "A template with this name already exists" }` |
+| 409 | Duplicate template name | `{ error: 'Ya existe una plantilla llamada "..." . Elegí otro nombre.' }` |
 | 500 | Unhandled server error | `{ error: string }` |
 
 ## Testing Strategy
