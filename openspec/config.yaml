@@ -1,0 +1,28 @@
+context:
+  project: template-ai
+  stack: "Monorepo pnpm — apps/api (NestJS+TS+PostgreSQL), apps/web (Next.js+React+TS), packages/contracts (Zod)"
+  conventions: "SDD via OpenSpec. RLS auth with app.current_user_id. POC userId=0. Ports & Adapters."
+
+strict_tdd: true
+
+testing:
+  api:
+    command: "pnpm --filter @template-ai/api test"
+    framework: Vitest
+  web:
+    command: "pnpm --filter @template-ai/web test"
+    framework: Vitest
+  e2e:
+    command: "pnpm --filter @template-ai/web test:e2e"
+    framework: Playwright
+  typecheck: "pnpm typecheck"
+  coverage: "npx vitest --coverage"
+
+quality:
+  formatter: "pnpm format (Prettier)"
+  linter: "pnpm lint (ESLint)"
+  typescript: strict
+
+phases:
+  apply: "Strict TDD — tests first"
+  archive: "Sync delta specs before moving"
