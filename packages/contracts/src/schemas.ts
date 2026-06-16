@@ -97,6 +97,49 @@ export const WizardDraftSchema = z.object({
   savedAt: z.string().datetime(),
 });
 
+// --- Case schemas ---
+
+// Case status enum: lifecycle states for a legal case
+export const CaseStatus = z.enum([
+  "borrador",
+  "generado",
+  "exportado",
+  "archivado",
+]);
+
+// Case schema: full case entity with form data and generated text
+export const CaseSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.number(),
+  templateId: z.string().uuid(),
+  status: CaseStatus,
+  formData: z.record(z.string(), z.string()),
+  generatedText: z.string().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+// Create case request: requires a valid template reference
+export const CreateCaseRequestSchema = z.object({
+  templateId: z.string().uuid(),
+});
+
+// Update case form data: partial form data merge, optional status for archiving
+export const UpdateCaseFormDataSchema = z.object({
+  formData: z.record(z.string(), z.string()).optional(),
+  status: CaseStatus.optional(),
+});
+
+// Generate document response: AI-generated text (must be non-empty)
+export const GenerateDocumentResponseSchema = z.object({
+  generatedText: z.string().min(1),
+});
+
+// Export request: output format selection
+export const ExportRequestSchema = z.object({
+  format: z.enum(["pdf", "docx"]),
+});
+
 // Infer types from schemas
 export type Document = z.infer<typeof DocumentSchema>;
 export type Entity = z.infer<typeof EntitySchema>;
@@ -105,3 +148,10 @@ export type Template = z.infer<typeof TemplateSchema>;
 export type WizardDraft = z.infer<typeof WizardDraftSchema>;
 export type ClassifySpanRequest = z.infer<typeof ClassifySpanRequestSchema>;
 export type ClassifySpanResponse = z.infer<typeof ClassifySpanResponseSchema>;
+export type Case = z.infer<typeof CaseSchema>;
+export type CreateCaseRequest = z.infer<typeof CreateCaseRequestSchema>;
+export type UpdateCaseFormData = z.infer<typeof UpdateCaseFormDataSchema>;
+export type GenerateDocumentResponse = z.infer<
+  typeof GenerateDocumentResponseSchema
+>;
+export type ExportRequest = z.infer<typeof ExportRequestSchema>;
