@@ -38,6 +38,7 @@ export type WizardAction =
       extractedText: string | null;
     }
   | { type: "UPDATE_ENTITY"; entity: Entity }
+  | { type: "ADD_ENTITY"; entity: Entity }
   | { type: "SET_DRAFT"; draft: WizardState }
   | { type: "LOAD_DRAFT"; draft: WizardState }
   | { type: "RESET" };

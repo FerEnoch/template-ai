@@ -88,4 +88,80 @@ describe("renderHighlightedText", () => {
     expect(document.querySelectorAll("mark")).toHaveLength(1);
     expect(container.textContent).toBe(text);
   });
+
+  describe("hover variant", () => {
+    it("applies elevated classes when hoveredEntityId matches an ALTA entity", () => {
+      const text = "Juan Pérez firma en Madrid";
+      const entities: Entity[] = [
+        createEntity("1", 0, 10, "ALTA"),
+        createEntity("2", 20, 26, "MEDIA"),
+      ];
+
+      render(
+        <div>
+          {renderHighlightedText(text, entities, { hoveredEntityId: "1" })}
+        </div>,
+      );
+
+      const marks = document.querySelectorAll("mark");
+      expect(marks).toHaveLength(2);
+
+      // Hovered ALTA entity gets elevated classes
+      expect(marks[0].className).toContain("bg-success/35");
+      expect(marks[0].className).toContain("border-success");
+      expect(marks[0].className).not.toContain("bg-success/20");
+
+      // Non-hovered entity keeps default classes
+      expect(marks[1].className).toContain("bg-warning/20");
+      expect(marks[1].className).toContain("border-warning/50");
+    });
+
+    it("keeps default classes when hoveredEntityId does not match any entity", () => {
+      const text = "Juan Pérez firma en Madrid";
+      const entities: Entity[] = [
+        createEntity("1", 0, 10, "ALTA"),
+        createEntity("2", 20, 26, "MEDIA"),
+      ];
+
+      render(
+        <div>
+          {renderHighlightedText(text, entities, {
+            hoveredEntityId: "non-existent",
+          })}
+        </div>,
+      );
+
+      const marks = document.querySelectorAll("mark");
+      expect(marks).toHaveLength(2);
+
+      // All marks keep default classes
+      expect(marks[0].className).toContain("bg-success/20");
+      expect(marks[0].className).toContain("border-success/50");
+      expect(marks[1].className).toContain("bg-warning/20");
+      expect(marks[1].className).toContain("border-warning/50");
+    });
+
+    it("keeps default classes when hoveredEntityId is null", () => {
+      const text = "Juan Pérez firma en Madrid";
+      const entities: Entity[] = [
+        createEntity("1", 0, 10, "ALTA"),
+        createEntity("2", 20, 26, "MEDIA"),
+      ];
+
+      render(
+        <div>
+          {renderHighlightedText(text, entities, { hoveredEntityId: null })}
+        </div>,
+      );
+
+      const marks = document.querySelectorAll("mark");
+      expect(marks).toHaveLength(2);
+
+      // All marks keep default classes
+      expect(marks[0].className).toContain("bg-success/20");
+      expect(marks[0].className).toContain("border-success/50");
+      expect(marks[1].className).toContain("bg-warning/20");
+      expect(marks[1].className).toContain("border-warning/50");
+    });
+  });
 });

@@ -1,7 +1,15 @@
 import type { Entity } from "@template-ai/contracts";
 import type { ReactNode } from "react";
 
-export function renderHighlightedText(text: string, entities: Entity[]): ReactNode {
+interface HighlightOptions {
+  hoveredEntityId?: string | null;
+}
+
+export function renderHighlightedText(
+  text: string,
+  entities: Entity[],
+  options?: HighlightOptions,
+): ReactNode {
   const sorted = entities
     .filter((entity) => entity.sourceSpan)
     .sort((a, b) => a.sourceSpan!.start - b.sourceSpan!.start);
@@ -27,10 +35,16 @@ export function renderHighlightedText(text: string, entities: Entity[]): ReactNo
       );
     }
 
+    const isHovered = entity.id === options?.hoveredEntityId;
+
     const colorClass =
       entity.confidence === "ALTA"
-        ? "bg-success/20 border-b-2 border-success/50"
-        : "bg-warning/20 border-b-2 border-warning/50";
+        ? isHovered
+          ? "bg-success/35 border-b-2 border-success"
+          : "bg-success/20 border-b-2 border-success/50"
+        : isHovered
+          ? "bg-warning/35 border-b-2 border-warning"
+          : "bg-warning/20 border-b-2 border-warning/50";
 
     segments.push(
       <mark
