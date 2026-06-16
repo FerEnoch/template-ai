@@ -253,4 +253,70 @@ describe("EntityInspector", () => {
     expect(screen.getByText("Editar entidad")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Juan Pérez")).toBeInTheDocument();
   });
+
+  describe("onEntityHover", () => {
+    it("calls onEntityHover with entity id on mouseEnter", () => {
+      const onEntityHover = vi.fn();
+      render(
+        <EntityInspector {...defaultProps} onEntityHover={onEntityHover} />,
+      );
+
+      const entityRow = screen.getByText("Juan Pérez").closest("button")!;
+      fireEvent.mouseEnter(entityRow);
+
+      expect(onEntityHover).toHaveBeenCalledWith("entity-1");
+    });
+
+    it("calls onEntityHover with null on mouseLeave", () => {
+      const onEntityHover = vi.fn();
+      render(
+        <EntityInspector {...defaultProps} onEntityHover={onEntityHover} />,
+      );
+
+      const entityRow = screen.getByText("Juan Pérez").closest("button")!;
+      fireEvent.mouseLeave(entityRow);
+
+      expect(onEntityHover).toHaveBeenCalledWith(null);
+    });
+
+    it("calls onEntityHover for entities without sourceSpan", () => {
+      const onEntityHover = vi.fn();
+      const entitiesWithoutSpan: Entity[] = [
+        {
+          id: "entity-no-span",
+          label: "NOTARIO",
+          value: "Dr. García",
+          group: "PARTES",
+          confidence: "ALTA",
+          reviewed: false,
+          excluded: false,
+          userCreated: false,
+        },
+      ];
+
+      render(
+        <EntityInspector
+          entities={entitiesWithoutSpan}
+          onEntityUpdate={vi.fn()}
+          onEntityHover={onEntityHover}
+        />,
+      );
+
+      const entityRow = screen.getByText("Dr. García").closest("button")!;
+      fireEvent.mouseEnter(entityRow);
+
+      expect(onEntityHover).toHaveBeenCalledWith("entity-no-span");
+    });
+
+    it("does not throw when onEntityHover is not provided", () => {
+      render(<EntityInspector {...defaultProps} />);
+
+      const entityRow = screen.getByText("Juan Pérez").closest("button")!;
+
+      expect(() => {
+        fireEvent.mouseEnter(entityRow);
+        fireEvent.mouseLeave(entityRow);
+      }).not.toThrow();
+    });
+  });
 });

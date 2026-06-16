@@ -45,6 +45,7 @@ function ReviewInner() {
 
   const [pendingBajaCount, setPendingBajaCount] = useState(0);
   const [isConfirmEnabled, setIsConfirmEnabled] = useState(false);
+  const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
 
   // Manual entity creation state
   const [isClassifying, setIsClassifying] = useState(false);
@@ -250,7 +251,7 @@ function ReviewInner() {
               >
                 {state.extractedText ? (
                   <div className="prose prose-sm max-w-none whitespace-pre-wrap font-body text-sm leading-relaxed text-text-primary">
-                    {renderHighlightedText(state.extractedText, state.entities)}
+                    {renderHighlightedText(state.extractedText, state.entities, { hoveredEntityId })}
                   </div>
                 ) : (
                   <p className="text-sm text-text-secondary">
@@ -374,6 +375,7 @@ function ReviewInner() {
                 onEntityUpdate={handleEntityUpdate}
                 onAddEntity={handleAddEntity}
                 manualEntityCount={manualEntityCount}
+                onEntityHover={setHoveredEntityId}
               />
             </div>
           </section>

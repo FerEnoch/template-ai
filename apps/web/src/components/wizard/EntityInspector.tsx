@@ -24,6 +24,7 @@ interface EntityInspectorProps {
   onAddEntity?: () => void;
   manualEntityCount?: number;
   manualEntityLimit?: number;
+  onEntityHover?: (entityId: string | null) => void;
 }
 
 const GROUP_CONFIG: Record<
@@ -68,6 +69,7 @@ export function EntityInspector({
   onAddEntity,
   manualEntityCount = 0,
   manualEntityLimit = MANUAL_ENTITY_LIMIT,
+  onEntityHover,
 }: EntityInspectorProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<Group>>(
     new Set(["PARTES"])
@@ -282,6 +284,8 @@ export function EntityInspector({
                         <button
                           key={entity.id}
                           onClick={() => handleEditEntity(entity)}
+                          onMouseEnter={() => onEntityHover?.(entity.id)}
+                          onMouseLeave={() => onEntityHover?.(null)}
                           className={`group flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-background ${
                             isExcluded ? "opacity-50" : ""
                           }`}
