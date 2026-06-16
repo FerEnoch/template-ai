@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bullmq";
 import { HealthController } from "./health/health.controller";
 import { DatabaseModule } from "./infrastructure/postgres/database.module";
+import { CacheModule } from "./infrastructure/redis/redis-cache.module";
 import { DomainSchemaFirstModule } from "./domain-schema-first/domain-schema-first.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { AnalysisModule } from "./analysis/analysis.module";
@@ -19,6 +20,7 @@ import { AiModule } from "./ai/ai.module.js";
       },
     }),
     DatabaseModule,
+    CacheModule,
     DomainSchemaFirstModule,
     DocumentsModule,
     AnalysisModule,

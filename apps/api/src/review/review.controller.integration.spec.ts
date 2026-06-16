@@ -4,20 +4,24 @@
  * Validates the full HTTP cycle: update entity fields (reviewed, value, excluded),
  * verify 404 on missing entity.
  * When DATABASE_URL is not set, the suite is skipped silently.
- * Run with DATABASE_URL set to execute against a real PostgreSQL instance.
  */
 
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, afterEach } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import type { Pool } from "pg";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Shared state
 // ---------------------------------------------------------------------------
 
 let pool: Pool | null = null;
+let app: INestApplication | null = null;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 async function setupPool(): Promise<Pool | null> {
   if (!DATABASE_URL) return null;
@@ -127,26 +131,44 @@ describe("Review integration: POST /api/review/:documentId/entities/:entityId", 
     if (!DATABASE_URL) return;
     pool = await setupPool();
     if (!pool) return;
-    await cleanReviewTables();
-  });
 
-  afterAll(async () => {
-    if (pool) {
-      await cleanReviewTables();
-      await pool.end();
-    }
-  });
-
-  it("updates entity reviewed and value fields, returns updated entity", async () => {
-    if (!pool) return;
-
+    // Bootstrap NestJS app ONCE — shared across all tests
     const { Test } = await import("@nestjs/testing");
     const { ReviewModule } = await import("./review.module.js");
     const { DocumentsModule } = await import("../documents/documents.module.js");
     const { AnalysisModule } = await import("../analysis/analysis.module.js");
+
+    const moduleFixture = await Test.createTestingModule({
+      imports: [ReviewModule, DocumentsModule, AnalysisModule],
+    }).compile();
+    app = moduleFixture.createNestApplication({ logger: false });
+    app.setGlobalPrefix("api");
+    await app.init();
+
+    await cleanReviewTables();
+  });
+
+  afterEach(async () => {
+    if (pool) await cleanReviewTables();
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+      app = null;
+    }
+    if (pool) {
+      await cleanReviewTables();
+      await pool.end();
+      pool = null;
+    }
+  });
+
+  it("updates entity reviewed and value fields, returns updated entity", async () => {
+    if (!pool || !app) return;
+
     const request = (await import("supertest")).default;
 
-    // Ensure user exists for RLS
     await createUserAs(0, {
       email: "review-int@example.com",
       displayName: "Review Int",
@@ -155,38 +177,20 @@ describe("Review integration: POST /api/review/:documentId/entities/:entityId", 
 
     const { documentId, entityId } = await insertDocumentAnalysisAndEntity();
 
-    // Bootstrap NestJS app
-    const moduleFixture = await Test.createTestingModule({
-      imports: [ReviewModule, DocumentsModule, AnalysisModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const res = await request(app.getHttpServer())
+      .post(`/api/review/${documentId}/entities/${entityId}`)
+      .send({ reviewed: true, value: "Juan Pérez" });
 
-    try {
-      // Update reviewed and value
-      const res = await request(app.getHttpServer())
-        .post(`/api/review/${documentId}/entities/${entityId}`)
-        .send({ reviewed: true, value: "Juan Pérez" });
-
-      expect(res.status).toBe(201);
-      expect(res.body.id).toBe(entityId);
-      expect(res.body.reviewed).toBe(true);
-      expect(res.body.value).toBe("Juan Pérez");
-      expect(res.body.excluded).toBe(false);
-    } finally {
-      await app.close();
-      await cleanReviewTables();
-    }
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe(entityId);
+    expect(res.body.reviewed).toBe(true);
+    expect(res.body.value).toBe("Juan Pérez");
+    expect(res.body.excluded).toBe(false);
   });
 
   it("updates entity excluded field only", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { ReviewModule } = await import("./review.module.js");
-    const { DocumentsModule } = await import("../documents/documents.module.js");
-    const { AnalysisModule } = await import("../analysis/analysis.module.js");
     const request = (await import("supertest")).default;
 
     await createUserAs(0, {
@@ -197,52 +201,25 @@ describe("Review integration: POST /api/review/:documentId/entities/:entityId", 
 
     const { documentId, entityId } = await insertDocumentAnalysisAndEntity();
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [ReviewModule, DocumentsModule, AnalysisModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const res = await request(app.getHttpServer())
+      .post(`/api/review/${documentId}/entities/${entityId}`)
+      .send({ excluded: true });
 
-    try {
-      const res = await request(app.getHttpServer())
-        .post(`/api/review/${documentId}/entities/${entityId}`)
-        .send({ excluded: true });
-
-      expect(res.status).toBe(201);
-      expect(res.body.excluded).toBe(true);
-      expect(res.body.reviewed).toBe(false);
-    } finally {
-      await app.close();
-      await cleanReviewTables();
-    }
+    expect(res.status).toBe(201);
+    expect(res.body.excluded).toBe(true);
+    expect(res.body.reviewed).toBe(false);
   });
 
   it("returns 404 for non-existent entity", async () => {
-    if (!pool) return;
+    if (!pool || !app) return;
 
-    const { Test } = await import("@nestjs/testing");
-    const { ReviewModule } = await import("./review.module.js");
-    const { DocumentsModule } = await import("../documents/documents.module.js");
-    const { AnalysisModule } = await import("../analysis/analysis.module.js");
     const request = (await import("supertest")).default;
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [ReviewModule, DocumentsModule, AnalysisModule],
-    }).compile();
-    const app: INestApplication = moduleFixture.createNestApplication();
-    app.setGlobalPrefix("api");
-    await app.init();
+    const res = await request(app.getHttpServer())
+      .post("/api/review/00000000-0000-0000-0000-000000000000/entities/00000000-0000-0000-0000-000000000000")
+      .send({ reviewed: true });
 
-    try {
-      const res = await request(app.getHttpServer())
-        .post("/api/review/00000000-0000-0000-0000-000000000000/entities/00000000-0000-0000-0000-000000000000")
-        .send({ reviewed: true });
-
-      expect(res.status).toBe(404);
-      expect(res.body.error).toBe("Entity not found");
-    } finally {
-      await app.close();
-    }
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Entity not found");
   });
 });

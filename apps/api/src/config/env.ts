@@ -8,6 +8,7 @@ export type ApiEnv = {
   OPENROUTER_API_KEY: string;
   REDIS_HOST: string;
   REDIS_PORT: number;
+  AI_CACHE_ENABLED: boolean;
 };
 
 const allowedNodeEnvs: readonly NodeEnv[] = ["development", "test", "production"];
@@ -101,6 +102,16 @@ function parseRedisPort(value: string | undefined): number {
   return port;
 }
 
+function parseAiCacheEnabled(value: string | undefined): boolean {
+  // Default to false — cache is opt-in
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase().trim();
+  return normalized === "true" || normalized === "1";
+}
+
 let cachedApiEnv: ApiEnv | null = null;
 
 export function getApiEnv(): ApiEnv {
@@ -116,6 +127,7 @@ export function getApiEnv(): ApiEnv {
     OPENROUTER_API_KEY: parseOpenRouterApiKey(process.env.OPENROUTER_API_KEY),
     REDIS_HOST: parseRedisHost(process.env.REDIS_HOST),
     REDIS_PORT: parseRedisPort(process.env.REDIS_PORT),
+    AI_CACHE_ENABLED: parseAiCacheEnabled(process.env.AI_CACHE_ENABLED),
   };
 
   return cachedApiEnv;
@@ -127,10 +139,17 @@ function handleFatalError(message: string): never {
   process.exit(1);
 }
 
-// Trap startup errors to guarantee non-zero exit
-process.on("uncaughtException", (err) => {
-  if (err.message.includes("[api env]")) {
-    handleFatalError(err.message.replace("[api env] ", ""));
-  }
-  process.exit(1);
-});
+// Trap startup errors to guarantee non-zero exit.
+// Guarded to prevent duplicate listeners when the module is re-imported
+// (e.g., across test files in the same pool).
+let fatalErrorHandlerRegistered = false;
+
+if (!fatalErrorHandlerRegistered) {
+  fatalErrorHandlerRegistered = true;
+  process.on("uncaughtException", (err) => {
+    if (err.message.includes("[api env]")) {
+      handleFatalError(err.message.replace("[api env] ", ""));
+    }
+    process.exit(1);
+  });
+}
