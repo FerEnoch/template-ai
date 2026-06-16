@@ -52,7 +52,9 @@ The system MUST define a `Document` schema with fields: `id` (uuid string), `fil
 
 ### Requirement: Entity schema
 
-The system MUST define an `Entity` schema with fields: `id` (uuid string), `label` (non-empty string), `value` (string), `group` (non-empty string), `confidence` (enum: alta, media, baja), `sourceSpan` (object with `start` and `end` positive integers), `reviewed` (boolean, default false).
+The system MUST define an `Entity` schema with fields: `id` (uuid string), `label` (non-empty string), `value` (string), `group` (non-empty string), `confidence` (enum: alta, media, baja), `sourceSpan` (object with `start` and `end` positive integers, **optional/nullable** — an entity whose value cannot be located in the extracted text is still valid, just not highlightable), `reviewed` (boolean, default false), `excluded` (boolean, default false).
+
+(Previously: `sourceSpan` was required — analysis responses with no exact match failed validation. The `excluded` field did not exist.)
 
 #### Scenario: Valid entity passes validation
 
@@ -66,15 +68,54 @@ The system MUST define an `Entity` schema with fields: `id` (uuid string), `labe
 - WHEN parsed by the Entity schema
 - THEN validation fails
 
+#### Scenario: Entity without sourceSpan validates
+
+- GIVEN an entity whose `sourceSpan` is `undefined` (post-validation fallback)
+- WHEN parsed by the Entity schema
+- THEN validation succeeds and the entity remains usable in the UI
+
+#### Scenario: Excluded field defaults to false
+
+- GIVEN an entity without an `excluded` field
+- WHEN parsed by the Entity schema
+- THEN validation succeeds with `excluded: false`
+
+#### Scenario: Excluded entity validates
+
+- GIVEN an entity with `excluded: true`
+- WHEN parsed by the Entity schema
+- THEN validation succeeds
+
 ### Requirement: AnalysisResult schema
 
-The system MUST define an `AnalysisResult` schema with fields: `documentId` (uuid string), `status` (enum: pending, processing, analyzing, completed, failed), `entities` (array of Entity), `progress` (integer 0–100), `startedAt` (ISO datetime), `completedAt` (ISO datetime, nullable).
+The system MUST define an `AnalysisResult` schema with fields: `documentId` (uuid string), `status` (enum: pending, processing, analyzing, completed, failed), `entities` (array of Entity), `progress` (integer 0–100), `startedAt` (ISO datetime), `completedAt` (ISO datetime, nullable), `extractedText` (string, optional/nullable — the full document text from OCR/parsing, consumed by the review step to render highlights).
+
+(Previously: AnalysisResult carried entities and progress only — extracted text was not part of the contract)
 
 #### Scenario: Completed analysis with entities
 
 - GIVEN an analysis result with status "completed" and 8 entities
 - WHEN parsed by the AnalysisResult schema
 - THEN validation succeeds and entities array is accessible
+
+#### Scenario: Analyzing status validates
+
+- GIVEN an analysis result with `status: "analyzing"` (mid AI phase)
+- WHEN parsed by the AnalysisResult schema
+- THEN validation succeeds
+- AND the inferred TypeScript type narrows `status` to include "analyzing" as a valid value
+
+#### Scenario: Result with extractedText validates
+
+- GIVEN an analysis result with status "completed" and a non-empty `extractedText`
+- WHEN parsed by the AnalysisResult schema
+- THEN validation succeeds and `extractedText` is accessible
+
+#### Scenario: Result without extractedText validates (backward compat)
+
+- GIVEN an analysis result that omits `extractedText`
+- WHEN parsed by the AnalysisResult schema
+- THEN validation succeeds (the field is optional)
 
 ### Requirement: Template schema
 
@@ -101,3 +142,75 @@ The package MUST export each schema as a named export. The package MUST also exp
 - GIVEN the contracts package is imported
 - WHEN a variable is typed as `Document` (inferred type)
 - THEN TypeScript enforces the schema shape at compile time
+
+### Requirement: sourceSpan post-validation
+
+The analysis service MUST post-validate every AI-emitted `sourceSpan` against the actual `extractedText` before returning the result. For each entity, the service MUST search `extractedText` for the exact `entity.value` (case-sensitive). If exactly one match is found, the service MUST replace the AI's approximate `sourceSpan` with `{ start: indexOf(value), end: indexOf(value) + value.length }`. If multiple matches exist, the service SHOULD pick the match whose `start` is closest to the AI's approximate `aiSpan.start`. If no match is found, the service SHOULD set `sourceSpan` to `undefined` rather than emit a misleading offset. Validation MUST be case-sensitive initially; case-insensitive matching MAY be added later as an enhancement.
+
+#### Scenario: Exact match replaces approximate offset
+
+- GIVEN `extractedText` contains "Juan Pérez" exactly once and the AI emitted `sourceSpan: { start: 100, end: 110 }`
+- WHEN post-validation runs
+- THEN the entity's `sourceSpan` is replaced with the real position of "Juan Pérez"
+
+#### Scenario: Multiple matches disambiguated by AI offset
+
+- GIVEN "Lima" appears at positions 50, 220, 500 and the AI emitted `sourceSpan: { start: 500, end: 504 }`
+- WHEN post-validation runs
+- THEN the match closest to offset 500 is selected (the third occurrence)
+
+#### Scenario: No match sets sourceSpan to undefined
+
+- GIVEN `extractedText` does not contain `entity.value` (OCR drift, encoding mismatch)
+- WHEN post-validation runs
+- THEN `sourceSpan` is `undefined`
+- AND the entity is still present in the result and remains editable
+
+#### Scenario: Case-sensitive validation
+
+- GIVEN `extractedText` contains "juan pérez" (lowercase) and `entity.value` is "Juan Pérez" (mixed case)
+- WHEN post-validation runs
+- THEN no match is found and `sourceSpan` is `undefined`
+- AND case-insensitive matching is NOT applied
+
+### Requirement: ClassifySpanRequest schema
+
+The system MUST define a `ClassifySpanRequest` Zod schema with fields: `text` (non-empty string — selected span), `sourceSpan` (object with `start` and `end` positive integers), `context` (string — ±100 characters surrounding the span). The schema MUST be exported from `@template-ai/contracts`.
+
+#### Scenario: Valid request passes validation
+
+- GIVEN `{ text: "Juan Pérez", sourceSpan: { start: 50, end: 62 }, context: "...Ante mí compareció Juan Pérez, mayor de edad..." }`
+- WHEN parsed by `ClassifySpanRequest`
+- THEN validation succeeds
+
+#### Scenario: Missing text rejected
+
+- GIVEN `{ text: "", sourceSpan: { start: 0, end: 0 }, context: "" }`
+- WHEN parsed by `ClassifySpanRequest`
+- THEN validation fails with a non-empty constraint error
+
+### Requirement: ClassifySpanResponse schema
+
+The system MUST define a `ClassifySpanResponse` Zod schema with fields: `label` (non-empty string), `group` (non-empty string), `value` (string — mirrors the input text). The schema MUST be exported from `@template-ai/contracts`.
+
+#### Scenario: Valid response passes validation
+
+- GIVEN `{ label: "Arrendatario", group: "PARTES", value: "Juan Pérez" }`
+- WHEN parsed by `ClassifySpanResponse`
+- THEN validation succeeds
+
+### Requirement: Manual entity limit constant
+
+The contracts package MUST export `MANUAL_ENTITY_LIMIT = 5` as a constant. Both frontend and backend MUST reference this constant.
+
+#### Scenario: Constant is importable
+
+- GIVEN `@template-ai/contracts` is installed
+- WHEN `MANUAL_ENTITY_LIMIT` is imported
+- THEN the value is `5`
+
+## Notes
+
+- `EntitySchema` requires **no changes** — manual entities use the identical shape with `sourceSpan` populated from text selection and `confidence` set to ALTA.
+- `AnalysisResultSchema` requires **no changes** — `entities` array already accepts any valid Entity.
+- `userCreated` boolean on Entity is **not required** for MVP; distinction can be inferred from entity origin context rather than schema field.

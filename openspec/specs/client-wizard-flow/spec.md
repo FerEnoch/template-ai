@@ -8,7 +8,9 @@ Wire the four existing static screens (upload, analysis, review, save) into a co
 
 ### Requirement: Wizard state machine
 
-The system MUST maintain wizard state via React Context (`useReducer`). Steps MUST be ordered: upload → analysis → review → save. Each step MUST track its own validation status (pending, valid, invalid). The system MUST expose `currentStep`, `nextStep()`, `prevStep()`, and `canProceed` through a `useWizard` hook.
+The system MUST maintain wizard state via React Context (`useReducer`). State MUST include `extractedText: string | null` carrying the analysis API's document text. Steps MUST be ordered: upload → analysis → review → save. Each step MUST track its own validation status (pending, valid, invalid). The system MUST expose `currentStep`, `nextStep()`, `prevStep()`, and `canProceed` through a `useWizard` hook.
+
+(Previously: state tracked steps, validation, and navigation only)
 
 #### Scenario: Step navigation follows fixed order
 
@@ -21,6 +23,18 @@ The system MUST maintain wizard state via React Context (`useReducer`). Steps MU
 - GIVEN the user is on step 3 (review)
 - WHEN the user calls `prevStep()`
 - THEN `currentStep` returns to step 2 (analysis)
+
+#### Scenario: SET_ANALYSIS_RESULT stores extractedText
+
+- GIVEN the analysis API returns a result with `extractedText`
+- WHEN the reducer receives `SET_ANALYSIS_RESULT`
+- THEN `state.extractedText` equals the API's value
+
+#### Scenario: Backward navigation to UPLOAD clears extractedText
+
+- GIVEN state has `extractedText` set
+- WHEN the user navigates back to UPLOAD
+- THEN `clearDownstreamState()` resets `extractedText` to `null`
 
 ### Requirement: Step validation gating
 
@@ -85,7 +99,9 @@ After a valid file is accepted, the system MUST display an animated progress ind
 
 ### Requirement: Analysis polling
 
-The analysis step MUST poll the mock API at intervals. The system MUST render skeleton placeholders until data arrives. On data arrival, the system MUST transition from skeleton to content with a CSS animation.
+The analysis step MUST poll the mock API at intervals. The system MUST render skeleton placeholders until data arrives. On data arrival, the system MUST transition from skeleton to content with a CSS animation. The system MUST differentiate the `processing` and `analyzing` statuses: `processing` shows determinate progress with sub-phase 2 active; `analyzing` activates the friendly waiting UI from `analysis-waiting-ui` and progresses sub-phases 2–4.
+
+(Previously: both statuses were treated identically as `isProcessing` — same skeleton, same single-sub-phase stepper, no distinction during the 20–30s AI wait)
 
 #### Scenario: Skeleton shown during polling
 
@@ -99,9 +115,49 @@ The analysis step MUST poll the mock API at intervals. The system MUST render sk
 - WHEN the mock API returns entity data
 - THEN skeletons fade out and entity previews render
 
+#### Scenario: Processing status shows determinate UI
+
+- GIVEN the status endpoint returns "processing" with progress 50
+- WHEN the polling cycle updates state
+- THEN a determinate progress bar renders at 50%
+- AND only sub-phase 2 of the in-page stepper is active
+
+#### Scenario: Analyzing status shows friendly waiting UI
+
+- GIVEN the status endpoint returns "analyzing"
+- WHEN the polling cycle updates state
+- THEN the AnalysisProgress component renders (indeterminate bar, rotating messages, elapsed timer)
+- AND the in-page stepper shows sub-phases 2–4 as "En proceso"
+
+### Requirement: Analysis sub-phase stepper
+
+The analysis step MUST render an in-page stepper with 4 sub-phases (Validating file, Extracting text, Detecting structure, Identifying case data). The stepper MUST differentiate status: when `status === "analyzing"`, sub-phases 2–4 all display "En proceso" with spinner icons; when `status === "processing"`, only sub-phase 2 displays "En proceso". The stepper MUST never freeze on a single sub-phase during the AI wait. The stepper MUST remain independent of the top-level wizard `StepIndicator`.
+
+#### Scenario: All sub-phases active during analyzing
+
+- GIVEN the analysis status is "analyzing"
+- WHEN the in-page stepper renders
+- THEN sub-phase 1 shows "Completado"
+- AND sub-phases 2, 3, 4 all show "En proceso" with spinner icons
+
+#### Scenario: Only sub-phase 2 active during processing
+
+- GIVEN the analysis status is "processing"
+- WHEN the in-page stepper renders
+- THEN only sub-phase 2 shows "En proceso"
+- AND sub-phases 3 and 4 show "Pendiente"
+
+#### Scenario: All sub-phases completed
+
+- GIVEN the analysis status transitions to "completed"
+- WHEN the in-page stepper renders
+- THEN all 4 sub-phases show "Completado"
+
 ### Requirement: Review entity interaction
 
-The review step MUST display entity groups in expand/collapse panels. Each entity MUST show a confidence badge (ALTA, MEDIA, BAJA). The system MUST filter entities by confidence level.
+The review step MUST display entity groups in expand/collapse panels. Each group header MUST include a "+ AGREGAR CAMPO" button. The button MUST trigger text selection mode when below the manual entity limit, and MUST be disabled with a tier-upgrade tooltip when the limit is reached. Each entity MUST show a confidence badge (ALTA, MEDIA, BAJA). The system MUST filter entities by confidence level. Entity rows MUST be clickable to open the edit modal. Excluded entities MUST be visually distinguished (strikethrough or dimmed) and filtered out by default. The review step MUST also render `state.extractedText` with entity highlights overlaid, reusing the same `renderHighlightedText()` utility for consistency. When `extractedText` is `null` or empty, the document preview area MUST show a fallback message ("Vista previa no disponible").
+
+(Previously: entity groups had no manual creation button; text selection did not exist)
 
 #### Scenario: Entity group expands on click
 
@@ -114,6 +170,52 @@ The review step MUST display entity groups in expand/collapse panels. Each entit
 - GIVEN entities with mixed confidence levels exist
 - WHEN the user selects "ALTA only" filter
 - THEN only high-confidence entities are shown
+
+#### Scenario: Entity row opens edit modal
+
+- GIVEN the review step displays entities
+- WHEN the user clicks an entity row
+- THEN the edit modal opens with the entity's details
+
+#### Scenario: Excluded entity visually distinguished
+
+- GIVEN an entity is marked as excluded
+- WHEN the review step renders
+- THEN the entity row shows a strikethrough or dimmed appearance
+
+#### Scenario: Review renders extracted text with highlights
+
+- GIVEN `state.extractedText` and entities with `sourceSpan` exist
+- WHEN the review step renders
+- THEN the document area shows the extracted text with `sourceSpan` characters highlighted
+
+#### Scenario: "+ AGREGAR CAMPO" present in every group header
+
+- GIVEN any entity group (PARTES, INMUEBLE, FECHAS, ANEXOS) is rendered
+- WHEN the review step displays the group header
+- THEN "+ AGREGAR CAMPO" button is visible
+
+#### Scenario: Fallback when extractedText is missing
+
+- GIVEN `state.extractedText` is `null` or empty
+- WHEN the review step renders
+- THEN the preview area shows "Vista previa no disponible"
+
+### Requirement: Entity edit modal integration
+
+The review step MUST allow clicking any entity row to open an edit modal. The modal changes MUST be reflected in the wizard state immediately (optimistic update). If the API call fails, the review step MUST display an inline error.
+
+#### Scenario: Entity click opens modal
+
+- GIVEN the review step displays entities
+- WHEN the user clicks an entity row
+- THEN an edit modal appears
+
+#### Scenario: Inline error on API failure
+
+- GIVEN the user confirms an entity edit
+- WHEN the API call fails
+- THEN an inline error appears on the review step
 
 ### Requirement: Save form validation
 
@@ -133,7 +235,9 @@ The save step MUST use react-hook-form with Zod resolver. The template name fiel
 
 ### Requirement: Draft persistence
 
-The system MUST persist wizard state to localStorage keyed `template-draft:v1`. On mount, the system MUST restore from draft if it exists. Draft MUST be cleared on successful save or explicit cancel.
+The system MUST persist wizard state to localStorage keyed `template-draft:v1`. The draft MUST include `extractedText` alongside existing fields. `WizardDraftSchema` MUST validate `extractedText` (optional, defaulting to empty string for legacy drafts). On mount, the system MUST restore from draft if it exists. Draft MUST be cleared on successful save or explicit cancel.
+
+(Previously: draft persisted core wizard fields only)
 
 #### Scenario: Draft restored on page reload
 
@@ -146,3 +250,84 @@ The system MUST persist wizard state to localStorage keyed `template-draft:v1`. 
 - GIVEN a draft exists in localStorage
 - WHEN the save step completes successfully
 - THEN `template-draft:v1` is removed from localStorage
+
+#### Scenario: saveDraft persists extractedText
+
+- GIVEN state has `extractedText` set
+- WHEN `saveDraft()` is called
+- THEN localStorage `template-draft:v1` contains the value
+
+#### Scenario: Legacy draft without extractedText loads
+
+- GIVEN a legacy draft that omits `extractedText`
+- WHEN parsed by `WizardDraftSchema`
+- THEN validation succeeds and the field defaults to empty string
+
+### Requirement: Analysis page completed layout
+
+The analysis page MUST treat the `completed` status as a final summary state. When status is `completed`, the page MUST render a single-column centered layout with: (1) a completion confirmation, (2) a confidence summary, and (3) a prominent "Continuar a Revisión" CTA. The page MUST NOT render the document preview or entity list when completed — those belong on the review page. On completion, the page MUST call `setWizardAnalysisResult()` AND `saveDraft()` with the full result, including `extractedText`, so state and the localStorage draft stay in sync before navigation.
+
+#### Scenario: Completed analysis shows CTA-only layout
+
+- GIVEN status is "completed"
+- WHEN the analysis page renders
+- THEN it shows: completion confirmation, confidence summary, and "Continuar a Revisión" button
+- AND no document preview or entity list is rendered
+
+#### Scenario: Completed analysis wires extractedText to state and draft
+
+- GIVEN the API returns a result with `extractedText`
+- WHEN the completed state is committed
+- THEN `setWizardAnalysisResult(fullResult)` is called with `extractedText`
+- AND `saveDraft()` is called with the same payload
+
+#### Scenario: CTA navigates to review with text available
+
+- GIVEN the completed state is showing
+- WHEN the user clicks "Continuar a Revisión"
+- THEN the wizard advances to review
+- AND `state.extractedText` is available for the review page
+
+### Requirement: ADD_ENTITY reducer action
+
+The wizard reducer MUST handle an `ADD_ENTITY` action that appends a new entity to `state.entities`. The action payload MUST be a complete `Entity` object. Manual entity count MUST be derivable from state (entities where `sourceSpan` exists and entity was not produced by AI analysis).
+
+#### Scenario: ADD_ENTITY appends entity to state
+
+- GIVEN `state.entities` has 3 AI-detected entities
+- WHEN `ADD_ENTITY` is dispatched with a new manual entity
+- THEN `state.entities` length is 4
+- AND the new entity is the last in the array
+
+#### Scenario: Manual entity count derives from state
+
+- GIVEN 2 entities with `sourceSpan` exist (user-created, no AI analysis association)
+- WHEN the manual entity count is computed
+- THEN the count is 2
+
+### Requirement: addEntity() context method
+
+`WizardContext` MUST expose `addEntity(entity: Entity)` that dispatches `ADD_ENTITY` and triggers draft persistence. The method MUST be callable from the review page component.
+
+#### Scenario: addEntity persists entity to draft
+
+- GIVEN `addEntity(newEntity)` is called
+- WHEN draft is read from localStorage
+- THEN the new entity is present in `entities[]`
+
+### Requirement: Text selection mode state
+
+Text selection mode MUST be tracked in the review page component (local state, not wizard global state). Entering selection mode MUST set a visual cue. Exiting selection mode MUST clear the cue. On text selection, the component MUST capture `window.getSelection()` offsets against `extractedText`.
+
+#### Scenario: Selection mode activates visual cue
+
+- GIVEN "+ AGREGAR CAMPO" is clicked
+- WHEN selection mode state is set
+- THEN document preview shows a highlight hint cursor
+- AND existing `<mark>` elements are temporarily non-interactive
+
+#### Scenario: Selection of existing highlight is detected
+
+- GIVEN the user selects text overlapping an existing `<mark>` element
+- WHEN `window.getSelection()` is captured
+- THEN the component warns the user about overlap
