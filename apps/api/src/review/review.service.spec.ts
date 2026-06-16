@@ -76,6 +76,21 @@ function createMockPostgresService(setup: {
         });
       }
 
+      // SELECT analysis_results (findByDocumentId)
+      if (sql.includes("FROM analysis_results") && sql.includes("WHERE document_id")) {
+        return Promise.resolve({
+          rowCount: 1,
+          rows: [
+            {
+              id: "analysis-uuid-1",
+              document_id: "doc-1",
+              status: "completed",
+              progress: 100,
+            },
+          ],
+        });
+      }
+
       // SELECT entities (findById)
       if (sql.includes("SELECT") && sql.includes("FROM entities") && sql.includes("WHERE id =")) {
         if (entityRecord === null) {
@@ -376,21 +391,9 @@ describe("ReviewService", () => {
   });
 
   describe("classifySpan", () => {
-    it("should classify a span and create a user-created entity", async () => {
-      const createdRecord = makeEntityRecord({
-        id: "new-entity-1",
-        documentId: "doc-1",
-        label: "ARRENDATARIO",
-        value: "Juan Pérez",
-        group: "PARTES",
-        confidence: "ALTA",
-        sourceSpan: { start: 34, end: 44 },
-        userCreated: true,
-      });
-
+    it("should classify a span and return label, group, value", async () => {
       const mockPostgres = createMockPostgresService({
         manualEntityCount: 0,
-        createdRecord,
       });
 
       vi.spyOn(mockOpenRouter, "classifySpan").mockResolvedValue({
@@ -401,15 +404,15 @@ describe("ReviewService", () => {
 
       const service = new ReviewService(mockPostgres, mockOpenRouter);
 
-      const result = await service.classifySpan("doc-1", "analysis-1", {
+      const result = await service.classifySpan("doc-1", {
         text: "Juan Pérez",
         sourceSpan: { start: 34, end: 44 },
         context: "...entre Juan Pérez y María López...",
       });
 
       expect(result.label).toBe("ARRENDATARIO");
-      expect(result.userCreated).toBe(true);
-      expect(result.confidence).toBe("ALTA");
+      expect(result.group).toBe("PARTES");
+      expect(result.value).toBe("Juan Pérez");
       expect(mockOpenRouter.classifySpan).toHaveBeenCalledWith(
         "Juan Pérez",
         "...entre Juan Pérez y María López...",
@@ -424,7 +427,7 @@ describe("ReviewService", () => {
       const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       await expect(
-        service.classifySpan("doc-1", "analysis-1", {
+        service.classifySpan("doc-1", {
           text: "Juan Pérez",
           sourceSpan: { start: 34, end: 44 },
           context: "context",
@@ -432,7 +435,7 @@ describe("ReviewService", () => {
       ).rejects.toThrow(ForbiddenException);
 
       await expect(
-        service.classifySpan("doc-1", "analysis-1", {
+        service.classifySpan("doc-1", {
           text: "Juan Pérez",
           sourceSpan: { start: 34, end: 44 },
           context: "context",
@@ -441,15 +444,8 @@ describe("ReviewService", () => {
     });
 
     it("should retry once on network error", async () => {
-      const createdRecord = makeEntityRecord({
-        id: "new-entity-1",
-        documentId: "doc-1",
-        userCreated: true,
-      });
-
       const mockPostgres = createMockPostgresService({
         manualEntityCount: 0,
-        createdRecord,
       });
 
       vi.spyOn(mockOpenRouter, "classifySpan")
@@ -462,7 +458,7 @@ describe("ReviewService", () => {
 
       const service = new ReviewService(mockPostgres, mockOpenRouter);
 
-      const result = await service.classifySpan("doc-1", "analysis-1", {
+      const result = await service.classifySpan("doc-1", {
         text: "Juan Pérez",
         sourceSpan: { start: 0, end: 10 },
         context: "context",
@@ -492,7 +488,7 @@ describe("ReviewService", () => {
 
       const service = new ReviewService(mockPostgres, mockOpenRouter);
 
-      const result = await service.createEntity("doc-1", "analysis-1", {
+      const result = await service.createEntity("doc-1", {
         label: "CAMPO_CUSTOM",
         value: "Valor Custom",
         group: "ANEXOS",
@@ -510,7 +506,7 @@ describe("ReviewService", () => {
       const service = new ReviewService(mockPostgres, mockOpenRouter);
 
       await expect(
-        service.createEntity("doc-1", "analysis-1", {
+        service.createEntity("doc-1", {
           label: "FIELD",
           value: "value",
           group: "PARTES",

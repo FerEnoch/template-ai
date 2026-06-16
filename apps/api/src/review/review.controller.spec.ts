@@ -123,14 +123,12 @@ describe("ReviewController", () => {
   });
 
   describe("POST /:documentId/entities/classify-span", () => {
-    it("should classify a span and return the created entity", async () => {
-      const entity = makeReviewEntity({
-        id: "new-entity-1",
+    it("should classify a span and return label, group, value", async () => {
+      vi.spyOn(service, "classifySpan").mockResolvedValue({
         label: "ARRENDATARIO",
+        group: "PARTES",
         value: "Juan Pérez",
-        userCreated: true,
       });
-      vi.spyOn(service, "classifySpan").mockResolvedValue(entity);
 
       const result = await controller.classifySpan("doc-uuid-1", {
         text: "Juan Pérez",
@@ -138,8 +136,9 @@ describe("ReviewController", () => {
         context: "...entre Juan Pérez y María López...",
       });
 
-      expect(result.entity.label).toBe("ARRENDATARIO");
-      expect(result.entity.userCreated).toBe(true);
+      expect(result.label).toBe("ARRENDATARIO");
+      expect(result.group).toBe("PARTES");
+      expect(result.value).toBe("Juan Pérez");
     });
 
     it("should throw BadRequestException on invalid request body", async () => {

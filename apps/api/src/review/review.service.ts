@@ -3,6 +3,7 @@ import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
 import { OpenRouterService, OpenRouterError } from "../ai/open-router.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
+import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -116,38 +117,21 @@ export class ReviewService {
 
   /**
    * Classify a text span via AI and return the inferred entity fields.
+   * Does NOT persist the entity — the caller must use createEntity() to save.
    * Enforces the manual entity cap before calling AI.
    */
   async classifySpan(
     documentId: string,
-    analysisResultId: string,
     input: ClassifySpanInput,
-  ): Promise<ReviewEntity> {
+  ): Promise<{ label: string; group: string; value: string }> {
     return this.postgres.withOwnerTransaction(0, async ({ client }) => {
       const entitiesRepo = new EntitiesRepository(client);
 
       // Enforce manual entity cap
       await this.enforceManualEntityLimit(entitiesRepo, documentId);
 
-      // Call AI to classify the span
-      const classification = await this.callClassifyWithRetry(
-        input.text,
-        input.context,
-      );
-
-      // Create entity with userCreated: true, confidence: ALTA
-      const created = await entitiesRepo.create({
-        analysisResultId,
-        documentId,
-        label: classification.label,
-        value: classification.value,
-        group: classification.group,
-        confidence: "ALTA",
-        sourceSpan: input.sourceSpan,
-        userCreated: true,
-      });
-
-      return this.mapToReviewEntity(created);
+      // Call AI to classify the span (with retry)
+      return this.callClassifyWithRetry(input.text, input.context);
     });
   }
 
@@ -157,11 +141,18 @@ export class ReviewService {
    */
   async createEntity(
     documentId: string,
-    analysisResultId: string,
     input: CreateEntityInput,
   ): Promise<ReviewEntity> {
     return this.postgres.withOwnerTransaction(0, async ({ client }) => {
       const entitiesRepo = new EntitiesRepository(client);
+      const analysisRepo = new AnalysisResultsRepository(client);
+
+      // Resolve the actual analysis result from the document
+      const results = await analysisRepo.findByDocumentId(documentId);
+      if (results.length === 0) {
+        throw new NotFoundException("No analysis result found for this document");
+      }
+      const analysisResultId = results[0].id;
 
       // Enforce manual entity cap
       await this.enforceManualEntityLimit(entitiesRepo, documentId);

@@ -22,27 +22,15 @@ export class ReviewController {
   public constructor(private readonly reviewService: ReviewService) {}
 
   /**
-   * POST /:documentId/entities/:entityId
-   * Update an entity's review fields (reviewed, value, excluded).
-   */
-  @Post(":documentId/entities/:entityId")
-  public async updateEntity(
-    @Param("documentId") documentId: string,
-    @Param("entityId") entityId: string,
-    @Body() body: UpdateEntityInput,
-  ): Promise<ReviewEntity> {
-    return this.reviewService.updateEntity(documentId, entityId, body);
-  }
-
-  /**
    * POST /:documentId/entities/classify-span
    * Classify a text span via AI and persist the resulting entity.
+   * MUST be registered before :entityId to avoid route collision.
    */
   @Post(":documentId/entities/classify-span")
   public async classifySpan(
     @Param("documentId") documentId: string,
     @Body() body: unknown,
-  ): Promise<{ entity: ReviewEntity }> {
+  ): Promise<{ label: string; group: string; value: string }> {
     // Validate request body with Zod schema
     const parsed = ClassifySpanRequestSchema.safeParse(body);
     if (!parsed.success) {
@@ -57,15 +45,20 @@ export class ReviewController {
       context: parsed.data.context,
     };
 
-    // Use documentId as analysisResultId fallback — the service resolves
-    // the actual analysis result internally via the document relationship
-    const entity = await this.reviewService.classifySpan(
-      documentId,
-      documentId,
-      input,
-    );
+    return this.reviewService.classifySpan(documentId, input);
+  }
 
-    return { entity };
+  /**
+   * POST /:documentId/entities/:entityId
+   * Update an entity's review fields (reviewed, value, excluded).
+   */
+  @Post(":documentId/entities/:entityId")
+  public async updateEntity(
+    @Param("documentId") documentId: string,
+    @Param("entityId") entityId: string,
+    @Body() body: UpdateEntityInput,
+  ): Promise<ReviewEntity> {
+    return this.reviewService.updateEntity(documentId, entityId, body);
   }
 
   /**
@@ -81,11 +74,7 @@ export class ReviewController {
       throw new BadRequestException("label, value, and group are required");
     }
 
-    const entity = await this.reviewService.createEntity(
-      documentId,
-      documentId,
-      body,
-    );
+    const entity = await this.reviewService.createEntity(documentId, body);
 
     return { entity };
   }
