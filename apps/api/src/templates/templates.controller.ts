@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
 import { TemplateSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
+import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
 
 // Build the creation schema: omit server-generated fields and status (backend
@@ -11,7 +12,10 @@ const CreateTemplateBody = TemplateSchema.omit({ id: true, createdAt: true, stat
 export class TemplatesController {
   private readonly logger = new Logger(TemplatesController.name);
 
-  public constructor(private readonly templatesService: TemplatesService) {}
+  public constructor(
+    private readonly templatesService: TemplatesService,
+    private readonly postgres: PostgresService,
+  ) {}
 
   /**
    * GET /templates — list all templates for the current user.
@@ -33,6 +37,32 @@ export class TemplatesController {
     }
 
     return template;
+  }
+
+  /**
+   * GET /templates/:id/extracted-text — return the extracted text from the
+   * template's associated document analysis results.
+   */
+  @Get(":id/extracted-text")
+  public async getExtractedText(
+    @Param("id") id: string,
+  ): Promise<{ extractedText: string | null }> {
+    const template = await this.templatesService.findOne(0, id);
+
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const result = await client.query(
+        `SELECT extracted_text FROM analysis_results WHERE document_id = $1`,
+        [template.documentId],
+      );
+
+      if (result.rowCount === 0 || result.rows.length === 0) {
+        return { extractedText: null };
+      }
+
+      return {
+        extractedText: (result.rows[0].extracted_text as string) ?? null,
+      };
+    });
   }
 
   /**
