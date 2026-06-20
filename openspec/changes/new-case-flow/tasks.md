@@ -34,17 +34,17 @@ Tracker: `feature/new-case-flow-tracker` (draft). Bases: PR#2→PR#1, PR#3→PR#
 
 ## Phase 3: PR #3 — New-Case Form UI
 
-- [ ] 3.1 RED: `CaseContext.test.tsx` — dispatch updates; pure reducer
-- [ ] 3.2 RED: `groupEntities.test.ts` — by `Entity.group` (PARTES→INMUEBLE→FECHAS→ANEXOS)
-- [ ] 3.3 RED: `inferFieldType.test.ts` — date/number/checkbox/text regex
-- [ ] 3.4 RED: `CaseStickyBar.test.tsx` — "Generar documento" disabled below 80%
-- [ ] 3.5 Create `apps/web/src/lib/api/cases.ts` (wrappers)
-- [ ] 3.6 GREEN: `apps/web/src/lib/case/CaseContext.tsx` (no `WizardContext` import)
-- [ ] 3.7 GREEN: `CaseForm.tsx`, `CaseFormSection.tsx`, `FieldRenderer.tsx` (rhf + zod)
-- [ ] 3.8 GREEN: `CaseProgress.tsx` + `CaseStickyBar.tsx`
-- [ ] 3.9 GREEN: `NewCaseLayout.tsx` + `apps/web/src/app/nuevo/[templateId]/page.tsx`
-- [ ] 3.10 Wire 30s auto-save + manual "Guardar borrador"
-- [ ] 3.11 Playwright: fill form → reload → data persisted
+- [x] 3.1 RED: `CaseContext.test.tsx` — dispatch updates; pure reducer
+- [x] 3.2 RED: `groupEntities.test.ts` — by `Entity.group` (PARTES→INMUEBLE→FECHAS→ANEXOS)
+- [x] 3.3 RED: `inferFieldType.test.ts` — date/number/checkbox/text regex
+- [x] 3.4 RED: `CaseStickyBar.test.tsx` — "Generar documento" disabled below 80%
+- [x] 3.5 Create `apps/web/src/lib/api/cases.ts` (wrappers)
+- [x] 3.6 GREEN: `apps/web/src/lib/case/CaseContext.tsx` (no `WizardContext` import)
+- [x] 3.7 GREEN: `CaseForm.tsx`, `CaseFormSection.tsx`, `FieldRenderer.tsx` (rhf + zod)
+- [x] 3.8 GREEN: `CaseProgress.tsx` + `CaseStickyBar.tsx`
+- [x] 3.9 GREEN: `NewCaseLayout.tsx` + `apps/web/src/app/nuevo/[templateId]/page.tsx`
+- [x] 3.10 Wire 30s auto-save + manual "Guardar borrador"
+- [x] 3.11 Playwright: fill form → reload → data persisted
 
 ## Phase 4: PR #4 — Preview + Export
 
