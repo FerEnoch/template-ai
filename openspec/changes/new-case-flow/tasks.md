@@ -48,17 +48,17 @@ Tracker: `feature/new-case-flow-tracker` (draft). Bases: PR#2→PR#1, PR#3→PR#
 
 ## Phase 4: PR #4 — Preview + Export
 
-- [ ] 4.1 RED: `splitParagraphs.test.ts` — `\n\n` split + empty filter
-- [ ] 4.2 RED: `EditableParagraph.test.tsx` — contenteditable + save/cancel + callback
-- [ ] 4.3 RED: `VerificationChecklist.test.tsx` — 3 sections, local state
-- [ ] 4.4 RED: `exporters.test.ts` — filename `${slug}-${id.slice(0,8)}.${ext}`
-- [ ] 4.5 Add `jspdf@^2.5` + `docx@^8.5` to `apps/web/package.json`
-- [ ] 4.6 GREEN: `apps/web/src/lib/export/pdf.ts` + `lib/export/docx.ts`
-- [ ] 4.7 GREEN: `DocumentViewer.tsx` + `EditableParagraph.tsx` (PATCH on save)
-- [ ] 4.8 GREEN: `VerificationChecklist.tsx` + `ExportPanel.tsx` + `ExportSpinner.tsx`
-- [ ] 4.9 GREEN: `apps/web/src/app/preview/[caseId]/page.tsx` (case fetch + redirect guard)
-- [ ] 4.10 Modify `apps/web/src/app/biblioteca/[id]/page.tsx` — "Crear nuevo caso" CTA
-- [ ] 4.11 Playwright: form → generate → preview → export PDF + DOCX; assert `exportado`
+- [x] 4.1 RED: `splitParagraphs.test.ts` — `\n\n` split + empty filter
+- [x] 4.2 RED: `EditableParagraph.test.tsx` — contenteditable + save/cancel + callback
+- [x] 4.3 RED: `VerificationChecklist.test.tsx` — 3 sections, local state
+- [x] 4.4 RED: `exporters.test.ts` — filename `${slug}-${id.slice(0,8)}.${ext}`
+- [x] 4.5 Add `jspdf@^2.5` + `docx@^8.5` to `apps/web/package.json`
+- [x] 4.6 GREEN: `apps/web/src/lib/export/pdf.ts` + `lib/export/docx.ts`
+- [x] 4.7 GREEN: `DocumentViewer.tsx` + `EditableParagraph.tsx` (PATCH on save)
+- [x] 4.8 GREEN: `VerificationChecklist.tsx` + `ExportPanel.tsx` + `ExportSpinner.tsx`
+- [x] 4.9 GREEN: `apps/web/src/app/preview/[caseId]/page.tsx` (case fetch + redirect guard)
+- [x] 4.10 Modify `apps/web/src/app/biblioteca/[id]/page.tsx` — "Crear nuevo caso" CTA
+- [x] 4.11 Playwright: form → generate → preview → export PDF + DOCX; assert `exportado`
 
 ## Phase 5: Verification (post-merge)
 
