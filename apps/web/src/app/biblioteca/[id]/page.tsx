@@ -13,6 +13,7 @@ import {
   Shield,
   AlertTriangle,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import type { Template, Entity } from "@template-ai/contracts";
@@ -341,6 +342,17 @@ export default function TemplateDetailPage({
               {template.entities.length}{" "}
               {template.entities.length === 1 ? "campo" : "campos"}
             </span>
+          </div>
+
+          {/* New case CTA */}
+          <div className="pt-2">
+            <Link
+              href={`/nuevo/${template.id}`}
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-label text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+            >
+              <Plus className="h-4 w-4" />
+              Crear nuevo caso
+            </Link>
           </div>
         </div>
 
