@@ -2,9 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Logger,
 } from "@nestjs/common";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { CasesRepository } from "../infrastructure/postgres/repositories/cases.repository";
+import { DocumentGenerationService } from "../ai/document-generation.service.js";
 import type { CaseRecord } from "../infrastructure/postgres/repositories/cases.repository";
 
 // ---------------------------------------------------------------------------
@@ -37,7 +39,12 @@ export interface UpdateCaseData {
 
 @Injectable()
 export class CasesService {
-  public constructor(private readonly postgres: PostgresService) {}
+  private readonly logger = new Logger(CasesService.name);
+
+  public constructor(
+    private readonly postgres: PostgresService,
+    private readonly generationService: DocumentGenerationService,
+  ) {}
 
   /**
    * Create a new case from a template.
@@ -170,6 +177,80 @@ export class CasesService {
   ): Promise<CaseResponse> {
     return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
       const repo = new CasesRepository(client);
+      const updated = await repo.updateGeneratedText(id, generatedText);
+
+      if (!updated) {
+        throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      return this.mapToResponse(updated);
+    });
+  }
+
+  /**
+   * Orchestrate AI document generation for a case:
+   * 1. Fetch the case + validate status
+   * 2. Fetch template entities (from templates.entities JSONB)
+   * 3. Fetch base extracted text (from analysis_results via template.document_id)
+   * 4. Call DocumentGenerationService
+   * 5. Update case with generated text and set status to 'generado'
+   */
+  async generate(userId: number, id: string): Promise<CaseResponse> {
+    return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
+      const repo = new CasesRepository(client);
+      const existing = await repo.findById(id);
+
+      if (!existing) {
+        throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      if (existing.status === "archivado") {
+        throw new ConflictException(
+          `Case "${id}" is archived and cannot be regenerated.`,
+        );
+      }
+
+      // Fetch template entities
+      const tplResult = await client.query(
+        `SELECT entities, document_id FROM templates WHERE id = $1`,
+        [existing.templateId],
+      );
+      const templateEntities =
+        (tplResult.rows[0]?.entities as Array<{
+          id: string;
+          label: string;
+          value: string;
+          group: string;
+        }>) ?? [];
+
+      // Fetch base extracted text from the template's source document
+      let baseText: string | null = null;
+      if (tplResult.rows[0]?.document_id) {
+        const txtResult = await client.query(
+          `SELECT extracted_text FROM analysis_results WHERE document_id = $1`,
+          [tplResult.rows[0].document_id],
+        );
+        baseText = (txtResult.rows[0]?.extracted_text as string) ?? null;
+      }
+
+      // Call AI generation
+      const genResult = await this.generationService.generate({
+        entities: templateEntities,
+        formData: existing.formData,
+        baseText,
+      });
+
+      if (!genResult.success) {
+        this.logger.error(
+          `Generation failed for case ${id}: ${genResult.error} (${genResult.errorType})`,
+        );
+        throw new ConflictException(
+          `Document generation failed: ${genResult.error ?? "Unknown error"}`,
+        );
+      }
+
+      // Update case with generated text
+      const generatedText = genResult.generatedText ?? "";
       const updated = await repo.updateGeneratedText(id, generatedText);
 
       if (!updated) {

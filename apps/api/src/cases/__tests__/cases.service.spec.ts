@@ -5,8 +5,16 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { CasesService } from "../cases.service";
+import { DocumentGenerationService } from "../../ai/document-generation.service.js";
 import { PostgresService, type TransactionContext } from "../../infrastructure/postgres/postgres.service";
 import type { CaseRecord } from "../../infrastructure/postgres/repositories/cases.repository";
+
+const mockGenerationService = {
+  generate: vi.fn().mockResolvedValue({
+    success: true,
+    generatedText: "Generated legal document text",
+  }),
+} as unknown as DocumentGenerationService;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -195,7 +203,7 @@ describe("CasesService", () => {
         createdRecord: created,
         templateExists: true,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.create(0, { templateId: "tmpl-uuid-1" });
 
@@ -209,7 +217,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         templateExists: false,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       await expect(
         service.create(0, { templateId: "non-existent-uuid" }),
@@ -228,7 +236,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: record,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.findOne(0, "case-uuid-1");
 
@@ -240,7 +248,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: null,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       await expect(
         service.findOne(0, "non-existent"),
@@ -258,7 +266,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         caseRecords: records,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.list(0);
 
@@ -275,7 +283,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         caseRecords: records,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.list(0, "borrador");
 
@@ -287,7 +295,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         caseRecords: [],
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.list(0);
 
@@ -312,7 +320,7 @@ describe("CasesService", () => {
         findByIdRecord: existing,
         updateRecord: updated,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.updateFormData(0, "case-uuid-1", {
         formData: { ent_1: "Juan Pérez" },
@@ -330,7 +338,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: existing,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       await expect(
         service.updateFormData(0, "case-uuid-1", {
@@ -348,7 +356,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: existing,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       await expect(
         service.updateFormData(0, "case-uuid-1", {
@@ -361,7 +369,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: null,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       await expect(
         service.updateFormData(0, "non-existent", {
@@ -386,7 +394,7 @@ describe("CasesService", () => {
         findByIdRecord: existing,
         updateRecord: archived,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       const result = await service.archive(0, "case-uuid-1");
 
@@ -397,7 +405,7 @@ describe("CasesService", () => {
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: null,
       });
-      const service = new CasesService(mockPostgres);
+      const service = new CasesService(mockPostgres, mockGenerationService);
 
       await expect(service.archive(0, "non-existent")).rejects.toThrow(
         NotFoundException,
