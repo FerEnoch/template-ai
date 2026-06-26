@@ -53,7 +53,7 @@ describe("TemplatesController", () => {
       const result = await controller.findAll();
 
       expect(result).toEqual(templates);
-      expect(service.list).toHaveBeenCalledWith(0);
+      expect(service.list).toHaveBeenCalledWith(0, false);
     });
 
     it("should return an empty array when no templates exist", async () => {
@@ -62,7 +62,7 @@ describe("TemplatesController", () => {
       const result = await controller.findAll();
 
       expect(result).toEqual([]);
-      expect(service.list).toHaveBeenCalledWith(0);
+      expect(service.list).toHaveBeenCalledWith(0, false);
     });
   });
 
@@ -186,51 +186,5 @@ describe("TemplatesController", () => {
       );
     });
 
-    it("should filter out excluded entities before creating a template", async () => {
-      const created = makeTemplateResponse({
-        id: "770e8400-e29b-41d4-a716-446655440002",
-        createdAt: "2025-02-01T12:00:00.000Z",
-      });
-      vi.spyOn(service, "create").mockResolvedValue(created);
-
-      const activeEntity = {
-        id: ENTITY_UUID,
-        label: "COMPRADOR",
-        value: "Juan Pérez",
-        group: "PARTES" as const,
-        confidence: "ALTA" as const,
-        reviewed: false,
-        excluded: false,
-        userCreated: false,
-      };
-      const excludedEntity = {
-        id: "880e8400-e29b-41d4-a716-446655440003",
-        label: "VENDEDOR",
-        value: "María López",
-        group: "PARTES" as const,
-        confidence: "ALTA" as const,
-        reviewed: false,
-        excluded: true,
-        userCreated: false,
-      };
-
-      const body = {
-        name: "Contrato de Arrendamiento",
-        description: "Standard lease agreement template",
-        documentId: VALID_UUID,
-        entities: [activeEntity, excludedEntity],
-        category: "legal",
-        status: "draft" as const,
-      };
-
-      const result = await controller.create(body);
-
-      expect(result).toEqual(created);
-      expect(service.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          entities: [activeEntity],
-        }),
-      );
-    });
   });
 });

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
+import { Controller, Get, Post, Delete, Body, Param, Query, NotFoundException, BadRequestException, HttpCode, Logger } from "@nestjs/common";
 import { TemplateSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
@@ -6,6 +6,11 @@ import type { CreateTemplateData, TemplateResponse } from "./templates.service";
 // Build the creation schema: omit server-generated fields and status (backend
 // defaults to "draft" when not provided — see controller create() method).
 const CreateTemplateBody = TemplateSchema.omit({ id: true, createdAt: true, status: true });
+
+/** Parse a boolean query parameter: "true" or "1" → true; everything else → false. */
+function parseBool(value?: string): boolean {
+  return value === "true" || value === "1";
+}
 
 @Controller("templates")
 export class TemplatesController {
@@ -15,10 +20,13 @@ export class TemplatesController {
 
   /**
    * GET /templates — list all templates for the current user.
+   * Pass ?includeArchived=true to include soft-deleted templates.
    */
   @Get()
-  public async findAll(): Promise<TemplateResponse[]> {
-    return this.templatesService.list(0);
+  public async findAll(
+    @Query("includeArchived") includeArchived?: string,
+  ): Promise<TemplateResponse[]> {
+    return this.templatesService.list(0, parseBool(includeArchived));
   }
 
   /**
@@ -53,15 +61,12 @@ export class TemplatesController {
     }
 
     // Normalize: Zod v4 .optional() rejects null — convert null → undefined.
-    // Filter out excluded entities so they are not saved in the template snapshot.
     const raw = body as Record<string, unknown>;
     if (Array.isArray(raw.entities)) {
-      raw.entities = (raw.entities as Record<string, unknown>[])
-        .filter((e) => e.excluded !== true)
-        .map((e) => ({
-          ...e,
-          sourceSpan: e.sourceSpan ?? undefined,
-        }));
+      raw.entities = (raw.entities as Record<string, unknown>[]).map((e) => ({
+        ...e,
+        sourceSpan: e.sourceSpan ?? undefined,
+      }));
     }
 
     const parsed = CreateTemplateBody.safeParse(raw);
@@ -87,5 +92,28 @@ export class TemplatesController {
     };
 
     return this.templatesService.create(data);
+  }
+
+  /**
+   * DELETE /templates/:id — soft-delete a template.
+   *
+   * Query params:
+   * - deleteSourceFile=true|false (default false) — also delete the source document and its file.
+   * - deleteGeneratedCases=true|false (default false) — archive cases generated from this template.
+   *
+   * Idempotent: returns 204 even if the template is already archived.
+   * Returns 404 if the template does not exist.
+   */
+  @Delete(":id")
+  @HttpCode(204)
+  public async remove(
+    @Param("id") id: string,
+    @Query("deleteSourceFile") deleteSourceFile?: string,
+    @Query("deleteGeneratedCases") deleteGeneratedCases?: string,
+  ): Promise<void> {
+    await this.templatesService.delete(0, id, {
+      deleteSourceFile: parseBool(deleteSourceFile),
+      deleteGeneratedCases: parseBool(deleteGeneratedCases),
+    });
   }
 }

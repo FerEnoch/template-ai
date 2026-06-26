@@ -83,7 +83,7 @@ describe("bootstrap boundaries", () => {
 
   it("keeps infra ownership guidance explicit in agents doc", async () => {
     const agentsDoc = await readFile(resolve(workspaceRoot, ".atl/AGENTS.md"), "utf8");
-    const infraDoc = await readFile(resolve(workspaceRoot, "docs/local-operational-infra.md"), "utf8");
+    const infraDoc = await readFile(resolve(workspaceRoot, "docs/infrastructure/local-operational-infra.md"), "utf8");
 
     expect(agentsDoc).toContain("Makefile as interface ONLY for PostgreSQL/local infra");
     expect(agentsDoc).toContain("App commands (dev/start/lint/typecheck): `pnpm`");

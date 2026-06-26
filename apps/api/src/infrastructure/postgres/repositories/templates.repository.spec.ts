@@ -67,6 +67,7 @@ describe("TemplatesRepository", () => {
         status: "draft",
         entities: expect.any(Array),
         createdAt: new Date("2025-01-01T00:00:00Z"),
+        deletedAt: null,
       } satisfies TemplateRecord);
 
       expect(querySpy).toHaveBeenCalledWith(
