@@ -18,6 +18,8 @@ import { WizardLayout, EntityInspector } from "@/components/wizard";
 import { EntityEditModal } from "@/components/wizard/EntityEditModal";
 import { renderHighlightedText, useWizard, stepUrl } from "@/lib/wizard";
 import { useTextSelection } from "@/lib/wizard/useTextSelection";
+import { useCreateEntityHandler } from "@/lib/wizard/useCreateEntityHandler";
+import { useUpdateEntityHandler } from "@/lib/wizard/useUpdateEntityHandler";
 import { WizardStep } from "@/lib/wizard";
 import type { Entity, ClassifySpanResponse } from "@template-ai/contracts";
 import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
@@ -83,30 +85,20 @@ function ReviewInner() {
     setIsConfirmEnabled(bajaCount === 0);
   }, [state.entities]);
 
-  const handleEntityUpdate = useCallback(
-    async (entity: Entity) => {
-      // Optimistically update locally
-      updateEntity(entity);
-
-      try {
-        await fetch(
-          `/api/review/${state.analysisResultId}/entities/${entity.id}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              reviewed: entity.reviewed,
-              value: entity.value,
-              ...(entity.excluded !== undefined && { excluded: entity.excluded }),
-            }),
-          }
-        );
-      } catch {
-        // Keep local state on error — user can still proceed
-      }
-    },
-    [state.analysisResultId, updateEntity]
+  const getEntityById = useCallback(
+    (id: string) => state.entities.find((e) => e.id === id),
+    [state.entities]
   );
+
+  const handleEntityUpdate = useUpdateEntityHandler({
+    analysisResultId: state.analysisResultId,
+    getEntityById,
+    updateEntity,
+    onError: useCallback(
+      (message: string) => setClassificationError(message),
+      []
+    ),
+  });
 
   const handleConfirm = useCallback(() => {
     if (pendingBajaCount === 0) {
@@ -182,28 +174,16 @@ function ReviewInner() {
     classifySpan();
   }, [selection, state.analysisResultId, clearSelection]);
 
-  const handleCreateModalSave = useCallback(
-    async (entity: Entity) => {
-      // Optimistic update: add to wizard state immediately
-      addEntity(entity);
-
-      // Persist to backend
-      try {
-        await fetch(`/api/review/${state.analysisResultId}/entities`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(entity),
-        });
-      } catch {
-        // Keep local state on error — user can still proceed
-      }
-
+  const handleCreateModalSave = useCreateEntityHandler({
+    analysisResultId: state.analysisResultId,
+    addEntity,
+    onSuccess: useCallback(() => {
       setIsCreateModalOpen(false);
       setCreateModalEntity(null);
       cancelSelection();
-    },
-    [addEntity, state.analysisResultId, cancelSelection]
-  );
+    }, [cancelSelection]),
+    onError: useCallback((message: string) => setClassificationError(message), []),
+  });
 
   const handleCreateModalClose = useCallback(() => {
     setIsCreateModalOpen(false);

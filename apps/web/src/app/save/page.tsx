@@ -20,7 +20,7 @@ import type { Template } from "@template-ai/contracts";
 
 type SaveStatus = "idle" | "submitting" | "success" | "error";
 
-function SaveContent({
+export function SaveContent({
   state,
   setStep,
   reset,
@@ -72,7 +72,7 @@ function SaveContent({
             description: values.description ?? "",
             category: values.category,
             documentId: state.analysisResultId,
-            entities: state.entities,
+            entities: state.entities.filter((entity) => !entity.excluded),
           }),
         });
 

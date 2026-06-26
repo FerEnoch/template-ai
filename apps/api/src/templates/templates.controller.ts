@@ -53,12 +53,15 @@ export class TemplatesController {
     }
 
     // Normalize: Zod v4 .optional() rejects null — convert null → undefined.
+    // Filter out excluded entities so they are not saved in the template snapshot.
     const raw = body as Record<string, unknown>;
     if (Array.isArray(raw.entities)) {
-      raw.entities = (raw.entities as Record<string, unknown>[]).map((e) => ({
-        ...e,
-        sourceSpan: e.sourceSpan ?? undefined,
-      }));
+      raw.entities = (raw.entities as Record<string, unknown>[])
+        .filter((e) => e.excluded !== true)
+        .map((e) => ({
+          ...e,
+          sourceSpan: e.sourceSpan ?? undefined,
+        }));
     }
 
     const parsed = CreateTemplateBody.safeParse(raw);
