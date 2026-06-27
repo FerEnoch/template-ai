@@ -9,6 +9,7 @@ import { AnalysisModule } from "./analysis/analysis.module";
 import { ReviewModule } from "./review/review.module";
 import { TemplatesModule } from "./templates/templates.module";
 import { AiModule } from "./ai/ai.module.js";
+import { CasesModule } from "./cases/cases.module";
 
 @Module({
   controllers: [HealthController],
@@ -27,6 +28,7 @@ import { AiModule } from "./ai/ai.module.js";
     ReviewModule,
     TemplatesModule,
     AiModule,
+    CasesModule,
   ],
 })
 export class AppModule {}

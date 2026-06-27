@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { BadRequestException, ConflictException, NotFoundException } from "@nestjs/common";
 import { TemplatesController } from "./templates.controller";
 import { TemplatesService } from "./templates.service";
+import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import type { TemplateResponse } from "./templates.service";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +33,7 @@ const ENTITY_UUID = "770e8400-e29b-41d4-a716-446655440002";
 describe("TemplatesController", () => {
   let service: TemplatesService;
   let controller: TemplatesController;
+  let mockPostgres: PostgresService;
 
   beforeEach(() => {
     service = {
@@ -39,7 +41,10 @@ describe("TemplatesController", () => {
       findOne: vi.fn(),
       create: vi.fn(),
     } as unknown as TemplatesService;
-    controller = new TemplatesController(service);
+    mockPostgres = {
+      withOwnerTransaction: vi.fn(),
+    } as unknown as PostgresService;
+    controller = new TemplatesController(service, mockPostgres);
   });
 
   describe("GET /", () => {

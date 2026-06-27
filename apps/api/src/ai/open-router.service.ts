@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import OpenAI from "openai";
 import { z } from "zod";
-import { AI_CONFIG, CACHE_CONFIG } from "../config/ai.js";
+import { AI_CONFIG, CACHE_CONFIG, AI_GENERATION_CONFIG } from "../config/ai.js";
 import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
@@ -444,6 +444,126 @@ export class OpenRouterService {
         throw new OpenRouterError("Rate limit exceeded", "RATE_LIMIT");
       }
 
+      if (status > 0) {
+        throw new OpenRouterError(
+          `OpenRouter API error: ${error instanceof Error ? error.message : String(error)}`,
+          "API_ERROR",
+        );
+      }
+
+      throw new OpenRouterError(
+        `OpenRouter API unreachable: ${error instanceof Error ? error.message : String(error)}`,
+        "NETWORK_ERROR",
+      );
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Document generation
+  // -------------------------------------------------------------------------
+
+  /**
+   * Generate a legal document from template entities, user form data, and
+   * optional base extracted text. Returns the generated text string.
+   */
+  async generateDocument(
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<{ generatedText: string }> {
+    const model = AI_CONFIG.model;
+    if (!model) {
+      throw new OpenRouterError(
+        "AI_MODEL is not configured. Set AI_MODEL in your environment.",
+        "MODEL_NOT_CONFIGURED",
+      );
+    }
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model,
+        max_tokens: AI_GENERATION_CONFIG.maxTokens,
+        temperature: AI_GENERATION_CONFIG.temperature,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "generated_document",
+            strict: true,
+            schema: {
+              type: "object" as const,
+              additionalProperties: false,
+              properties: {
+                generatedText: { type: "string" as const },
+              },
+              required: ["generatedText"] as const,
+            },
+          },
+        },
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      });
+
+      const rawResponse = response.choices[0]?.message?.content ?? "";
+
+      const stripMarkdownFences = (text: string): string => {
+        const trimmed = text.trim();
+        const fenceMatch = trimmed.match(
+          /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/,
+        );
+        return fenceMatch ? fenceMatch[1].trim() : trimmed;
+      };
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(stripMarkdownFences(rawResponse));
+      } catch (parseError) {
+        this.logger.error(
+          `Invalid JSON from generation: ${(parseError as Error).message}`,
+        );
+        throw new OpenRouterError(
+          `Invalid JSON response from generation: ${(parseError as Error).message}`,
+          "INVALID_RESPONSE",
+        );
+      }
+
+      const obj = parsed as Record<string, unknown>;
+      const generatedText = obj.generatedText;
+
+      if (typeof generatedText !== "string" || generatedText.length === 0) {
+        throw new OpenRouterError(
+          "Generated text is empty or not a string",
+          "INVALID_RESPONSE",
+        );
+      }
+
+      return { generatedText };
+    } catch (error) {
+      if (error instanceof OpenRouterError) {
+        throw error;
+      }
+
+      if (error instanceof SyntaxError) {
+        throw new OpenRouterError(
+          `Invalid JSON response: ${error.message}`,
+          "INVALID_RESPONSE",
+        );
+      }
+
+      const status = (error as { status?: number })?.status ?? 0;
+
+      if (status === 401) {
+        throw new OpenRouterError("Invalid OPENROUTER_API_KEY", "AUTH_ERROR");
+      }
+      if (status === 404) {
+        throw new OpenRouterError(
+          `Model not found: ${model}`,
+          "MODEL_NOT_FOUND",
+        );
+      }
+      if (status === 429) {
+        throw new OpenRouterError("Rate limit exceeded", "RATE_LIMIT");
+      }
       if (status > 0) {
         throw new OpenRouterError(
           `OpenRouter API error: ${error instanceof Error ? error.message : String(error)}`,
