@@ -69,7 +69,7 @@ export default function BibliotecaPage() {
   }, [fetchCases]);
 
   return (
-    <AppShell activeSidebarItem="Plantillas">
+    <AppShell activeSidebarItem="Biblioteca">
       <div className="mx-auto max-w-7xl px-6 pb-16 pt-10">
         {/* Header */}
         <header className="mb-8">

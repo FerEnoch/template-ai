@@ -451,7 +451,7 @@ export default function TemplateDetailPage({
   }
 
   return (
-    <AppShell activeSidebarItem="Plantillas">
+    <AppShell activeSidebarItem="Biblioteca">
       <div className="mx-auto max-w-4xl px-6 pb-16 pt-10">{content}</div>
     </AppShell>
   );

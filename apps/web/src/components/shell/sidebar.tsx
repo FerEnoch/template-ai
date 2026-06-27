@@ -15,7 +15,7 @@ interface SidebarProps {
 
 const navItems = [
   { label: "Inicio", icon: Home, href: "/" },
-  { label: "Plantillas", icon: FolderOpen, href: "/biblioteca" },
+  { label: "Biblioteca", icon: FolderOpen, href: "/biblioteca" },
   { label: "Archivo", icon: Archive, href: "#" },
   { label: "Plan y uso", icon: BarChart3, href: "#" },
   { label: "Configuración", icon: Settings, href: "#" },
