@@ -8,6 +8,8 @@ interface TemplateGridProps {
   readonly isLoading: boolean;
   readonly error: string | null;
   readonly onRetry?: () => void;
+  readonly onDelete?: (id: string) => void;
+  readonly onDeleteError?: () => void;
 }
 
 function SkeletonCard() {
@@ -83,6 +85,8 @@ export function TemplateGrid({
   isLoading,
   error,
   onRetry,
+  onDelete,
+  onDeleteError,
 }: TemplateGridProps) {
   if (isLoading) {
     return (
@@ -105,7 +109,12 @@ export function TemplateGrid({
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {templates.map((template) => (
-        <TemplateCard key={template.id} template={template} />
+        <TemplateCard
+          key={template.id}
+          template={template}
+          onDelete={onDelete}
+          onDeleteError={onDeleteError}
+        />
       ))}
     </div>
   );

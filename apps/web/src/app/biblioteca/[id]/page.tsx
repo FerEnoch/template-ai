@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   FileText,
@@ -13,8 +14,11 @@ import {
   Shield,
   AlertTriangle,
   Loader2,
+  FilePlus,
+  Trash2,
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
+import { ConfirmDeleteDialog } from "@/components/biblioteca/ConfirmDeleteDialog";
 import type { Template, Entity } from "@template-ai/contracts";
 
 // ---------------------------------------------------------------------------
@@ -247,6 +251,10 @@ export default function TemplateDetailPage({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [id, setId] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const router = useRouter();
 
   // Unwrap params promise (Next.js 15+ async params)
   useEffect(() => {
@@ -277,6 +285,42 @@ export default function TemplateDetailPage({
   useEffect(() => {
     fetchTemplate();
   }, [fetchTemplate]);
+
+  const handleOpenDeleteDialog = useCallback(() => {
+    setDeleteError(null);
+    setIsDialogOpen(true);
+  }, []);
+
+  const handleCloseDeleteDialog = useCallback(() => {
+    if (isDeleting) return;
+    setIsDialogOpen(false);
+  }, [isDeleting]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!id) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/templates/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al eliminar la plantilla");
+      }
+
+      setIsDialogOpen(false);
+      router.push("/biblioteca");
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Error al eliminar la plantilla"
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [id, router]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -342,6 +386,33 @@ export default function TemplateDetailPage({
               {template.entities.length === 1 ? "campo" : "campos"}
             </span>
           </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <Link
+              href="/upload?step=upload"
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2 font-label text-xs font-bold text-white transition-colors hover:bg-accent-hover"
+            >
+              <FilePlus className="h-4 w-4" />
+              Nuevo documento
+            </Link>
+            {template.status !== "archived" && (
+              <button
+                type="button"
+                onClick={handleOpenDeleteDialog}
+                className="inline-flex items-center gap-2 rounded-lg border border-danger/30 bg-surface px-5 py-2 font-label text-xs font-bold text-danger transition-colors hover:bg-danger/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar
+              </button>
+            )}
+          </div>
+
+          {deleteError && (
+            <div className="rounded-md border border-danger/30 bg-danger/5 px-4 py-3 text-xs font-bold text-danger">
+              {deleteError}
+            </div>
+          )}
         </div>
 
         {/* Entity groups */}
@@ -367,12 +438,20 @@ export default function TemplateDetailPage({
             </div>
           )}
         </section>
+
+        <ConfirmDeleteDialog
+          isOpen={isDialogOpen}
+          onClose={handleCloseDeleteDialog}
+          onConfirm={handleConfirmDelete}
+          isLoading={isDeleting}
+          templateName={template.name}
+        />
       </div>
     );
   }
 
   return (
-    <AppShell activeSidebarItem="Biblioteca">
+    <AppShell activeSidebarItem="Plantillas">
       <div className="mx-auto max-w-4xl px-6 pb-16 pt-10">{content}</div>
     </AppShell>
   );
