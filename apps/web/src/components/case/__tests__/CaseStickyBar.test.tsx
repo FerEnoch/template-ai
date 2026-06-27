@@ -15,6 +15,7 @@ describe("CaseStickyBar", () => {
         filled={7}
         total={11}
         status="idle"
+        error={null}
         onSave={vi.fn()}
         onGenerate={vi.fn()}
       />
@@ -30,6 +31,7 @@ describe("CaseStickyBar", () => {
         filled={8}
         total={10}
         status="idle"
+        error={null}
         onSave={vi.fn()}
         onGenerate={vi.fn()}
       />
@@ -45,6 +47,7 @@ describe("CaseStickyBar", () => {
         filled={17}
         total={20}
         status="idle"
+        error={null}
         onSave={vi.fn()}
         onGenerate={vi.fn()}
       />
@@ -61,6 +64,7 @@ describe("CaseStickyBar", () => {
         filled={5}
         total={10}
         status="idle"
+        error={null}
         onSave={onSave}
         onGenerate={vi.fn()}
       />
@@ -77,10 +81,45 @@ describe("CaseStickyBar", () => {
         filled={5}
         total={10}
         status="saving"
+        error={null}
         onSave={vi.fn()}
         onGenerate={vi.fn()}
       />
     );
     expect(screen.getByText(/guardando/i)).toBeInTheDocument();
+  });
+
+  it("shows generating indicator and disables both buttons when generating", () => {
+    const onSave = vi.fn();
+    const onGenerate = vi.fn();
+    render(
+      <CaseStickyBar
+        progress={100}
+        filled={10}
+        total={10}
+        status="generating"
+        error={null}
+        onSave={onSave}
+        onGenerate={onGenerate}
+      />
+    );
+    expect(screen.getByText(/generando documento/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /generando/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /guardar borrador/i })).toBeDisabled();
+  });
+
+  it("shows error message inline when error is provided", () => {
+    render(
+      <CaseStickyBar
+        progress={100}
+        filled={10}
+        total={10}
+        status="idle"
+        error="Error al generar el documento"
+        onSave={vi.fn()}
+        onGenerate={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/error al generar el documento/i)).toBeInTheDocument();
   });
 });

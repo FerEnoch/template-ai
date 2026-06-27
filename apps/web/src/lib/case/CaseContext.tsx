@@ -23,6 +23,7 @@ export interface CaseState {
   progress: number;
   loading: boolean;
   error: string | null;
+  generationError: string | null;
 }
 
 export type CaseAction =
@@ -36,6 +37,7 @@ export type CaseAction =
   | { type: "SET_SAVE_STATUS"; payload: CaseState["saveStatus"] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "SET_ERROR"; payload: string | null }
+  | { type: "SET_GENERATION_ERROR"; payload: string | null }
   | { type: "SET_FORM_DATA"; payload: Record<string, string> }
   | { type: "ADD_ENTITY"; payload: Entity }
   | { type: "REMOVE_ENTITY"; payload: string };
@@ -95,6 +97,8 @@ export function caseReducer(
       return { ...state, loading: action.payload };
     case "SET_ERROR":
       return { ...state, error: action.payload };
+    case "SET_GENERATION_ERROR":
+      return { ...state, generationError: action.payload };
     case "SET_FORM_DATA":
       return {
         ...state,
@@ -139,6 +143,7 @@ export const initialCaseState: CaseState = {
   progress: 0,
   loading: false,
   error: null,
+  generationError: null,
 };
 
 interface CaseContextValue {
@@ -150,6 +155,7 @@ interface CaseContextValue {
   setStatus: (status: CaseState["status"]) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
+  setGenerationError: (error: string | null) => void;
   saveForm: () => Promise<void>;
   addEntity: (entity: Entity) => void;
   removeEntity: (entityId: string) => void;
@@ -196,6 +202,10 @@ export function CaseProvider({
 
   const setError = useCallback((error: string | null) => {
     dispatch({ type: "SET_ERROR", payload: error });
+  }, []);
+
+  const setGenerationError = useCallback((error: string | null) => {
+    dispatch({ type: "SET_GENERATION_ERROR", payload: error });
   }, []);
 
   const addEntity = useCallback((entity: Entity) => {
@@ -252,6 +262,7 @@ export function CaseProvider({
         setStatus,
         setLoading,
         setError,
+        setGenerationError,
         saveForm,
         addEntity,
         removeEntity,

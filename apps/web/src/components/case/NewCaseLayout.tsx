@@ -12,7 +12,7 @@ interface NewCaseLayoutProps {
 
 export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
   const { state } = useCase();
-  const { template, entities, formData, progress, saveStatus } = state;
+  const { template, entities, formData, progress, saveStatus, status, generationError } = state;
 
   const filled = entities.filter(
     (entity) => (formData[entity.id] ?? "").trim() !== ""
@@ -22,6 +22,15 @@ export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
   if (!template) {
     return null;
   }
+
+  const stickyStatus =
+    status === "generating"
+      ? "generating"
+      : saveStatus === "saving"
+        ? "saving"
+        : saveStatus === "saved"
+          ? "saved"
+          : "idle";
 
   return (
     <div className="flex flex-1 flex-col gap-6 bg-background p-4 md:flex-row md:p-6">
@@ -42,7 +51,8 @@ export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
         progress={progress}
         filled={filled}
         total={total}
-        status={saveStatus === "saving" ? "saving" : saveStatus === "saved" ? "saved" : "idle"}
+        status={stickyStatus}
+        error={generationError}
         onSave={onSave}
         onGenerate={onGenerate}
       />

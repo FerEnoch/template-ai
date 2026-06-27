@@ -15,7 +15,7 @@ function NewCasePageContent() {
   const params = useParams();
   const router = useRouter();
   const templateId = params.templateId as string;
-  const { state, setTemplate, setCase, setLoading, setError, saveForm } =
+  const { state, setTemplate, setCase, setLoading, setError, setStatus, setGenerationError, saveForm } =
     useCase();
 
   useEffect(() => {
@@ -65,18 +65,21 @@ function NewCasePageContent() {
 
   const handleGenerate = useCallback(async () => {
     if (!state.caseId) return;
+    setStatus("generating");
+    setGenerationError(null);
     try {
-      await handleSave();
+      await saveForm();
       const generated = await generateCase(state.caseId);
       router.push(`/preview/${generated.id}`);
     } catch (err) {
-      setError(
+      setGenerationError(
         err instanceof Error
           ? err.message
           : "Error al generar el documento"
       );
+      setStatus("idle");
     }
-  }, [state.caseId, handleSave, router, setError]);
+  }, [state.caseId, saveForm, router, setStatus, setGenerationError]);
 
   if (state.loading) {
     return (
