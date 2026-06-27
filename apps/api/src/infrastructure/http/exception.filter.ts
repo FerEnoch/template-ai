@@ -28,17 +28,67 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
 
       response.status(status).json({ error });
-    } else {
-      // Non-HttpException — always an unexpected 500. Log with stack so we can debug.
-      this.logger.error(
-        `Unhandled exception on ${request.method} ${request.url}`,
-        exception instanceof Error ? exception.stack : String(exception),
-      );
-
-      response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        error: "Internal server error",
-      });
+      return;
     }
+
+    // Non-HttpException — classify into an appropriate status + user-safe message.
+    // Internal details (stack, error codes) are logged but never sent to the client.
+    const { status, message } = this.classifyError(exception);
+
+    this.logger.error(
+      `HTTP ${status} ${request.method} ${request.url} — ${message}`,
+      exception instanceof Error ? exception.stack : String(exception),
+    );
+
+    response.status(status).json({ error: message });
+  }
+
+  /**
+   * Map a non-HttpException to an HTTP status and a user-safe message.
+   *
+   * Known infrastructure failures (DB down, request aborted) get specific
+   * status codes so the frontend can react appropriately. Everything else
+   * falls back to 500 with a generic message — the real detail is in the
+   * server logs, not the response body.
+   */
+  private classifyError(exception: unknown): {
+    status: HttpStatus;
+    message: string;
+  } {
+    const err = exception as { code?: string; message?: string; name?: string };
+
+    // Database / Redis connection failures → 503
+    if (
+      err?.code === "ECONNREFUSED" ||
+      err?.code === "ETIMEDOUT" ||
+      err?.code === "ENOTFOUND" ||
+      err?.code === "57P01" || // PG: admin_shutdown
+      err?.code === "57P02" || // PG: crash_shutdown
+      err?.code === "08006"    // PG: connection_failure
+    ) {
+      return {
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+        message: "Service temporarily unavailable. Please try again.",
+      };
+    }
+
+    // Request aborted / timed out → 504
+    if (
+      err?.code === "ECONNRESET" ||
+      err?.code === "ABORT_ERR" ||
+      err?.name === "AbortError"
+    ) {
+      return {
+        status: HttpStatus.GATEWAY_TIMEOUT,
+        message: "Request timed out. Please try again.",
+      };
+    }
+
+    // Truly unexpected error → 500
+    return {
+      status: HttpStatus.INTERNAL_SERVER_ERROR,
+      message: "Unexpected error occurred. Please try again.",
+    };
   }
 
   /**

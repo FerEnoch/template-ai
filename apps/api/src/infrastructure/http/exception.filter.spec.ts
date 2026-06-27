@@ -72,14 +72,43 @@ describe("HttpExceptionFilter", () => {
     expect(json).toHaveBeenCalledWith({ error: "email must be valid, name is required" });
   });
 
-  it("should return 500 with generic message for non-HttpException errors", () => {
+  it("should return 500 with user-safe message for non-HttpException errors", () => {
     const { host, status, json } = createMockHost();
     const exception = new Error("Something broke");
 
     filter.catch(exception, host);
 
     expect(status).toHaveBeenCalledWith(500);
-    expect(json).toHaveBeenCalledWith({ error: "Internal server error" });
+    expect(json).toHaveBeenCalledWith({
+      error: "Unexpected error occurred. Please try again.",
+    });
+  });
+
+  it("should map ECONNREFUSED to 503 Service Unavailable", () => {
+    const { host, status, json } = createMockHost();
+    const exception = Object.assign(new Error("connect ECONNREFUSED"), {
+      code: "ECONNREFUSED",
+    });
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(503);
+    expect(json).toHaveBeenCalledWith({
+      error: "Service temporarily unavailable. Please try again.",
+    });
+  });
+
+  it("should map AbortError to 504 Gateway Timeout", () => {
+    const { host, status, json } = createMockHost();
+    const exception = new Error("The operation was aborted");
+    exception.name = "AbortError";
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(504);
+    expect(json).toHaveBeenCalledWith({
+      error: "Request timed out. Please try again.",
+    });
   });
 
   it("should handle ServiceUnavailableException with custom object body (health check pattern)", () => {
