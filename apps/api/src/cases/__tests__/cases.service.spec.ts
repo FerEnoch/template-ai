@@ -59,7 +59,7 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
     createdAt: new Date("2025-06-01T10:00:00Z"),
     updatedAt: new Date("2025-06-01T10:00:00Z"),
     template: {
-      id: "tmpl-uuid-1",
+      id: overrides.templateId ?? "tmpl-uuid-1",
       userId: 0,
       name: "Test Template",
       description: "Test description",
@@ -113,24 +113,12 @@ function createMockPostgresService(setup: {
       });
     }
 
-    // INSERT INTO casos (create)
+    // INSERT INTO casos (create) — returns only the generated id
     if (sql.includes("INSERT INTO casos")) {
       const record = createdRecord ?? makeCaseRecord();
       return Promise.resolve({
         rowCount: 1,
-        rows: [
-          {
-            id: record.id,
-            user_id: record.userId,
-            template_id: record.templateId,
-            status: record.status,
-            form_data: record.formData,
-            generated_text: record.generatedText,
-            created_at: record.createdAt,
-            updated_at: record.updatedAt,
-            ...makeTemplateRow({ id: record.templateId }),
-          },
-        ],
+        rows: [{ id: record.id }],
       });
     }
 
@@ -245,6 +233,7 @@ describe("CasesService", () => {
 
       const { mockPostgres } = createMockPostgresService({
         createdRecord: created,
+        findByIdRecord: created,
         templateExists: true,
       });
       const service = new CasesService(mockPostgres, mockGenerationService);
@@ -255,6 +244,28 @@ describe("CasesService", () => {
       expect(result.status).toBe("borrador");
       expect(result.templateId).toBe("tmpl-uuid-1");
       expect(result.formData).toEqual({});
+    });
+
+    it("should create a case with embedded template", async () => {
+      const created = makeCaseRecord({
+        id: "new-case-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: {},
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        createdRecord: created,
+        findByIdRecord: created,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.template).toBeDefined();
+      expect(result.template.id).toBe("tmpl-uuid-1");
+      expect(result.template.name).toBe("Test Template");
     });
 
     it("should throw NotFoundException when template does not exist", async () => {

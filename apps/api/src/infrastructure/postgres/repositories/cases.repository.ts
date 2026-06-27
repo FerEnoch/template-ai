@@ -63,26 +63,27 @@ export class CasesRepository {
   constructor(private readonly client: PoolClient) {}
 
   async create(input: CreateCaseInput): Promise<CaseRecord> {
-    const result = await this.client.query<Record<string, unknown>>(
+    const insertResult = await this.client.query<Record<string, unknown>>(
       `
-        WITH inserted AS (
-          INSERT INTO casos (user_id, template_id, status, form_data)
-          VALUES ($1, $2, 'borrador', '{}')
-          RETURNING id
-        )
-        SELECT ${CASE_SELECT}
-        FROM inserted
-        JOIN casos c ON c.id = inserted.id
-        ${CASE_JOIN}
+        INSERT INTO casos (user_id, template_id, status, form_data)
+        VALUES ($1, $2, 'borrador', '{}')
+        RETURNING id
       `,
       [input.userId, input.templateId],
     );
 
-    if (result.rowCount === 0) {
+    if (insertResult.rowCount === 0 || !insertResult.rows[0]) {
       throw new Error("Failed to insert case");
     }
 
-    return rowToCase(result.rows[0]);
+    const id = insertResult.rows[0]["id"] as string;
+    const found = await this.findById(id);
+
+    if (!found) {
+      throw new Error("Failed to insert case");
+    }
+
+    return found;
   }
 
   async findById(id: string): Promise<CaseRecord | null> {

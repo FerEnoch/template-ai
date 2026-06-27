@@ -80,7 +80,7 @@ describe("HttpExceptionFilter", () => {
 
     expect(status).toHaveBeenCalledWith(500);
     expect(json).toHaveBeenCalledWith({
-      error: "Unexpected error occurred. Please try again.",
+      error: "Ocurrió un error inesperado. Intentá nuevamente.",
     });
   });
 

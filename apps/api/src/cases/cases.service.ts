@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadGatewayException,
+  InternalServerErrorException,
   Logger,
 } from "@nestjs/common";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
@@ -67,10 +68,21 @@ export class CasesService {
       }
 
       const repo = new CasesRepository(client);
-      const record = await repo.create({
-        userId,
-        templateId: data.templateId,
-      });
+      let record;
+      try {
+        record = await repo.create({
+          userId,
+          templateId: data.templateId,
+        });
+      } catch (error) {
+        this.logger.error(
+          `Failed to create case for template ${data.templateId} (user ${userId}): ${error instanceof Error ? error.message : String(error)}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+        throw new InternalServerErrorException(
+          "No se pudo crear el caso. Intentá nuevamente.",
+        );
+      }
 
       return this.mapToResponse(record);
     });
