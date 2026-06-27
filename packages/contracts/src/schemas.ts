@@ -119,6 +119,13 @@ export const CaseSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
+// Case with template: case entity with its associated template embedded
+// (used by the API to avoid forcing the client to make a second request
+// just to render the case's template metadata).
+export const CaseWithTemplateSchema = CaseSchema.extend({
+  template: TemplateSchema,
+});
+
 // Create case request: requires a valid template reference
 export const CreateCaseRequestSchema = z.object({
   templateId: z.string().uuid(),
@@ -149,6 +156,7 @@ export type WizardDraft = z.infer<typeof WizardDraftSchema>;
 export type ClassifySpanRequest = z.infer<typeof ClassifySpanRequestSchema>;
 export type ClassifySpanResponse = z.infer<typeof ClassifySpanResponseSchema>;
 export type Case = z.infer<typeof CaseSchema>;
+export type CaseWithTemplate = z.infer<typeof CaseWithTemplateSchema>;
 export type CreateCaseRequest = z.infer<typeof CreateCaseRequestSchema>;
 export type UpdateCaseFormData = z.infer<typeof UpdateCaseFormDataSchema>;
 export type GenerateDocumentResponse = z.infer<

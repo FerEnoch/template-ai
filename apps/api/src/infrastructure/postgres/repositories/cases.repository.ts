@@ -1,4 +1,5 @@
 import { PoolClient } from "pg";
+import { TemplateRecord } from "./templates.repository";
 
 export interface CaseRecord {
   id: string;
@@ -9,6 +10,7 @@ export interface CaseRecord {
   generatedText: string | null;
   createdAt: Date;
   updatedAt: Date;
+  template: TemplateRecord | null;
 }
 
 export interface CreateCaseInput {
@@ -16,8 +18,18 @@ export interface CreateCaseInput {
   templateId: string;
 }
 
+const CASE_SELECT = `
+  c.id, c.user_id, c.template_id, c.status, c.form_data, c.generated_text, c.created_at, c.updated_at,
+  t.id AS t_id, t.user_id AS t_user_id, t.name AS t_name, t.description AS t_description,
+  t.document_id AS t_document_id, t.category AS t_category, t.status AS t_status,
+  t.entities AS t_entities, t.created_at AS t_created_at, t.deleted_at AS t_deleted_at
+`;
+
+const CASE_JOIN = `LEFT JOIN templates t ON c.template_id = t.id`;
+
 function rowToCase(row: Record<string, unknown>): CaseRecord {
   const formData = row["form_data"];
+  const tId = row["t_id"] as string | null | undefined;
   return {
     id: row["id"] as string,
     userId: row["user_id"] as number,
@@ -30,6 +42,20 @@ function rowToCase(row: Record<string, unknown>): CaseRecord {
     generatedText: row["generated_text"] as string | null,
     createdAt: row["created_at"] as Date,
     updatedAt: row["updated_at"] as Date,
+    template: tId
+      ? {
+          id: tId,
+          userId: row["t_user_id"] as number,
+          name: row["t_name"] as string,
+          description: (row["t_description"] as string | null | undefined) ?? "",
+          documentId: (row["t_document_id"] as string | null | undefined) ?? null,
+          category: row["t_category"] as string,
+          status: row["t_status"] as string,
+          entities: row["t_entities"] as unknown[],
+          createdAt: row["t_created_at"] as Date,
+          deletedAt: (row["t_deleted_at"] as Date | null | undefined) ?? null,
+        }
+      : null,
   };
 }
 
@@ -39,9 +65,15 @@ export class CasesRepository {
   async create(input: CreateCaseInput): Promise<CaseRecord> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        INSERT INTO casos (user_id, template_id, status, form_data)
-        VALUES ($1, $2, 'borrador', '{}')
-        RETURNING id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
+        WITH inserted AS (
+          INSERT INTO casos (user_id, template_id, status, form_data)
+          VALUES ($1, $2, 'borrador', '{}')
+          RETURNING id
+        )
+        SELECT ${CASE_SELECT}
+        FROM inserted
+        JOIN casos c ON c.id = inserted.id
+        ${CASE_JOIN}
       `,
       [input.userId, input.templateId],
     );
@@ -56,9 +88,10 @@ export class CasesRepository {
   async findById(id: string): Promise<CaseRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
-        FROM casos
-        WHERE id = $1
+        SELECT ${CASE_SELECT}
+        FROM casos c
+        ${CASE_JOIN}
+        WHERE c.id = $1
       `,
       [id],
     );
@@ -75,23 +108,24 @@ export class CasesRepository {
     statusFilter?: string,
   ): Promise<CaseRecord[]> {
     let sql = `
-      SELECT id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
-      FROM casos
-      WHERE user_id = $1
+      SELECT ${CASE_SELECT}
+      FROM casos c
+      ${CASE_JOIN}
+      WHERE c.user_id = $1
     `;
     const params: unknown[] = [userId];
 
     if (statusFilter) {
-      sql += ` AND status = $2`;
+      sql += ` AND c.status = $2`;
       params.push(statusFilter);
     }
 
     // Exclude archived cases by default when no status filter is applied
     if (!statusFilter) {
-      sql += ` AND status != 'archivado'`;
+      sql += ` AND c.status != 'archivado'`;
     }
 
-    sql += ` ORDER BY created_at DESC`;
+    sql += ` ORDER BY c.created_at DESC`;
 
     const result = await this.client.query<Record<string, unknown>>(
       sql,
@@ -107,10 +141,16 @@ export class CasesRepository {
   ): Promise<CaseRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        UPDATE casos
-        SET form_data = $1, updated_at = now()
-        WHERE id = $2
-        RETURNING id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
+        WITH updated AS (
+          UPDATE casos
+          SET form_data = $1, updated_at = now()
+          WHERE id = $2
+          RETURNING id
+        )
+        SELECT ${CASE_SELECT}
+        FROM updated
+        JOIN casos c ON c.id = updated.id
+        ${CASE_JOIN}
       `,
       [JSON.stringify(formData), id],
     );
@@ -128,10 +168,16 @@ export class CasesRepository {
   ): Promise<CaseRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        UPDATE casos
-        SET status = $1, updated_at = now()
-        WHERE id = $2
-        RETURNING id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
+        WITH updated AS (
+          UPDATE casos
+          SET status = $1, updated_at = now()
+          WHERE id = $2
+          RETURNING id
+        )
+        SELECT ${CASE_SELECT}
+        FROM updated
+        JOIN casos c ON c.id = updated.id
+        ${CASE_JOIN}
       `,
       [status, id],
     );
@@ -149,10 +195,16 @@ export class CasesRepository {
   ): Promise<CaseRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        UPDATE casos
-        SET generated_text = $1, status = 'generado', updated_at = now()
-        WHERE id = $2 AND status != 'archivado'
-        RETURNING id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
+        WITH updated AS (
+          UPDATE casos
+          SET generated_text = $1, status = 'generado', updated_at = now()
+          WHERE id = $2 AND status != 'archivado'
+          RETURNING id
+        )
+        SELECT ${CASE_SELECT}
+        FROM updated
+        JOIN casos c ON c.id = updated.id
+        ${CASE_JOIN}
       `,
       [generatedText, id],
     );

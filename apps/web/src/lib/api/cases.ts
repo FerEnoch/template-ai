@@ -1,13 +1,12 @@
 import type {
   Template,
   Case,
+  CaseWithTemplate,
   CreateCaseRequest,
   UpdateCaseFormData,
 } from "@template-ai/contracts";
 
-export interface CaseWithTemplate extends Case {
-  template: Template;
-}
+export type { CaseWithTemplate };
 
 export interface ExtractedTextResponse {
   extractedText: string | null;

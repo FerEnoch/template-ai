@@ -20,6 +20,34 @@ const mockGenerationService = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function makeTemplateRow(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    description: string;
+    documentId: string | null;
+    category: string;
+    status: string;
+    entities: unknown[];
+    createdAt: Date;
+    deletedAt: Date | null;
+    userId: number;
+  }> = {},
+) {
+  return {
+    t_id: overrides.id ?? "tmpl-uuid-1",
+    t_user_id: overrides.userId ?? 0,
+    t_name: overrides.name ?? "Test Template",
+    t_description: overrides.description ?? "Test description",
+    t_document_id: overrides.documentId ?? null,
+    t_category: overrides.category ?? "general",
+    t_status: overrides.status ?? "published",
+    t_entities: overrides.entities ?? [],
+    t_created_at: overrides.createdAt ?? new Date("2025-06-01T10:00:00Z"),
+    t_deleted_at: overrides.deletedAt ?? null,
+  };
+}
+
 function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
   return {
     id: "case-uuid-1",
@@ -30,6 +58,18 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
     generatedText: null,
     createdAt: new Date("2025-06-01T10:00:00Z"),
     updatedAt: new Date("2025-06-01T10:00:00Z"),
+    template: {
+      id: "tmpl-uuid-1",
+      userId: 0,
+      name: "Test Template",
+      description: "Test description",
+      documentId: null,
+      category: "general",
+      status: "published",
+      entities: [],
+      createdAt: new Date("2025-06-01T10:00:00Z"),
+      deletedAt: null,
+    },
     ...overrides,
   };
 }
@@ -88,6 +128,7 @@ function createMockPostgresService(setup: {
             generated_text: record.generatedText,
             created_at: record.createdAt,
             updated_at: record.updatedAt,
+            ...makeTemplateRow({ id: record.templateId }),
           },
         ],
       });
@@ -97,7 +138,7 @@ function createMockPostgresService(setup: {
     if (
       sql.includes("SELECT") &&
       sql.includes("FROM casos") &&
-      sql.includes("WHERE id =")
+      (sql.includes("WHERE id =") || sql.includes("WHERE c.id ="))
     ) {
       if (!findByIdRecord) {
         return Promise.resolve({ rowCount: 0, rows: [] });
@@ -114,6 +155,7 @@ function createMockPostgresService(setup: {
             generated_text: findByIdRecord.generatedText,
             created_at: findByIdRecord.createdAt,
             updated_at: findByIdRecord.updatedAt,
+            ...makeTemplateRow({ id: findByIdRecord.templateId }),
           },
         ],
       });
@@ -123,7 +165,7 @@ function createMockPostgresService(setup: {
     if (
       sql.includes("SELECT") &&
       sql.includes("FROM casos") &&
-      sql.includes("WHERE user_id =")
+      (sql.includes("WHERE user_id =") || sql.includes("WHERE c.user_id ="))
     ) {
       return Promise.resolve({
         rowCount: caseRecords.length,
@@ -136,6 +178,7 @@ function createMockPostgresService(setup: {
           generated_text: r.generatedText,
           created_at: r.createdAt,
           updated_at: r.updatedAt,
+          ...makeTemplateRow({ id: r.templateId }),
         })),
       });
     }
@@ -157,6 +200,7 @@ function createMockPostgresService(setup: {
             generated_text: updateRecord.generatedText,
             created_at: updateRecord.createdAt,
             updated_at: updateRecord.updatedAt,
+            ...makeTemplateRow({ id: updateRecord.templateId }),
           },
         ],
       });
@@ -253,6 +297,25 @@ describe("CasesService", () => {
       await expect(
         service.findOne(0, "non-existent"),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should return the embedded template in the response", async () => {
+      const record = makeCaseRecord({
+        id: "case-uuid-1",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: record,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.findOne(0, "case-uuid-1");
+
+      expect(result.template).toBeDefined();
+      expect(result.template.id).toBe("tmpl-uuid-1");
+      expect(result.template.name).toBe("Test Template");
     });
   });
 
