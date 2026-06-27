@@ -1,5 +1,6 @@
 import {
   Injectable,
+  HttpException,
   NotFoundException,
   ConflictException,
   BadGatewayException,
@@ -222,68 +223,94 @@ export class CasesService {
    * (ECONNREFUSED) when the HTTP layer aborted the socket.
    */
   async generate(userId: number, id: string): Promise<CaseResponse> {
-    // --- Read phase: fetch case + template data in a short-lived transaction ---
-    const { caseRecord, baseText } = await this.postgres.withOwnerTransaction(
-      userId,
-      async ({ client }) => {
-        const repo = new CasesRepository(client);
-        const record = await repo.findById(id);
+    this.logger.log(`Starting generation for case ${id} (user ${userId})`);
 
-        if (!record) {
-          throw new NotFoundException(`Case with id "${id}" not found`);
-        }
+    try {
+      // --- Read phase: fetch case + template data in a short-lived transaction ---
+      const { caseRecord, baseText } = await this.postgres.withOwnerTransaction(
+        userId,
+        async ({ client }) => {
+          const repo = new CasesRepository(client);
+          const record = await repo.findById(id);
 
-        if (record.status === "archivado") {
-          throw new ConflictException(
-            `Case "${id}" is archived and cannot be regenerated.`,
-          );
-        }
+          if (!record) {
+            throw new NotFoundException(`Case with id "${id}" not found`);
+          }
 
-        if (!record.template) {
-          throw new NotFoundException(`Template for case "${id}" not found`);
-        }
+          if (record.status === "archivado") {
+            throw new ConflictException(
+              `Case "${id}" is archived and cannot be regenerated.`,
+            );
+          }
 
-        // Fetch base extracted text from the template's source document
-        let text: string | null = null;
-        if (record.template.documentId) {
-          const txtResult = await client.query(
-            `SELECT extracted_text FROM analysis_results WHERE document_id = $1`,
-            [record.template.documentId],
-          );
-          text = (txtResult.rows[0]?.extracted_text as string) ?? null;
-        }
+          if (!record.template) {
+            throw new NotFoundException(`Template for case "${id}" not found`);
+          }
 
-        return {
-          caseRecord: record,
-          baseText: text,
-        };
-      },
-    );
+          // Fetch base extracted text from the template's source document
+          let text: string | null = null;
+          if (record.template.documentId) {
+            const txtResult = await client.query(
+              `SELECT extracted_text FROM analysis_results WHERE document_id = $1`,
+              [record.template.documentId],
+            );
+            text = (txtResult.rows[0]?.extracted_text as string) ?? null;
+          }
 
-    // --- AI generation phase: runs OUTSIDE any DB transaction ---
-    const genResult = await this.generationService.generate({
-      entities: (caseRecord.template?.entities as Array<{
-        id: string;
-        label: string;
-        value: string;
-        group: string;
-      }>) ?? [],
-      formData: caseRecord.formData,
-      baseText,
-    });
+          this.logger.log(`Read phase done: case ${id}, status=${record.status}, entities=${(record.template?.entities as unknown[] | undefined)?.length ?? 0}, hasBaseText=${text !== null}`);
 
-    if (!genResult.success) {
-      this.logger.error(
-        `Generation failed for case ${id}: ${genResult.error} (${genResult.errorType})`,
+          return {
+            caseRecord: record,
+            baseText: text,
+          };
+        },
       );
-      throw new BadGatewayException(
-        "Document generation failed. Please try again.",
+
+      // --- AI generation phase: runs OUTSIDE any DB transaction ---
+      this.logger.log(`Calling AI generation for case ${id}...`);
+      const genResult = await this.generationService.generate({
+        entities: (caseRecord.template?.entities as Array<{
+          id: string;
+          label: string;
+          value: string;
+          group: string;
+        }>) ?? [],
+        formData: caseRecord.formData,
+        baseText,
+      });
+
+      if (!genResult.success) {
+        this.logger.error(
+          `Generation failed for case ${id}: ${genResult.error} (${genResult.errorType})`,
+        );
+        throw new BadGatewayException(
+          "Document generation failed. Please try again.",
+        );
+      }
+
+      this.logger.log(`AI generation succeeded for case ${id}`);
+
+      // --- Write phase: persist generated text in a short-lived transaction ---
+      const generatedText = genResult.generatedText ?? "";
+      const result = await this.setGeneratedText(userId, id, generatedText);
+      this.logger.log(`Generation complete for case ${id}`);
+      return result;
+    } catch (error) {
+      // HttpExceptions (NotFound, Conflict, BadGateway) are re-thrown as-is
+      // so the exception filter returns the correct status code + message.
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // Unexpected error — log with full stack and throw a user-friendly 500.
+      this.logger.error(
+        `Unexpected error generating case ${id}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new InternalServerErrorException(
+        "No se pudo generar el documento. Intentá nuevamente.",
       );
     }
-
-    // --- Write phase: persist generated text in a short-lived transaction ---
-    const generatedText = genResult.generatedText ?? "";
-    return this.setGeneratedText(userId, id, generatedText);
   }
 
   private mapToResponse(record: CaseRecord): CaseResponse {
