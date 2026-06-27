@@ -151,7 +151,7 @@ export class CasesRepository {
       `
         UPDATE casos
         SET generated_text = $1, status = 'generado', updated_at = now()
-        WHERE id = $2
+        WHERE id = $2 AND status != 'archivado'
         RETURNING id, user_id, template_id, status, form_data, generated_text, created_at, updated_at
       `,
       [generatedText, id],

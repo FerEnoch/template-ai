@@ -6,13 +6,32 @@ import { AppModule } from "./app.module";
 import { getApiEnv } from "./config/env";
 import { HttpExceptionFilter } from "./infrastructure/http/exception.filter";
 
-// Request timeout: AI inference calls (document generation via OpenRouter) can
-// take 30-60s with retries. We set the timeout high enough to accommodate that.
-// Previously 30s, which caused ECONNRESET on the generate endpoint because the
-// Node.js HTTP server closes the socket when the timeout fires — even for
-// in-flight responses, not just request reception.
+// Timeout configuration for long-running AI generation requests.
+//
+// server.requestTimeout (120s): Maximum time to receive the complete HTTP
+//   request headers + body. The Node.js HTTP server destroys the socket when
+//   this fires — even for in-flight responses, NOT just request reception.
+//   This was the root cause of the original ECONNRESET crash on /generate.
+//
+// server.timeout (0 = disabled): Socket inactivity timer. DELIBERATELY kept
+//   at 0 because during AI generation (OpenRouter, 30-60s + retries) NO bytes
+//   flow on the socket — it sits completely idle while the backend waits for
+//   the upstream model. A non-zero value would destroy the socket mid-flight
+//   and re-trigger the exact ECONNRESET/ECONNREFUSED crashes this timeout
+//   config was designed to fix.
+//
+//   Trade-off: disabling the inactivity timer removes a layer of slow-loris
+//   protection. That protection is handled by requestTimeout (caps request
+//   reception), headersTimeout (caps header arrival for keep-alive), and
+//   keepAliveTimeout (caps keep-alive idle between requests).
+//
+// server.keepAliveTimeout (75s): Idle keep-alive connection lifetime.
+// server.headersTimeout (76s): Must be > keepAliveTimeout to avoid races.
+//
+// Reference: https://nodejs.org/api/http.html#servertimeout
+// server.timeout is deprecated since Node 18; prefer server.requestTimeout.
 const REQUEST_TIMEOUT_MS = 120 * 1000;
-const SOCKET_TIMEOUT_MS = 0; // no socket inactivity timeout
+const SOCKET_TIMEOUT_MS = 0; // disabled — see explanation above
 const KEEP_ALIVE_TIMEOUT_MS = 75 * 1000;
 const HEADERS_TIMEOUT_MS = 76 * 1000;
 

@@ -127,7 +127,7 @@ export class CasesController {
   /**
    * POST /api/cases/:id/generate — trigger AI document generation.
    * Orchestrates: fetch case + template entities + base text → call AI → update case.
-   * Blocks regeneration if the case is already generated or archived.
+   * Blocks regeneration if the case is archived.
    */
   @Post(":id/generate")
   public async generate(
@@ -135,11 +135,9 @@ export class CasesController {
   ): Promise<CaseResponse> {
     const caseData = await this.casesService.findOne(0, id);
 
-    if (caseData.status === "generado" || caseData.status === "archivado") {
+    if (caseData.status === "archivado") {
       throw new ConflictException(
-        caseData.status === "generado"
-          ? `Case "${id}" has already been generated.`
-          : `Case "${id}" is archived and cannot be regenerated.`,
+        `Case "${id}" is archived and cannot be regenerated.`,
       );
     }
 

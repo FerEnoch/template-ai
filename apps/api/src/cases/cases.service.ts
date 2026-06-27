@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadGatewayException,
   Logger,
 } from "@nestjs/common";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
@@ -180,7 +181,14 @@ export class CasesService {
       const updated = await repo.updateGeneratedText(id, generatedText);
 
       if (!updated) {
-        throw new NotFoundException(`Case with id "${id}" not found`);
+        // Distinguish: missing row vs stale write (case was archived/deleted during AI call)
+        const current = await repo.findById(id);
+        if (!current) {
+          throw new NotFoundException(`Case with id "${id}" not found`);
+        }
+        throw new ConflictException(
+          `Case status changed during generation (now: ${current.status})`,
+        );
       }
 
       return this.mapToResponse(updated);
@@ -212,14 +220,9 @@ export class CasesService {
             throw new NotFoundException(`Case with id "${id}" not found`);
           }
 
-          if (
-            record.status === "generado" ||
-            record.status === "archivado"
-          ) {
+          if (record.status === "archivado") {
             throw new ConflictException(
-              record.status === "generado"
-                ? `Case "${id}" has already been generated.`
-                : `Case "${id}" is archived and cannot be regenerated.`,
+              `Case "${id}" is archived and cannot be regenerated.`,
             );
           }
 
@@ -265,7 +268,7 @@ export class CasesService {
       this.logger.error(
         `Generation failed for case ${id}: ${genResult.error} (${genResult.errorType})`,
       );
-      throw new ConflictException(
+      throw new BadGatewayException(
         `Document generation failed: ${genResult.error ?? "Unknown error"}`,
       );
     }

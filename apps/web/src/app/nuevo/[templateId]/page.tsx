@@ -10,7 +10,6 @@ import {
   createCase,
   generateCase,
   fetchCase,
-  ApiError,
 } from "@/lib/api/cases";
 
 function NewCasePageContent() {
@@ -74,26 +73,27 @@ function NewCasePageContent() {
       const generated = await generateCase(state.caseId);
       router.push(`/preview/${generated.id}`);
     } catch (err) {
-      // 409 — case was already generated (by a previous attempt that timed out
-      // on the proxy but completed on the backend). Redirect to preview.
-      if (err instanceof ApiError && err.status === 409) {
+      // Check if the case was generated/archived despite the error
+      let currentStatus: string | null = null;
+      try {
+        const currentCase = await fetchCase(state.caseId);
+        currentStatus = currentCase.status;
+      } catch {
+        // Could not check — fall through to generic error handling
+      }
+
+      if (currentStatus === "generado") {
         router.push(`/preview/${state.caseId}`);
         return;
       }
 
-      // On any other error (e.g. ECONNRESET / proxy timeout), the backend may
-      // have still completed the generation in the background. Check the case
-      // status — if it's now 'generado', redirect instead of showing an error.
-      try {
-        const currentCase = await fetchCase(state.caseId);
-        if (currentCase.status === "generado") {
-          router.push(`/preview/${state.caseId}`);
-          return;
-        }
-      } catch {
-        // Could not check status — fall through to show the original error
+      if (currentStatus === "archivado") {
+        setGenerationError("El caso fue archivado y no puede regenerarse.");
+        setStatus("idle");
+        return;
       }
 
+      // Any other error — surface it
       setGenerationError(
         err instanceof Error
           ? err.message
