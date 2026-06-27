@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   async rewrites() {
     // Default to same-origin (empty string) for production behind reverse proxy.
     // Override with API_BASE_URL=http://localhost:3001 in .env.local for development.
