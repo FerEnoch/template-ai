@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   BadRequestException,
-  ConflictException,
   HttpCode,
   Logger,
 } from "@nestjs/common";
@@ -133,14 +132,6 @@ export class CasesController {
   public async generate(
     @Param("id") id: string,
   ): Promise<CaseResponse> {
-    const caseData = await this.casesService.findOne(0, id);
-
-    if (caseData.status === "archivado") {
-      throw new ConflictException(
-        `Case "${id}" is archived and cannot be regenerated.`,
-      );
-    }
-
     return this.casesService.generate(0, id);
   }
 

@@ -329,22 +329,29 @@ describe("CasesService", () => {
       expect(result.formData).toEqual({ ent_1: "Juan Pérez" });
     });
 
-    it("should throw ConflictException when updating a generado case", async () => {
+    it("should allow updating a generado case (supports re-generation)", async () => {
       const existing = makeCaseRecord({
         id: "case-uuid-1",
         status: "generado",
+        formData: { ent_1: "old" },
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "generado",
+        formData: { ent_1: "value" },
       });
 
       const { mockPostgres } = createMockPostgresService({
         findByIdRecord: existing,
+        updateRecord: updated,
       });
       const service = new CasesService(mockPostgres, mockGenerationService);
 
-      await expect(
-        service.updateFormData(0, "case-uuid-1", {
-          formData: { ent_1: "value" },
-        }),
-      ).rejects.toThrow(ConflictException);
+      const result = await service.updateFormData(0, "case-uuid-1", {
+        formData: { ent_1: "value" },
+      });
+
+      expect(result.formData).toEqual({ ent_1: "value" });
     });
 
     it("should throw ConflictException when updating an archivado case", async () => {

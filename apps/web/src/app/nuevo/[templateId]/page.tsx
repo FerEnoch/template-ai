@@ -88,8 +88,7 @@ function NewCasePageContent() {
       }
 
       if (currentStatus === "archivado") {
-        setGenerationError("El caso fue archivado y no puede regenerarse.");
-        setStatus("idle");
+        router.push("/biblioteca");
         return;
       }
 

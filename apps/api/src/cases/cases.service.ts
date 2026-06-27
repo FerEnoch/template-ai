@@ -108,7 +108,7 @@ export class CasesService {
 
   /**
    * Update form data on a case.
-   * Only borrador cases can be updated — generado/archivado are read-only (409).
+   * Only archivado cases are read-only. generado cases can be edited to allow re-generation.
    */
   async updateFormData(
     userId: number,
@@ -123,9 +123,9 @@ export class CasesService {
         throw new NotFoundException(`Case with id "${id}" not found`);
       }
 
-      if (existing.status === "generado" || existing.status === "archivado") {
+      if (existing.status === "archivado") {
         throw new ConflictException(
-          `Case "${id}" is locked (status: ${existing.status}). Cannot update form data.`,
+          `Case "${id}" is archived. Cannot update form data.`,
         );
       }
 
@@ -269,7 +269,7 @@ export class CasesService {
         `Generation failed for case ${id}: ${genResult.error} (${genResult.errorType})`,
       );
       throw new BadGatewayException(
-        `Document generation failed: ${genResult.error ?? "Unknown error"}`,
+        "Document generation failed. Please try again.",
       );
     }
 
