@@ -21,20 +21,29 @@ export default function BibliotecaPage() {
       const data: Template[] = await response.json();
       setTemplates(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error desconocido"
-      );
+      setError(err instanceof Error ? err.message : "Error desconocido");
     } finally {
       setIsLoading(false);
     }
   }, []);
+
+  const handleDelete = useCallback(
+    (id: string) => {
+      setTemplates((prev) => prev.filter((template) => template.id !== id));
+    },
+    [setTemplates]
+  );
+
+  const handleDeleteError = useCallback(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
 
   return (
-    <AppShell activeSidebarItem="Biblioteca">
+    <AppShell activeSidebarItem="Plantillas">
       <div className="mx-auto max-w-7xl px-6 pb-16 pt-10">
         {/* Header */}
         <header className="mb-8">
@@ -60,6 +69,8 @@ export default function BibliotecaPage() {
           isLoading={isLoading}
           error={error}
           onRetry={fetchTemplates}
+          onDelete={handleDelete}
+          onDeleteError={handleDeleteError}
         />
       </div>
     </AppShell>
