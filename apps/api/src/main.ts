@@ -6,9 +6,13 @@ import { AppModule } from "./app.module";
 import { getApiEnv } from "./config/env";
 import { HttpExceptionFilter } from "./infrastructure/http/exception.filter";
 
-// 30s request timeout — async workers handle AI inference,
-// no more blocking HTTP connections for 20-30s.
-const REQUEST_TIMEOUT_MS = 30 * 1000;
+// Request timeout: AI inference calls (document generation via OpenRouter) can
+// take 30-60s with retries. We set the timeout high enough to accommodate that.
+// Previously 30s, which caused ECONNRESET on the generate endpoint because the
+// Node.js HTTP server closes the socket when the timeout fires — even for
+// in-flight responses, not just request reception.
+const REQUEST_TIMEOUT_MS = 120 * 1000;
+const SOCKET_TIMEOUT_MS = 0; // no socket inactivity timeout
 const KEEP_ALIVE_TIMEOUT_MS = 75 * 1000;
 const HEADERS_TIMEOUT_MS = 76 * 1000;
 
@@ -48,6 +52,7 @@ async function bootstrap() {
 
   const server = app.getHttpServer() as Server;
   server.requestTimeout = REQUEST_TIMEOUT_MS;
+  server.timeout = SOCKET_TIMEOUT_MS;
   server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
   server.headersTimeout = HEADERS_TIMEOUT_MS;
 }

@@ -212,9 +212,14 @@ export class CasesService {
             throw new NotFoundException(`Case with id "${id}" not found`);
           }
 
-          if (record.status === "archivado") {
+          if (
+            record.status === "generado" ||
+            record.status === "archivado"
+          ) {
             throw new ConflictException(
-              `Case "${id}" is archived and cannot be regenerated.`,
+              record.status === "generado"
+                ? `Case "${id}" has already been generated.`
+                : `Case "${id}" is archived and cannot be regenerated.`,
             );
           }
 
