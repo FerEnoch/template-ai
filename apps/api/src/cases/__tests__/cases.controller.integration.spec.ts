@@ -194,7 +194,7 @@ describe("CasesController integration", () => {
           (res: IncomingMessage) => {
             let data = "";
             res.on("data", (chunk: string) => (data += chunk));
-            res.on("end", () => resolve({ status: res.statusCode }));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
           },
         );
         req.setHeader("Content-Type", "application/json");
@@ -220,7 +220,7 @@ describe("CasesController integration", () => {
           (res: IncomingMessage) => {
             let data = "";
             res.on("data", (chunk: string) => (data += chunk));
-            res.on("end", () => resolve({ status: res.statusCode }));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
           },
         );
         req.setHeader("Content-Type", "application/json");
@@ -276,7 +276,7 @@ describe("CasesController integration", () => {
           (res: IncomingMessage) => {
             let data = "";
             res.on("data", (chunk: string) => (data += chunk));
-            res.on("end", () => resolve({ status: res.statusCode }));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
           },
         );
         req.end();
@@ -297,7 +297,7 @@ describe("CasesController integration", () => {
           (res: IncomingMessage) => {
             let data = "";
             res.on("data", (chunk: string) => (data += chunk));
-            res.on("end", () => resolve({ status: res.statusCode }));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
           },
         );
         req.setHeader("Content-Type", "application/json");
@@ -320,7 +320,7 @@ describe("CasesController integration", () => {
           (res: IncomingMessage) => {
             let data = "";
             res.on("data", (chunk: string) => (data += chunk));
-            res.on("end", () => resolve({ status: res.statusCode }));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
           },
         );
         req.end();

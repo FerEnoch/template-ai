@@ -21,16 +21,16 @@ Tracker: `feature/new-case-flow-tracker` (draft). Bases: PR#2→PR#1, PR#3→PR#
 
 ## Phase 2: PR #2 — API Layer + AI Service
 
-- [ ] 2.1 RED: `cases.service.spec.ts` — mock repo, create/get/list/update/archive + 404/409
-- [ ] 2.2 RED: `cases.controller.integration.spec.ts` — supertest, Zod/401/404/409/422/502
-- [ ] 2.3 RED: `document-generation.service.spec.ts` — mock OpenRouter, prompt, 3-retry, NULL fallback
-- [ ] 2.4 GREEN: `apps/api/src/infrastructure/postgres/repositories/cases.repository.ts` (RLS CRUD)
-- [ ] 2.5 GREEN: `apps/api/src/cases/cases.service.ts` (orchestration)
-- [ ] 2.6 GREEN: `apps/api/src/cases/cases.controller.ts` (5 endpoints + `safeParse` + error map)
-- [ ] 2.7 GREEN: `apps/api/src/ai/document-generation.service.ts` (prompt + OpenRouter + retry)
-- [ ] 2.8 Add `AI_GENERATION_MAX_TOKENS=16384` + `AI_GENERATION_TEMPERATURE=0.3` to `config/ai.ts`
-- [ ] 2.9 Add `GET /api/templates/:id/extracted-text` to `templates.controller.ts`
-- [ ] 2.10 Create `cases.module.ts`; register in `app.module.ts` + `ai.module.ts`
+- [x] 2.1 RED: `cases.service.spec.ts` — mock repo, create/get/list/update/archive + 404/409
+- [x] 2.2 RED: `cases.controller.integration.spec.ts` — supertest, Zod/401/404/409/422/502
+- [x] 2.3 RED: `document-generation.service.spec.ts` — mock OpenRouter, prompt, 3-retry, NULL fallback
+- [x] 2.4 GREEN: `apps/api/src/infrastructure/postgres/repositories/cases.repository.ts` (RLS CRUD)
+- [x] 2.5 GREEN: `apps/api/src/cases/cases.service.ts` (orchestration)
+- [x] 2.6 GREEN: `apps/api/src/cases/cases.controller.ts` (5 endpoints + `safeParse` + error map)
+- [x] 2.7 GREEN: `apps/api/src/ai/document-generation.service.ts` (prompt + OpenRouter + retry)
+- [x] 2.8 Add `AI_GENERATION_MAX_TOKENS=16384` + `AI_GENERATION_TEMPERATURE=0.3` to `config/ai.ts`
+- [x] 2.9 Add `GET /api/templates/:id/extracted-text` to `templates.controller.ts`
+- [x] 2.10 Create `cases.module.ts`; register in `app.module.ts` + `ai.module.ts`
 
 ## Phase 3: PR #3 — New-Case Form UI
 
@@ -48,17 +48,17 @@ Tracker: `feature/new-case-flow-tracker` (draft). Bases: PR#2→PR#1, PR#3→PR#
 
 ## Phase 4: PR #4 — Preview + Export
 
-- [ ] 4.1 RED: `splitParagraphs.test.ts` — `\n\n` split + empty filter
-- [ ] 4.2 RED: `EditableParagraph.test.tsx` — contenteditable + save/cancel + callback
-- [ ] 4.3 RED: `VerificationChecklist.test.tsx` — 3 sections, local state
-- [ ] 4.4 RED: `exporters.test.ts` — filename `${slug}-${id.slice(0,8)}.${ext}`
-- [ ] 4.5 Add `jspdf@^2.5` + `docx@^8.5` to `apps/web/package.json`
-- [ ] 4.6 GREEN: `apps/web/src/lib/export/pdf.ts` + `lib/export/docx.ts`
-- [ ] 4.7 GREEN: `DocumentViewer.tsx` + `EditableParagraph.tsx` (PATCH on save)
-- [ ] 4.8 GREEN: `VerificationChecklist.tsx` + `ExportPanel.tsx` + `ExportSpinner.tsx`
-- [ ] 4.9 GREEN: `apps/web/src/app/preview/[caseId]/page.tsx` (case fetch + redirect guard)
-- [ ] 4.10 Modify `apps/web/src/app/biblioteca/[id]/page.tsx` — "Crear nuevo caso" CTA
-- [ ] 4.11 Playwright: form → generate → preview → export PDF + DOCX; assert `exportado`
+- [x] 4.1 RED: `splitParagraphs.test.ts` — `\n\n` split + empty filter
+- [x] 4.2 RED: `EditableParagraph.test.tsx` — contenteditable + save/cancel + callback
+- [x] 4.3 RED: `VerificationChecklist.test.tsx` — 3 sections, local state
+- [x] 4.4 RED: `exporters.test.ts` — filename `${slug}-${id.slice(0,8)}.${ext}`
+- [x] 4.5 Add `jspdf@^2.5` + `docx@^8.5` to `apps/web/package.json`
+- [x] 4.6 GREEN: `apps/web/src/lib/export/pdf.ts` + `lib/export/docx.ts`
+- [x] 4.7 GREEN: `DocumentViewer.tsx` + `EditableParagraph.tsx` (PATCH on save)
+- [x] 4.8 GREEN: `VerificationChecklist.tsx` + `ExportPanel.tsx` + `ExportSpinner.tsx`
+- [x] 4.9 GREEN: `apps/web/src/app/preview/[caseId]/page.tsx` (case fetch + redirect guard)
+- [x] 4.10 Modify `apps/web/src/app/biblioteca/[id]/page.tsx` — "Crear nuevo caso" CTA
+- [x] 4.11 Playwright: form → generate → preview → export PDF + DOCX; assert `exportado`
 
 ## Phase 5: Verification (post-merge)
 

@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   BadRequestException,
+  ConflictException,
   HttpCode,
   Logger,
 } from "@nestjs/common";
@@ -131,20 +132,15 @@ export class CasesController {
   public async generate(
     @Param("id") id: string,
   ): Promise<CaseResponse> {
-    // For now, this is a placeholder that delegates to the service.
-    // The full orchestration (fetching entities, base text, calling AI)
-    // will be wired when the full generation flow is integrated.
-    // For the PR scope, we validate the case exists and is in borrador status.
     const caseData = await this.casesService.findOne(0, id);
 
     if (caseData.status === "archivado") {
-      throw new BadRequestException(
+      throw new ConflictException(
         `Case "${id}" is archived and cannot be regenerated.`,
       );
     }
 
-    // Return the case — full generation orchestration is in Task 2.7 integration
-    return caseData;
+    return this.casesService.generate(0, id);
   }
 
   /**
