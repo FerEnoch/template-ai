@@ -6,6 +6,8 @@ import {
   ClassifySpanRequestSchema,
   ClassifySpanResponseSchema,
   MANUAL_ENTITY_LIMIT,
+  UpdateTemplateNameSchema,
+  CaseSchema,
 } from "./schemas.js";
 
 describe("EntitySchema", () => {
@@ -235,6 +237,90 @@ describe("ClassifySpanRequestSchema", () => {
     const result = ClassifySpanRequestSchema.safeParse({
       text: "hello",
       sourceSpan: { start: 0, end: 5 },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("UpdateTemplateNameSchema", () => {
+  it("parses a valid name", () => {
+    const result = UpdateTemplateNameSchema.safeParse({ name: "Contrato Alquiler" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Contrato Alquiler");
+    }
+  });
+
+  it("rejects an empty name", () => {
+    const result = UpdateTemplateNameSchema.safeParse({ name: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a whitespace-only name", () => {
+    const result = UpdateTemplateNameSchema.safeParse({ name: "   " });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a name over 200 characters", () => {
+    const result = UpdateTemplateNameSchema.safeParse({ name: "a".repeat(201) });
+    expect(result.success).toBe(false);
+  });
+
+  it("trims surrounding whitespace", () => {
+    const result = UpdateTemplateNameSchema.safeParse({ name: "  Contrato Alquiler  " });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Contrato Alquiler");
+    }
+  });
+});
+
+describe("CaseSchema name field", () => {
+  const baseCase = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    userId: 1,
+    templateId: "660e8400-e29b-41d4-a716-446655440001",
+    status: "borrador" as const,
+    formData: { ent_1: "Juan Pérez" },
+    generatedText: null,
+    createdAt: "2025-01-01T00:00:00.000Z",
+    updatedAt: "2025-01-01T00:00:00.000Z",
+  };
+
+  it("accepts a custom name", () => {
+    const result = CaseSchema.safeParse({
+      ...baseCase,
+      name: "Contrato Pérez",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Contrato Pérez");
+    }
+  });
+
+  it("accepts name as null", () => {
+    const result = CaseSchema.safeParse({
+      ...baseCase,
+      name: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBeNull();
+    }
+  });
+
+  it("accepts case without name for backward compatibility", () => {
+    const result = CaseSchema.safeParse(baseCase);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBeUndefined();
+    }
+  });
+
+  it("rejects a name over 200 characters", () => {
+    const result = CaseSchema.safeParse({
+      ...baseCase,
+      name: "a".repeat(201),
     });
     expect(result.success).toBe(false);
   });

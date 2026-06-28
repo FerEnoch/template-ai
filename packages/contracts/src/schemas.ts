@@ -113,6 +113,7 @@ export const CaseSchema = z.object({
   userId: z.number(),
   templateId: z.string().uuid(),
   status: CaseStatus,
+  name: z.string().max(200).nullable().optional(),
   formData: z.record(z.string(), z.string()),
   generatedText: z.string().nullable(),
   createdAt: z.string().datetime(),
@@ -135,6 +136,12 @@ export const CreateCaseRequestSchema = z.object({
 export const UpdateCaseFormDataSchema = z.object({
   formData: z.record(z.string(), z.string()).optional(),
   status: CaseStatus.optional(),
+  name: z.string().trim().max(200).nullable().optional(),
+});
+
+// Update template name: inline rename payload
+export const UpdateTemplateNameSchema = z.object({
+  name: z.string().trim().min(3).max(200),
 });
 
 // Generate document response: AI-generated text (must be non-empty)
@@ -159,6 +166,7 @@ export type Case = z.infer<typeof CaseSchema>;
 export type CaseWithTemplate = z.infer<typeof CaseWithTemplateSchema>;
 export type CreateCaseRequest = z.infer<typeof CreateCaseRequestSchema>;
 export type UpdateCaseFormData = z.infer<typeof UpdateCaseFormDataSchema>;
+export type UpdateTemplateName = z.infer<typeof UpdateTemplateNameSchema>;
 export type GenerateDocumentResponse = z.infer<
   typeof GenerateDocumentResponseSchema
 >;
