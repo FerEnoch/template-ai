@@ -16,8 +16,17 @@ function NewCasePageContent() {
   const params = useParams();
   const router = useRouter();
   const templateId = params.templateId as string;
-  const { state, setTemplate, setCase, setLoading, setError, setStatus, setGenerationError, saveForm } =
-    useCase();
+  const {
+    state,
+    setTemplate,
+    setCase,
+    setLoading,
+    setError,
+    setStatus,
+    setGenerationError,
+    saveForm,
+    clearDraft,
+  } = useCase();
 
   useEffect(() => {
     let cancelled = false;
@@ -57,12 +66,13 @@ function NewCasePageContent() {
   const handleSave = useCallback(async () => {
     try {
       await saveForm();
+      clearDraft();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al guardar el borrador"
       );
     }
-  }, [saveForm, setError]);
+  }, [saveForm, setError, clearDraft]);
 
   const handleGenerate = useCallback(async () => {
     if (!state.caseId) return;
@@ -72,6 +82,7 @@ function NewCasePageContent() {
       await saveForm();
       const generated = await generateCase(state.caseId);
       router.push(`/preview/${generated.id}`);
+      clearDraft();
     } catch (err) {
       // Check if the case was generated/archived despite the error
       let currentStatus: string | null = null;
@@ -100,7 +111,7 @@ function NewCasePageContent() {
       );
       setStatus("idle");
     }
-  }, [state.caseId, saveForm, router, setStatus, setGenerationError]);
+  }, [state.caseId, saveForm, router, setStatus, setGenerationError, clearDraft]);
 
   if (state.loading) {
     return (
