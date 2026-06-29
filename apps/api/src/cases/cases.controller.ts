@@ -112,24 +112,25 @@ export class CasesController {
       );
     }
 
+    let result: CaseResponse | undefined;
+
+    // Always rename first when a name is provided so it is not silently
+    // dropped when combined with formData or status updates.
+    if (parsed.data.name !== undefined) {
+      result = await this.casesService.updateName(0, id, parsed.data.name);
+    }
+
     // If only status is provided and it's 'archivado', archive the case
     if (parsed.data.status === "archivado" && !parsed.data.formData) {
-      return this.casesService.archive(0, id);
+      result = await this.casesService.archive(0, id);
+    } else if (parsed.data.formData !== undefined || parsed.data.status !== undefined) {
+      result = await this.casesService.updateFormData(0, id, {
+        formData: parsed.data.formData,
+        status: parsed.data.status,
+      });
     }
 
-    // If only name is provided, rename the case
-    if (
-      parsed.data.name !== undefined &&
-      parsed.data.formData === undefined &&
-      parsed.data.status === undefined
-    ) {
-      return this.casesService.updateName(0, id, parsed.data.name);
-    }
-
-    return this.casesService.updateFormData(0, id, {
-      formData: parsed.data.formData,
-      status: parsed.data.status,
-    });
+    return result ?? (await this.casesService.findOne(0, id));
   }
 
   /**
