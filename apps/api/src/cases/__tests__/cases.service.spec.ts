@@ -77,6 +77,7 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
 function createMockPostgresService(setup: {
   caseRecords?: CaseRecord[];
   createdRecord?: CaseRecord;
+  createError?: Error;
   findByIdRecord?: CaseRecord | null;
   findBorradorRecord?: CaseRecord | null;
   templateExists?: boolean;
@@ -88,6 +89,7 @@ function createMockPostgresService(setup: {
   const {
     caseRecords = [],
     createdRecord,
+    createError,
     findByIdRecord = null,
     findBorradorRecord = null,
     templateExists = true,
@@ -146,6 +148,9 @@ function createMockPostgresService(setup: {
 
     // INSERT INTO casos (create) — returns only the generated id
     if (sql.includes("INSERT INTO casos")) {
+      if (createError) {
+        return Promise.reject(createError);
+      }
       const record = createdRecord ?? makeCaseRecord();
       return Promise.resolve({
         rowCount: 1,
@@ -336,6 +341,31 @@ describe("CasesService", () => {
         ([sql]: [string]) => sql.includes("INSERT INTO casos"),
       );
       expect(insertCalls).toHaveLength(0);
+    });
+
+    it("should return existing borrador when INSERT loses a unique-violation race", async () => {
+      const existing = makeCaseRecord({
+        id: "race-case-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: {},
+      });
+
+      const uniqueViolation = new Error("duplicate key value violates unique constraint");
+      (uniqueViolation as Record<string, unknown>).code = "23505";
+
+      const { mockPostgres } = createMockPostgresService({
+        findBorradorRecord: existing,
+        findByIdRecord: existing,
+        createError: uniqueViolation,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.case.id).toBe("race-case-uuid");
+      expect(result.created).toBe(false);
     });
   });
 

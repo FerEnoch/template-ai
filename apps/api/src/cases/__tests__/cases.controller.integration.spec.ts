@@ -60,7 +60,7 @@ async function createUserAs(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+    await client.query(`SET LOCAL app.current_user_id = ${ownerId}`);
     const result = await client.query(
       `INSERT INTO users (email, display_name, external_subject)
        VALUES ($1, $2, $3)
@@ -93,7 +93,7 @@ async function insertDocumentAndTemplate(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`SET LOCAL app.current_user_id = $1`, [userId]);
+    await client.query(`SET LOCAL app.current_user_id = ${userId}`);
 
     const docResult = await client.query(
       `INSERT INTO documents (user_id, filename, mime_type, size_bytes)
@@ -273,6 +273,53 @@ describe("CasesController integration", () => {
       expect((second.body as Record<string, unknown>).id).toBe(
         (first.body as Record<string, unknown>).id,
       );
+
+      const count = await pool.query(
+        "SELECT COUNT(*)::int as count FROM casos WHERE user_id = $1 AND template_id = $2",
+        [user.id, templateId],
+      );
+      expect(count.rows[0].count).toBe(1);
+    });
+
+    it("should create exactly one borrador under concurrent POSTs", async () => {
+      if (!app || !pool) return;
+      const user = await createUserAs(0, {
+        email: "cases-concurrent@example.com",
+        displayName: "Cases Concurrent",
+        externalSubject: "subj_cases_concurrent",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const post = () =>
+        new Promise<{ status: number; body: unknown }>((resolve) => {
+          const req = http().request(
+            "POST",
+            "/api/cases",
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: data ? (JSON.parse(data) as unknown) : null,
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ templateId }));
+          req.end();
+        });
+
+      const [a, b] = await Promise.all([post(), post()]);
+
+      const statuses = [a.status, b.status].sort((x, y) => x - y);
+      expect(statuses).toEqual([200, 201]);
+
+      const aId = (a.body as Record<string, unknown> | null)?.id;
+      const bId = (b.body as Record<string, unknown> | null)?.id;
+      expect(aId).toBeDefined();
+      expect(aId).toBe(bId);
 
       const count = await pool.query(
         "SELECT COUNT(*)::int as count FROM casos WHERE user_id = $1 AND template_id = $2",
