@@ -102,6 +102,11 @@ export class DocumentGenerationService {
       const errorType =
         error instanceof OpenRouterError ? error.code : "UNKNOWN";
 
+      this.logger.error(
+        "Document generation failed",
+        error instanceof Error ? error.stack : String(error),
+      );
+
       return {
         success: false,
         error: message,
