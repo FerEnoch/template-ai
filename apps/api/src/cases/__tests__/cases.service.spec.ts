@@ -54,6 +54,7 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
     userId: 0,
     templateId: "tmpl-uuid-1",
     status: "borrador",
+    name: null,
     formData: {},
     generatedText: null,
     createdAt: new Date("2025-06-01T10:00:00Z"),
@@ -139,6 +140,7 @@ function createMockPostgresService(setup: {
             user_id: findByIdRecord.userId,
             template_id: findByIdRecord.templateId,
             status: findByIdRecord.status,
+            name: findByIdRecord.name,
             form_data: findByIdRecord.formData,
             generated_text: findByIdRecord.generatedText,
             created_at: findByIdRecord.createdAt,
@@ -162,6 +164,7 @@ function createMockPostgresService(setup: {
           user_id: r.userId,
           template_id: r.templateId,
           status: r.status,
+          name: r.name,
           form_data: r.formData,
           generated_text: r.generatedText,
           created_at: r.createdAt,
@@ -184,6 +187,7 @@ function createMockPostgresService(setup: {
             user_id: updateRecord.userId,
             template_id: updateRecord.templateId,
             status: updateRecord.status,
+            name: updateRecord.name,
             form_data: updateRecord.formData,
             generated_text: updateRecord.generatedText,
             created_at: updateRecord.createdAt,
@@ -456,6 +460,65 @@ describe("CasesService", () => {
         service.updateFormData(0, "non-existent", {
           formData: { ent_1: "value" },
         }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("updateName", () => {
+    it("should update a case name and return the updated record", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Custom Case Name",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", "Custom Case Name");
+
+      expect(result.name).toBe("Custom Case Name");
+    });
+
+    it("should pass null through to clear the custom case name", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Old Custom Name",
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", null);
+
+      expect(result.name).toBeNull();
+    });
+
+    it("should throw NotFoundException when case does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateName(0, "non-existent", "Custom Case Name"),
       ).rejects.toThrow(NotFoundException);
     });
   });

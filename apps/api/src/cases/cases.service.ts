@@ -22,6 +22,7 @@ export interface CaseResponse {
   userId: number;
   templateId: string;
   status: string;
+  name: string | null;
   formData: Record<string, string>;
   generatedText: string | null;
   createdAt: string;
@@ -36,6 +37,7 @@ export interface CreateCaseData {
 export interface UpdateCaseData {
   formData?: Record<string, string>;
   status?: string;
+  name?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,6 +153,33 @@ export class CasesService {
       };
 
       const updated = await repo.updateFormData(id, mergedFormData);
+
+      if (!updated) {
+        throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      return this.mapToResponse(updated);
+    });
+  }
+
+  /**
+   * Rename a case. Pass `null` to clear the custom name and fall back to
+   * the template name on the client.
+   */
+  async updateName(
+    userId: number,
+    id: string,
+    name: string | null,
+  ): Promise<CaseResponse> {
+    return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
+      const repo = new CasesRepository(client);
+      const existing = await repo.findById(id);
+
+      if (!existing) {
+        throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      const updated = await repo.updateName(id, name);
 
       if (!updated) {
         throw new NotFoundException(`Case with id "${id}" not found`);
@@ -323,6 +352,7 @@ export class CasesService {
       userId: record.userId,
       templateId: record.templateId,
       status: record.status,
+      name: record.name ?? null,
       formData: record.formData,
       generatedText: record.generatedText,
       createdAt: record.createdAt.toISOString(),

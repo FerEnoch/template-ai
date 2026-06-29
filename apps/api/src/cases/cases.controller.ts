@@ -117,6 +117,15 @@ export class CasesController {
       return this.casesService.archive(0, id);
     }
 
+    // If only name is provided, rename the case
+    if (
+      parsed.data.name !== undefined &&
+      parsed.data.formData === undefined &&
+      parsed.data.status === undefined
+    ) {
+      return this.casesService.updateName(0, id, parsed.data.name);
+    }
+
     return this.casesService.updateFormData(0, id, {
       formData: parsed.data.formData,
       status: parsed.data.status,

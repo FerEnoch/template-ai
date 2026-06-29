@@ -307,6 +307,118 @@ describe("CasesController integration", () => {
 
       expect(res.status).toBe(404);
     });
+
+    it("should rename a case when only name is provided", async () => {
+      if (!app || !pool) return;
+
+      const user = await createUserAs(0, {
+        email: "cases-rename@example.com",
+        displayName: "Cases Rename",
+        externalSubject: "subj_cases_rename",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const createRes = await new Promise<{ status: number; body: unknown }>(
+        (resolve) => {
+          const req = http().request(
+            "POST",
+            "/api/cases",
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: JSON.parse(data),
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ templateId }));
+          req.end();
+        },
+      );
+
+      expect(createRes.status).toBe(201);
+      const caseId = (createRes.body as Record<string, unknown>).id as string;
+
+      const patchRes = await new Promise<{ status: number; body: unknown }>(
+        (resolve) => {
+          const req = http().request(
+            "PATCH",
+            `/api/cases/${caseId}`,
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: data ? JSON.parse(data) : {},
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ name: "Custom Generated Document" }));
+          req.end();
+        },
+      );
+
+      expect(patchRes.status).toBe(200);
+      expect((patchRes.body as Record<string, unknown>).name).toBe(
+        "Custom Generated Document",
+      );
+    });
+
+    it("should return 404 when renaming a case owned by another user", async () => {
+      if (!app || !pool) return;
+
+      const otherUser = await createUserAs(1, {
+        email: "cases-rename-other@example.com",
+        displayName: "Cases Rename Other",
+        externalSubject: "subj_cases_rename_other",
+      });
+      const { templateId } = await insertDocumentAndTemplate(otherUser.id);
+
+      // Create a case directly as the other user so it belongs to them.
+      const client = await pool.connect();
+      let caseId: string;
+      try {
+        await client.query("BEGIN");
+        await client.query(`SET LOCAL app.current_user_id = $1`, [otherUser.id]);
+        const caseResult = await client.query(
+          `INSERT INTO casos (user_id, template_id, status, form_data)
+           VALUES ($1, $2, 'borrador', '{}')
+           RETURNING id`,
+          [otherUser.id, templateId],
+        );
+        await client.query("COMMIT");
+        caseId = caseResult.rows[0].id as string;
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      const patchRes = await new Promise<{ status: number }>((resolve) => {
+        const req = http().request(
+          "PATCH",
+          `/api/cases/${caseId}`,
+          (res: IncomingMessage) => {
+            let data = "";
+            res.on("data", (chunk: string) => (data += chunk));
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
+          },
+        );
+        req.setHeader("Content-Type", "application/json");
+        req.write(JSON.stringify({ name: "Hijacked Case Name" }));
+        req.end();
+      });
+
+      expect(patchRes.status).toBe(404);
+    });
   });
 
   describe("DELETE /api/cases/:id", () => {
