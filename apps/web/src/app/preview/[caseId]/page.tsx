@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { DocumentViewer } from "@/components/preview/DocumentViewer";
@@ -22,6 +22,7 @@ export default function PreviewPage() {
   const [error, setError] = useState<string | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const regenerateInFlight = useRef(false);
 
   const loadCase = useCallback(async () => {
     setLoading(true);
@@ -41,16 +42,23 @@ export default function PreviewPage() {
   }, [loadCase]);
 
   const handleRegenerate = useCallback(async () => {
+    if (regenerateInFlight.current) return;
+    regenerateInFlight.current = true;
     setIsRegenerating(true);
     setError(null);
     try {
       const updated = await generateCase(caseId);
       setCaseItem(updated as CaseWithTemplate);
     } catch (err) {
+      // Aborted fetches are expected on unmount / cleanup; don't surface them.
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       setError(
         err instanceof Error ? err.message : "Error al regenerar el documento"
       );
     } finally {
+      regenerateInFlight.current = false;
       setIsRegenerating(false);
     }
   }, [caseId]);

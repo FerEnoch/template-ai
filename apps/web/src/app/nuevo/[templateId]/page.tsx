@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { CaseProvider, useCase } from "@/lib/case/CaseContext";
@@ -19,38 +19,49 @@ function NewCasePageContent() {
   const { state, setTemplate, setCase, setLoading, setError, setStatus, setGenerationError, saveForm } =
     useCase();
 
+  const bootstrapInFlight = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function bootstrap() {
+      // Guard against duplicate bootstrap runs (StrictMode double-mount,
+      // dependency re-fires while a request is still in flight).
+      if (bootstrapInFlight.current) return;
+      bootstrapInFlight.current = true;
+
       setLoading(true);
       setError(null);
       try {
-        const template = await fetchTemplate(templateId);
-        if (cancelled) return;
+        const template = await fetchTemplate(templateId, controller.signal);
+        if (controller.signal.aborted) return;
         setTemplate(template);
 
-        const newCase = await createCase(templateId);
-        if (cancelled) return;
+        const newCase = await createCase(templateId, controller.signal);
+        if (controller.signal.aborted) return;
         setCase(newCase);
       } catch (err) {
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "No se pudo cargar el nuevo caso"
-          );
+        // Aborted fetches are expected on unmount / cleanup; don't surface them.
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
         }
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cargar el nuevo caso"
+        );
       } finally {
-        if (!cancelled) {
+        if (bootstrapInFlight.current) {
           setLoading(false);
+          bootstrapInFlight.current = false;
         }
       }
     }
 
     void bootstrap();
     return () => {
-      cancelled = true;
+      controller.abort();
+      bootstrapInFlight.current = false;
     };
   }, [templateId, setTemplate, setCase, setLoading, setError]);
 
@@ -64,8 +75,11 @@ function NewCasePageContent() {
     }
   }, [saveForm, setError]);
 
+  const generationInFlight = useRef(false);
+
   const handleGenerate = useCallback(async () => {
-    if (!state.caseId) return;
+    if (!state.caseId || generationInFlight.current) return;
+    generationInFlight.current = true;
     setStatus("generating");
     setGenerationError(null);
     try {
@@ -73,6 +87,11 @@ function NewCasePageContent() {
       const generated = await generateCase(state.caseId);
       router.push(`/preview/${generated.id}`);
     } catch (err) {
+      // Aborted fetches are expected on unmount / cleanup; don't surface them.
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
+
       // Check if the case was generated/archived despite the error
       let currentStatus: string | null = null;
       try {
@@ -99,6 +118,8 @@ function NewCasePageContent() {
           : "Error al generar el documento"
       );
       setStatus("idle");
+    } finally {
+      generationInFlight.current = false;
     }
   }, [state.caseId, saveForm, router, setStatus, setGenerationError]);
 

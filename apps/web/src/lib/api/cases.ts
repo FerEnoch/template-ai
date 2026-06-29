@@ -114,7 +114,11 @@ async function safeFetch(
 ): Promise<Response> {
   try {
     return await fetch(input, init);
-  } catch {
+  } catch (error) {
+    // Let abort signals propagate so callers can ignore cancellation cleanly.
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     throw new ApiError(
       "No se pudo conectar con el servidor. Verificá tu conexión e intentá nuevamente.",
       0
@@ -122,16 +126,23 @@ async function safeFetch(
   }
 }
 
-export async function fetchTemplate(id: string): Promise<Template> {
-  const response = await safeFetch(`/api/templates/${id}`);
+export async function fetchTemplate(
+  id: string,
+  signal?: AbortSignal
+): Promise<Template> {
+  const response = await safeFetch(`/api/templates/${id}`, { signal });
   return handleResponse<Template>(response);
 }
 
-export async function createCase(templateId: string): Promise<Case> {
+export async function createCase(
+  templateId: string,
+  signal?: AbortSignal
+): Promise<Case> {
   const response = await safeFetch("/api/cases", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ templateId } satisfies CreateCaseRequest),
+    signal,
   });
   return handleResponse<Case>(response);
 }
