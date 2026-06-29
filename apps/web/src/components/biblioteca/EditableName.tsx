@@ -7,6 +7,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { cn } from "@/lib/utils";
 
 interface EditableNameProps {
   readonly value: string;
@@ -97,14 +98,21 @@ export function EditableName({
     const previousValue = value;
     // Optimistically update local state so the input feels responsive.
     setDraft(trimmed);
-    setIsEditing(false);
 
     startTransition(async () => {
       try {
         await onSave(trimmed);
-      } catch {
-        // Rollback on error so the user sees the previous name.
+        setIsEditing(false);
+        setError(null);
+      } catch (err) {
+        // Rollback on error so the user can retry with the previous name.
         setDraft(previousValue);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Error al guardar el nombre. Intentá nuevamente.",
+        );
+        // Keep edit mode open so the inline error is visible and retryable.
       }
     });
   }, [draft, value, validate, onSave]);
@@ -167,10 +175,11 @@ export function EditableName({
         aria-label="Editar nombre"
         aria-invalid={error ? "true" : "false"}
         aria-describedby={error ? "editable-name-error" : undefined}
-        className={
+        className={cn(
           inputClassName ??
-          "w-full rounded-md border border-border bg-surface px-2 py-1 font-headline text-base font-semibold leading-tight text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        }
+            "w-full rounded-md border border-border bg-surface px-2 py-1 font-headline text-base font-semibold leading-tight text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent",
+          isPending && "animate-pulse opacity-80",
+        )}
       />
       {error && (
         <p

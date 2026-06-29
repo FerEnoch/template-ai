@@ -92,7 +92,7 @@ describe("EditableName", () => {
     expect(input).toBeInTheDocument();
   });
 
-  it("rolls back to the previous name when onSave throws", async () => {
+  it("shows the API error and stays in edit mode when onSave throws", async () => {
     const onSave = vi.fn().mockRejectedValue(new Error("Save failed"));
 
     render(
@@ -111,10 +111,12 @@ describe("EditableName", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("editable-name-trigger")).toHaveTextContent(
-        "Original Name",
-      );
+      expect(screen.getByText("Save failed")).toBeInTheDocument();
     });
+
+    expect(screen.getByTestId("editable-name-input")).toHaveValue(
+      "Original Name",
+    );
   });
 
   it("stops click propagation so the card link is not triggered", () => {

@@ -64,26 +64,52 @@ export default function BibliotecaPage() {
 
   const handleRenameTemplate = useCallback(
     async (id: string, name: string) => {
-      const updated = await updateTemplateName(id, name);
-      setTemplates((prev) =>
-        prev.map((template) =>
-          template.id === id ? { ...template, name: updated.name } : template,
-        ),
-      );
+      let previousTemplates: Template[] = [];
+      setTemplates((prev) => {
+        previousTemplates = prev;
+        return prev.map((template) =>
+          template.id === id ? { ...template, name } : template,
+        );
+      });
+
+      try {
+        const updated = await updateTemplateName(id, name);
+        setTemplates((prev) =>
+          prev.map((template) =>
+            template.id === id ? { ...template, name: updated.name } : template,
+          ),
+        );
+      } catch (error) {
+        setTemplates(previousTemplates);
+        throw error;
+      }
     },
     [],
   );
 
   const handleRenameCase = useCallback(
     async (id: string, name: string | null) => {
-      const updated = await updateCase(id, { name });
-      setCases((prev) =>
-        prev.map((caseItem) =>
-          caseItem.id === id
-            ? { ...caseItem, name: updated.name ?? null }
-            : caseItem,
-        ),
-      );
+      let previousCases: Case[] = [];
+      setCases((prev) => {
+        previousCases = prev;
+        return prev.map((caseItem) =>
+          caseItem.id === id ? { ...caseItem, name } : caseItem,
+        );
+      });
+
+      try {
+        const updated = await updateCase(id, { name });
+        setCases((prev) =>
+          prev.map((caseItem) =>
+            caseItem.id === id
+              ? { ...caseItem, name: updated.name ?? null }
+              : caseItem,
+          ),
+        );
+      } catch (error) {
+        setCases(previousCases);
+        throw error;
+      }
     },
     [],
   );
