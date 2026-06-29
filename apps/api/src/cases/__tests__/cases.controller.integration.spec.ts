@@ -121,6 +121,31 @@ async function insertDocumentAndTemplate(
   }
 }
 
+async function insertCaseAs(
+  userId: number,
+  templateId: string,
+): Promise<string> {
+  if (!pool) throw new Error("Pool not initialized");
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL app.current_user_id = $1`, [userId]);
+    const result = await client.query(
+      `INSERT INTO casos (user_id, template_id, status, form_data)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [userId, templateId, "borrador", JSON.stringify({})],
+    );
+    await client.query("COMMIT");
+    return result.rows[0].id as string;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 function http() {
   if (!app) throw new Error("App not initialized");
   return app.getHttpServer();
@@ -454,6 +479,35 @@ describe("CasesController integration", () => {
 
       expect(second.status).toBe(204);
       expect(second.body).toBe("");
+    });
+
+    it("should return 404 when deleting another user's case (RLS)", async () => {
+      if (!app) return;
+      const userA = await createUserAs(0, {
+        email: "cases-user-a@example.com",
+        displayName: "Cases User A",
+        externalSubject: "subj_cases_user_a",
+      });
+      await createUserAs(0, {
+        email: "cases-user-b@example.com",
+        displayName: "Cases User B",
+        externalSubject: "subj_cases_user_b",
+      });
+      const { templateId } = await insertDocumentAndTemplate(userA.id);
+      const caseId = await insertCaseAs(userA.id, templateId);
+
+      const res = await new Promise<{ status: number }>((resolve) => {
+        const req = http().request(
+          "DELETE",
+          `/api/cases/${caseId}`,
+          (res: IncomingMessage) => {
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
+          },
+        );
+        req.end();
+      });
+
+      expect(res.status).toBe(404);
     });
   });
 });

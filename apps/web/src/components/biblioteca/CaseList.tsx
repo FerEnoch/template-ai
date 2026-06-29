@@ -186,6 +186,12 @@ export function CaseCard({
     }
   };
 
+  const handleRetryDelete = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void handleConfirmDelete();
+  };
+
   const canDelete = caseData.status !== "archivado";
 
   return (
@@ -230,8 +236,15 @@ export function CaseCard({
         </div>
 
         {deleteError && (
-          <div className="mb-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-bold text-danger">
-            {deleteError}
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-bold text-danger">
+            <span>{deleteError}</span>
+            <button
+              type="button"
+              onClick={handleRetryDelete}
+              className="shrink-0 underline underline-offset-2 hover:text-danger/80"
+            >
+              Reintentar
+            </button>
           </div>
         )}
 

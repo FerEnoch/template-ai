@@ -60,6 +60,14 @@ export default function BibliotecaPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  const handleDeleteCase = useCallback((id: string) => {
+    setCases((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  const handleDeleteCaseError = useCallback(() => {
+    fetchCases();
+  }, [fetchCases]);
+
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
@@ -133,6 +141,8 @@ export default function BibliotecaPage() {
             isLoading={casesIsLoading}
             error={casesError}
             onRetry={fetchCases}
+            onDelete={handleDeleteCase}
+            onDeleteError={handleDeleteCaseError}
           />
         </section>
       </div>
