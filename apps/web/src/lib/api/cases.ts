@@ -164,9 +164,13 @@ export async function updateCase(
   return handleResponse<Case>(response);
 }
 
-export async function generateCase(id: string): Promise<Case> {
+export async function generateCase(
+  id: string,
+  signal?: AbortSignal
+): Promise<Case> {
   const response = await safeFetch(`/api/cases/${id}/generate`, {
     method: "POST",
+    signal,
   });
   return handleResponse<Case>(response);
 }

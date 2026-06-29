@@ -23,6 +23,7 @@ export default function PreviewPage() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const regenerateInFlight = useRef(false);
+  const regenerateControllerRef = useRef<AbortController | null>(null);
 
   const loadCase = useCallback(async () => {
     setLoading(true);
@@ -39,15 +40,20 @@ export default function PreviewPage() {
 
   useEffect(() => {
     void loadCase();
+    return () => {
+      regenerateControllerRef.current?.abort();
+    };
   }, [loadCase]);
 
   const handleRegenerate = useCallback(async () => {
     if (regenerateInFlight.current) return;
     regenerateInFlight.current = true;
+    const regenerateController = new AbortController();
+    regenerateControllerRef.current = regenerateController;
     setIsRegenerating(true);
     setError(null);
     try {
-      const updated = await generateCase(caseId);
+      const updated = await generateCase(caseId, regenerateController.signal);
       setCaseItem(updated as CaseWithTemplate);
     } catch (err) {
       // Aborted fetches are expected on unmount / cleanup; don't surface them.

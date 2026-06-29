@@ -70,15 +70,27 @@ function NewCasePageContent() {
   }, [saveForm, setError]);
 
   const generationInFlight = useRef(false);
+  const generateControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      generateControllerRef.current?.abort();
+    };
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!state.caseId || generationInFlight.current) return;
     generationInFlight.current = true;
+    const generateController = new AbortController();
+    generateControllerRef.current = generateController;
     setStatus("generating");
     setGenerationError(null);
     try {
       await saveForm();
-      const generated = await generateCase(state.caseId);
+      const generated = await generateCase(
+        state.caseId,
+        generateController.signal
+      );
       router.push(`/preview/${generated.id}`);
     } catch (err) {
       // Aborted fetches are expected on unmount / cleanup; don't surface them.
