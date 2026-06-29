@@ -283,9 +283,11 @@ export class CasesService {
         this.logger.error(
           `Generation failed for case ${id}: ${genResult.error} (${genResult.errorType})`,
         );
-        throw new BadGatewayException(
-          "Document generation failed. Please try again.",
-        );
+        throw new BadGatewayException({
+          message:
+            "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+          errorType: genResult.errorType ?? "UNKNOWN",
+        });
       }
 
       this.logger.log(`AI generation succeeded for case ${id}`);
