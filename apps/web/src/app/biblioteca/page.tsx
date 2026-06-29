@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { TemplateGrid } from "@/components/biblioteca/TemplateGrid";
 import { CaseList } from "@/components/biblioteca/CaseList";
+import { updateTemplateName } from "@/lib/api/templates";
+import { updateCase } from "@/lib/api/cases";
 import type { Template, Case } from "@template-ai/contracts";
 
 export default function BibliotecaPage() {
@@ -60,6 +62,32 @@ export default function BibliotecaPage() {
     fetchTemplates();
   }, [fetchTemplates]);
 
+  const handleRenameTemplate = useCallback(
+    async (id: string, name: string) => {
+      const updated = await updateTemplateName(id, name);
+      setTemplates((prev) =>
+        prev.map((template) =>
+          template.id === id ? { ...template, name: updated.name } : template,
+        ),
+      );
+    },
+    [],
+  );
+
+  const handleRenameCase = useCallback(
+    async (id: string, name: string | null) => {
+      const updated = await updateCase(id, { name });
+      setCases((prev) =>
+        prev.map((caseItem) =>
+          caseItem.id === id
+            ? { ...caseItem, name: updated.name ?? null }
+            : caseItem,
+        ),
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
@@ -107,6 +135,7 @@ export default function BibliotecaPage() {
             onRetry={fetchTemplates}
             onDelete={handleDelete}
             onDeleteError={handleDeleteError}
+            onRename={handleRenameTemplate}
           />
         </section>
 
@@ -133,6 +162,7 @@ export default function BibliotecaPage() {
             isLoading={casesIsLoading}
             error={casesError}
             onRetry={fetchCases}
+            onRename={handleRenameCase}
           />
         </section>
       </div>

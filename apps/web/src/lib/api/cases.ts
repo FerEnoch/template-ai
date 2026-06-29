@@ -94,7 +94,7 @@ async function parseErrorResponse(response: Response): Promise<string> {
   return fallbackMessageForStatus(response.status);
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const message = await parseErrorResponse(response);
     throw new ApiError(message, response.status);
@@ -108,7 +108,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * TypeError from fetch() and would otherwise show "fetch failed" to the
  * user.
  */
-async function safeFetch(
+export async function safeFetch(
   input: string,
   init?: RequestInit
 ): Promise<Response> {

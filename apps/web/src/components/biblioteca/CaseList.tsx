@@ -9,6 +9,7 @@ import {
   Files,
 } from "lucide-react";
 import type { Case, Template } from "@template-ai/contracts";
+import { EditableName } from "./EditableName";
 
 interface CaseListProps {
   readonly cases: Case[];
@@ -16,6 +17,7 @@ interface CaseListProps {
   readonly isLoading: boolean;
   readonly error: string | null;
   readonly onRetry?: () => void;
+  readonly onRename?: (id: string, name: string | null) => Promise<void>;
 }
 
 const statusConfig: Record<
@@ -129,11 +131,12 @@ function ErrorState({
 interface CaseCardProps {
   readonly caseData: Case;
   readonly templateName: string;
+  readonly onRename?: (id: string, name: string | null) => Promise<void>;
 }
 
-function CaseCard({ caseData, templateName }: CaseCardProps) {
+function CaseCard({ caseData, templateName, onRename }: CaseCardProps) {
   const status = statusConfig[caseData.status];
-
+  const displayName = caseData.name ?? templateName;
   return (
     <Link
       href={`/preview/${caseData.id}`}
@@ -145,9 +148,16 @@ function CaseCard({ caseData, templateName }: CaseCardProps) {
             <FileText className="h-5 w-5 text-accent" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
-              {templateName}
-            </h3>
+            <EditableName
+              value={displayName}
+              onSave={async (name) => {
+                await onRename?.(caseData.id, name);
+              }}
+            >
+              <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
+                {displayName}
+              </h3>
+            </EditableName>
           </div>
         </div>
         <span
@@ -173,6 +183,7 @@ export function CaseList({
   isLoading,
   error,
   onRetry,
+  onRename,
 }: CaseListProps) {
   if (isLoading) {
     return (
@@ -199,6 +210,7 @@ export function CaseList({
           key={caseData.id}
           caseData={caseData}
           templateName={resolveTemplateName(caseData.templateId, templates)}
+          onRename={onRename}
         />
       ))}
     </div>
