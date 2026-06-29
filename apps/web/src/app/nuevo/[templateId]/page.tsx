@@ -66,13 +66,15 @@ function NewCasePageContent() {
   const handleSave = useCallback(async () => {
     try {
       await saveForm();
-      clearDraft();
+      if (state.caseId) {
+        clearDraft(state.caseId);
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al guardar el borrador"
       );
     }
-  }, [saveForm, setError, clearDraft]);
+  }, [saveForm, setError, clearDraft, state.caseId]);
 
   const handleGenerate = useCallback(async () => {
     if (!state.caseId) return;
@@ -82,7 +84,7 @@ function NewCasePageContent() {
       await saveForm();
       const generated = await generateCase(state.caseId);
       router.push(`/preview/${generated.id}`);
-      clearDraft();
+      clearDraft(state.caseId);
     } catch (err) {
       // Check if the case was generated/archived despite the error
       let currentStatus: string | null = null;

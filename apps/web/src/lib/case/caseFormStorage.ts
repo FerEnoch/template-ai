@@ -3,7 +3,11 @@ import {
   type CaseFormDraft,
 } from "@template-ai/contracts";
 
-const DRAFT_KEY = "case-form-draft:v1";
+const DRAFT_KEY_PREFIX = "case-form-draft:v1";
+
+function getDraftKey(caseId: string): string {
+  return `${DRAFT_KEY_PREFIX}:${caseId}`;
+}
 
 export interface SaveCaseFormDraftInput {
   caseId: string;
@@ -15,12 +19,14 @@ export interface SaveCaseFormDraftInput {
  * Load a case form draft from sessionStorage.
  * Returns null if no draft exists or validation fails.
  */
-export function loadCaseFormDraft(): CaseFormDraft | null {
+export function loadCaseFormDraft(caseId: string): CaseFormDraft | null {
   if (typeof window === "undefined") return null;
   if (typeof sessionStorage === "undefined") return null;
 
+  const key = getDraftKey(caseId);
+
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY);
+    const raw = sessionStorage.getItem(key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
@@ -28,7 +34,7 @@ export function loadCaseFormDraft(): CaseFormDraft | null {
   } catch {
     // Invalid or missing — clear and return null
     try {
-      sessionStorage.removeItem(DRAFT_KEY);
+      sessionStorage.removeItem(key);
     } catch {
       // Ignore cleanup failures
     }
@@ -44,6 +50,8 @@ export function saveCaseFormDraft(input: SaveCaseFormDraftInput): void {
   if (typeof window === "undefined") return;
   if (typeof sessionStorage === "undefined") return;
 
+  const key = getDraftKey(input.caseId);
+
   const draft: CaseFormDraft = {
     caseId: input.caseId,
     templateId: input.templateId,
@@ -54,7 +62,7 @@ export function saveCaseFormDraft(input: SaveCaseFormDraftInput): void {
   try {
     // Validate before storing
     const validated = CaseFormDraftSchema.parse(draft);
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(validated));
+    sessionStorage.setItem(key, JSON.stringify(validated));
   } catch {
     // Storage failures (quota, disabled storage) degrade silently
   }
@@ -63,12 +71,12 @@ export function saveCaseFormDraft(input: SaveCaseFormDraftInput): void {
 /**
  * Clear the case form draft from sessionStorage.
  */
-export function clearCaseFormDraft(): void {
+export function clearCaseFormDraft(caseId: string): void {
   if (typeof window === "undefined") return;
   if (typeof sessionStorage === "undefined") return;
 
   try {
-    sessionStorage.removeItem(DRAFT_KEY);
+    sessionStorage.removeItem(getDraftKey(caseId));
   } catch {
     // Ignore cleanup failures
   }

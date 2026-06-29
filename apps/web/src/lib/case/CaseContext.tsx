@@ -164,7 +164,7 @@ export interface CaseContextValue {
   saveForm: () => Promise<void>;
   addEntity: (entity: Entity) => void;
   removeEntity: (entityId: string) => void;
-  clearDraft: () => void;
+  clearDraft: (caseId: string) => void;
 }
 
 const CaseContext = createContext<CaseContextValue | null>(null);
@@ -182,6 +182,7 @@ export function CaseProvider({
   const lastSavedFormData = useRef<Record<string, string>>({});
   const lastHydratedCaseId = useRef<string | null>(null);
   const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipWriteAfterSetCase = useRef(false);
 
   const updateField = useCallback((entityId: string, value: string) => {
     dispatch({ type: "UPDATE_FIELD", payload: { entityId, value } });
@@ -198,6 +199,7 @@ export function CaseProvider({
     });
     dispatch({ type: "SET_FORM_DATA", payload: caseItem.formData });
     lastSavedFormData.current = { ...caseItem.formData };
+    skipWriteAfterSetCase.current = true;
   }, []);
 
   const setStatus = useCallback((status: CaseState["status"]) => {
@@ -224,8 +226,12 @@ export function CaseProvider({
     dispatch({ type: "REMOVE_ENTITY", payload: entityId });
   }, []);
 
-  const clearDraft = useCallback(() => {
-    clearCaseFormDraft();
+  const clearDraft = useCallback((caseId: string) => {
+    if (writeTimer.current) {
+      clearTimeout(writeTimer.current);
+      writeTimer.current = null;
+    }
+    clearCaseFormDraft(caseId);
   }, []);
 
   const saveForm = useCallback(async () => {
@@ -269,20 +275,28 @@ export function CaseProvider({
     if (lastHydratedCaseId.current === state.caseId) return;
 
     lastHydratedCaseId.current = state.caseId;
-    const draft = loadCaseFormDraft();
+    const draft = loadCaseFormDraft(state.caseId);
     if (!draft || draft.caseId !== state.caseId) return;
 
     const validEntityIds = new Set(state.template.entities.map((e) => e.id));
-    const filteredFormData = Object.fromEntries(
+    const filteredDraftFormData = Object.fromEntries(
       Object.entries(draft.formData).filter(([key]) => validEntityIds.has(key))
     );
 
-    dispatch({ type: "SET_FORM_DATA", payload: filteredFormData });
+    dispatch({
+      type: "SET_FORM_DATA",
+      payload: { ...state.formData, ...filteredDraftFormData },
+    });
   }, [state.caseId, state.template]);
 
   // Debounced write to sessionStorage on formData change
   useEffect(() => {
     if (!state.caseId || !state.template) return;
+
+    if (skipWriteAfterSetCase.current) {
+      skipWriteAfterSetCase.current = false;
+      return;
+    }
 
     const caseId = state.caseId;
     const templateId = state.template.id;

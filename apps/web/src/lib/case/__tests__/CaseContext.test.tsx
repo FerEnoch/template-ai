@@ -8,6 +8,8 @@ import type { Template, Entity, Case } from "@template-ai/contracts";
 
 let mockStore: Record<string, string> = {};
 
+const DRAFT_KEY = "case-form-draft:v1:550e8400-e29b-41d4-a716-446655440000";
+
 beforeEach(() => {
   mockStore = {};
   Object.defineProperty(globalThis, "sessionStorage", {
@@ -210,7 +212,7 @@ describe("CaseProvider", () => {
   });
 
   it("hydrates formData from sessionStorage when caseId matches", async () => {
-    mockStore["case-form-draft:v1"] = JSON.stringify({
+    mockStore[DRAFT_KEY] = JSON.stringify({
       caseId: "550e8400-e29b-41d4-a716-446655440000",
       templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz" },
@@ -233,7 +235,7 @@ describe("CaseProvider", () => {
   });
 
   it("drops stale entity keys during hydration", async () => {
-    mockStore["case-form-draft:v1"] = JSON.stringify({
+    mockStore[DRAFT_KEY] = JSON.stringify({
       caseId: "550e8400-e29b-41d4-a716-446655440000",
       templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz", "ent-stale": "old value" },
@@ -256,7 +258,7 @@ describe("CaseProvider", () => {
   });
 
   it("does not hydrate when draft caseId does not match", async () => {
-    mockStore["case-form-draft:v1"] = JSON.stringify({
+    mockStore["case-form-draft:v1:770e8400-e29b-41d4-a716-446655440002"] = JSON.stringify({
       caseId: "770e8400-e29b-41d4-a716-446655440002",
       templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz" },
@@ -294,20 +296,20 @@ describe("CaseProvider", () => {
     apiRef!.updateField("ent-1", "Julián Ruiz");
     apiRef!.updateField("ent-1", "Julián Ruiz Updated");
 
-    expect(mockStore["case-form-draft:v1"]).toBeUndefined();
+    expect(mockStore[DRAFT_KEY]).toBeUndefined();
 
     await waitFor(() =>
-      expect(mockStore["case-form-draft:v1"]).not.toBeUndefined()
+      expect(mockStore[DRAFT_KEY]).not.toBeUndefined()
     );
 
-    const stored = JSON.parse(mockStore["case-form-draft:v1"]);
+    const stored = JSON.parse(mockStore[DRAFT_KEY]);
     expect(stored.formData["ent-1"]).toBe("Julián Ruiz Updated");
     expect(stored.caseId).toBe("550e8400-e29b-41d4-a716-446655440000");
     expect(stored.templateId).toBe("660e8400-e29b-41d4-a716-446655440001");
   });
 
   it("clearDraft removes the sessionStorage key", async () => {
-    mockStore["case-form-draft:v1"] = JSON.stringify({
+    mockStore[DRAFT_KEY] = JSON.stringify({
       caseId: "550e8400-e29b-41d4-a716-446655440000",
       templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz" },
@@ -330,9 +332,9 @@ describe("CaseProvider", () => {
 
     await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
 
-    apiRef!.clearDraft();
+    apiRef!.clearDraft("550e8400-e29b-41d4-a716-446655440000");
 
-    expect(mockStore["case-form-draft:v1"]).toBeUndefined();
+    expect(mockStore[DRAFT_KEY]).toBeUndefined();
   });
 
   it("hydrates only once per caseId", async () => {
