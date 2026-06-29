@@ -113,7 +113,7 @@ export const CaseSchema = z.object({
   userId: z.number(),
   templateId: z.string().uuid(),
   status: CaseStatus,
-  name: z.string().max(200).nullable().optional(),
+  name: z.string().min(1).max(200).nullable().optional(),
   formData: z.record(z.string(), z.string()),
   generatedText: z.string().nullable(),
   createdAt: z.string().datetime(),
@@ -136,7 +136,7 @@ export const CreateCaseRequestSchema = z.object({
 export const UpdateCaseFormDataSchema = z.object({
   formData: z.record(z.string(), z.string()).optional(),
   status: CaseStatus.optional(),
-  name: z.string().trim().max(200).nullable().optional(),
+  name: z.string().trim().min(1).max(200).nullable().optional(),
 });
 
 // Update template name: inline rename payload
