@@ -25,6 +25,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 142, end: 163 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
@@ -35,6 +36,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 165, end: 186 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
@@ -45,6 +47,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 220, end: 285 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "d4e5f6a7-b8c9-0123-defa-234567890123",
@@ -55,6 +58,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 310, end: 325 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "e5f6a7b8-c9d0-1234-efab-345678901234",
@@ -65,6 +69,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 400, end: 420 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "f6a7b8c9-d0e1-2345-fabc-456789012345",
@@ -75,6 +80,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 445, end: 450 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "a7b8c9d0-e1f2-3456-abcd-567890123456",
@@ -85,6 +91,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 470, end: 498 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "b8c9d0e1-f2a3-4567-bcde-678901234567",
@@ -95,6 +102,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 520, end: 595 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "c9d0e1f2-a3b4-5678-cdef-789012345678",
@@ -105,6 +113,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 600, end: 622 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "d0e1f2a3-b4c5-6789-defa-890123456789",
@@ -115,6 +124,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 650, end: 720 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
   {
     id: "e1f2a3b4-c5d6-7890-efab-901234567890",
@@ -125,6 +135,7 @@ export const SAMPLE_ENTITIES: Entity[] = [
     sourceSpan: { start: 740, end: 810 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
   },
 ];
 

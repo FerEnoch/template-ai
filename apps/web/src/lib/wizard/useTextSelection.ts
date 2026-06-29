@@ -15,7 +15,7 @@ export interface TextSelection {
  * using Range API with text node traversal to handle multi-byte characters correctly.
  */
 export function useTextSelection(
-  articleRef: RefObject<HTMLElement>,
+  articleRef: RefObject<HTMLElement | null>,
   extractedText: string | null
 ) {
   const [isSelecting, setIsSelecting] = useState(false);

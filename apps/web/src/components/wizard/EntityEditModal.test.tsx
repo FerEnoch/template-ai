@@ -27,6 +27,7 @@ const MOCK_ENTITY: Entity = {
   sourceSpan: { start: 10, end: 20 },
   reviewed: false,
   excluded: false,
+  userCreated: false,
 };
 
 const MOCK_ENTITY_BAJA: Entity = {

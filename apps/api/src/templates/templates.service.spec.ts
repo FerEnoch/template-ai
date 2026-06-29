@@ -19,6 +19,7 @@ function makeTemplateRecord(overrides: Partial<TemplateRecord> = {}): TemplateRe
     status: "draft",
     entities: [],
     createdAt: new Date("2025-01-15T10:30:00Z"),
+    deletedAt: null,
     ...overrides,
   };
 }
