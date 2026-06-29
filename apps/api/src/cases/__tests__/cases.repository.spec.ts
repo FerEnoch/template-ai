@@ -472,7 +472,6 @@ describe("0009_casos RLS and constraints", () => {
           template.id,
         );
 
-        process.exit(1);
         expect(found).not.toBeNull();
         expect(found!.id).toBe(first.rows[0].id as string);
         expect(found!.id).not.toBe(second.rows[0].id as string);

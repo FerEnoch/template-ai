@@ -8,8 +8,8 @@ import {
   Param,
   Query,
   BadRequestException,
-  HttpCode,
   Logger,
+  Res,
 } from "@nestjs/common";
 import {
   CreateCaseRequestSchema,
@@ -46,10 +46,13 @@ export class CasesController {
   /**
    * POST /api/cases — create a new case from a template.
    * Validates the request body with Zod.
+   * Returns 201 when a new row is created, 200 when an existing borrador is reused.
    */
   @Post()
-  @HttpCode(201)
-  public async create(@Body() body: unknown): Promise<CaseResponse> {
+  public async create(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: any,
+  ): Promise<CaseResponse> {
     if (
       body === null ||
       body === undefined ||
@@ -74,9 +77,12 @@ export class CasesController {
       );
     }
 
-    return this.casesService.create(0, {
+    const { case: caseResponse, created } = await this.casesService.create(0, {
       templateId: parsed.data.templateId,
     });
+
+    res.status(created ? 201 : 200);
+    return caseResponse;
   }
 
   /**

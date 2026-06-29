@@ -271,10 +271,11 @@ describe("CasesService", () => {
 
       const result = await service.create(0, { templateId: "tmpl-uuid-1" });
 
-      expect(result.id).toBe("new-case-uuid");
-      expect(result.status).toBe("borrador");
-      expect(result.templateId).toBe("tmpl-uuid-1");
-      expect(result.formData).toEqual({});
+      expect(result.created).toBe(true);
+      expect(result.case.id).toBe("new-case-uuid");
+      expect(result.case.status).toBe("borrador");
+      expect(result.case.templateId).toBe("tmpl-uuid-1");
+      expect(result.case.formData).toEqual({});
     });
 
     it("should create a case with embedded template", async () => {
@@ -294,9 +295,9 @@ describe("CasesService", () => {
 
       const result = await service.create(0, { templateId: "tmpl-uuid-1" });
 
-      expect(result.template).toBeDefined();
-      expect(result.template.id).toBe("tmpl-uuid-1");
-      expect(result.template.name).toBe("Test Template");
+      expect(result.case.template).toBeDefined();
+      expect(result.case.template.id).toBe("tmpl-uuid-1");
+      expect(result.case.template.name).toBe("Test Template");
     });
 
     it("should throw NotFoundException when template does not exist", async () => {

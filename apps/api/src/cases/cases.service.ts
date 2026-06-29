@@ -54,8 +54,13 @@ export class CasesService {
   /**
    * Create a new case from a template.
    * Validates the template exists before inserting.
+   * If a borrador for the same (user, template) already exists, returns it
+   * without inserting a new row.
    */
-  async create(userId: number, data: CreateCaseData): Promise<CaseResponse> {
+  async create(
+    userId: number,
+    data: CreateCaseData,
+  ): Promise<{ case: CaseResponse; created: boolean }> {
     return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
       // Verify template exists
       const tplResult = await client.query(
@@ -69,6 +74,16 @@ export class CasesService {
       }
 
       const repo = new CasesRepository(client);
+
+      // Idempotency: reuse an existing borrador for this (user, template).
+      const existing = await repo.findBorradorByUserAndTemplate(
+        userId,
+        data.templateId,
+      );
+      if (existing) {
+        return { case: this.mapToResponse(existing), created: false };
+      }
+
       let record;
       try {
         record = await repo.create({
@@ -85,7 +100,7 @@ export class CasesService {
         );
       }
 
-      return this.mapToResponse(record);
+      return { case: this.mapToResponse(record), created: true };
     });
   }
 
