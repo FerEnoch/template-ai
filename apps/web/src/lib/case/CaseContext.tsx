@@ -151,7 +151,7 @@ export const initialCaseState: CaseState = {
   generationError: null,
 };
 
-interface CaseContextValue {
+export interface CaseContextValue {
   state: CaseState;
   dispatch: React.Dispatch<CaseAction>;
   updateField: (entityId: string, value: string) => void;
@@ -284,15 +284,19 @@ export function CaseProvider({
   useEffect(() => {
     if (!state.caseId || !state.template) return;
 
+    const caseId = state.caseId;
+    const templateId = state.template.id;
+    const formData = state.formData;
+
     if (writeTimer.current) {
       clearTimeout(writeTimer.current);
     }
 
     writeTimer.current = setTimeout(() => {
       saveCaseFormDraft({
-        caseId: state.caseId,
-        templateId: state.template.id,
-        formData: state.formData,
+        caseId,
+        templateId,
+        formData,
       });
     }, 300);
 

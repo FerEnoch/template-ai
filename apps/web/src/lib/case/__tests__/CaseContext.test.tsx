@@ -84,7 +84,7 @@ const mockEntity2: Entity = {
 };
 
 const mockTemplate: Template = {
-  id: "tpl-1",
+  id: "660e8400-e29b-41d4-a716-446655440001",
   name: "Contrato de locación",
   description: "Plantilla de arrendamiento",
   documentId: "doc-1",
@@ -95,9 +95,9 @@ const mockTemplate: Template = {
 };
 
 const mockCase: Case = {
-  id: "case-1",
+  id: "550e8400-e29b-41d4-a716-446655440000",
   userId: 1,
-  templateId: "tpl-1",
+  templateId: "660e8400-e29b-41d4-a716-446655440001",
   status: "borrador",
   formData: {},
   generatedText: null,
@@ -211,8 +211,8 @@ describe("CaseProvider", () => {
 
   it("hydrates formData from sessionStorage when caseId matches", async () => {
     mockStore["case-form-draft:v1"] = JSON.stringify({
-      caseId: "case-1",
-      templateId: "tpl-1",
+      caseId: "550e8400-e29b-41d4-a716-446655440000",
+      templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz" },
       savedAt: new Date().toISOString(),
     });
@@ -225,15 +225,17 @@ describe("CaseProvider", () => {
 
     await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
 
-    expect(getByTestId("formData").textContent).toBe(
-      JSON.stringify({ "ent-1": "Julián Ruiz" })
+    await waitFor(() =>
+      expect(getByTestId("formData").textContent).toBe(
+        JSON.stringify({ "ent-1": "Julián Ruiz" })
+      )
     );
   });
 
   it("drops stale entity keys during hydration", async () => {
     mockStore["case-form-draft:v1"] = JSON.stringify({
-      caseId: "case-1",
-      templateId: "tpl-1",
+      caseId: "550e8400-e29b-41d4-a716-446655440000",
+      templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz", "ent-stale": "old value" },
       savedAt: new Date().toISOString(),
     });
@@ -246,15 +248,17 @@ describe("CaseProvider", () => {
 
     await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
 
-    expect(getByTestId("formData").textContent).toBe(
-      JSON.stringify({ "ent-1": "Julián Ruiz" })
+    await waitFor(() =>
+      expect(getByTestId("formData").textContent).toBe(
+        JSON.stringify({ "ent-1": "Julián Ruiz" })
+      )
     );
   });
 
   it("does not hydrate when draft caseId does not match", async () => {
     mockStore["case-form-draft:v1"] = JSON.stringify({
-      caseId: "other-case",
-      templateId: "tpl-1",
+      caseId: "770e8400-e29b-41d4-a716-446655440002",
+      templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz" },
       savedAt: new Date().toISOString(),
     });
@@ -271,8 +275,6 @@ describe("CaseProvider", () => {
   });
 
   it("debounces sessionStorage write after UPDATE_FIELD", async () => {
-    vi.useFakeTimers();
-
     let apiRef: ReturnType<typeof useCase> | undefined;
 
     const { getByTestId } = render(
@@ -294,22 +296,20 @@ describe("CaseProvider", () => {
 
     expect(mockStore["case-form-draft:v1"]).toBeUndefined();
 
-    vi.advanceTimersByTime(300);
-
     await waitFor(() =>
       expect(mockStore["case-form-draft:v1"]).not.toBeUndefined()
     );
 
     const stored = JSON.parse(mockStore["case-form-draft:v1"]);
     expect(stored.formData["ent-1"]).toBe("Julián Ruiz Updated");
-    expect(stored.caseId).toBe("case-1");
-    expect(stored.templateId).toBe("tpl-1");
+    expect(stored.caseId).toBe("550e8400-e29b-41d4-a716-446655440000");
+    expect(stored.templateId).toBe("660e8400-e29b-41d4-a716-446655440001");
   });
 
   it("clearDraft removes the sessionStorage key", async () => {
     mockStore["case-form-draft:v1"] = JSON.stringify({
-      caseId: "case-1",
-      templateId: "tpl-1",
+      caseId: "550e8400-e29b-41d4-a716-446655440000",
+      templateId: "660e8400-e29b-41d4-a716-446655440001",
       formData: { "ent-1": "Julián Ruiz" },
       savedAt: new Date().toISOString(),
     });
@@ -338,8 +338,8 @@ describe("CaseProvider", () => {
   it("hydrates only once per caseId", async () => {
     const loadSpy = vi.fn(() =>
       JSON.stringify({
-        caseId: "case-1",
-        templateId: "tpl-1",
+        caseId: "550e8400-e29b-41d4-a716-446655440000",
+        templateId: "660e8400-e29b-41d4-a716-446655440001",
         formData: { "ent-1": "Julián Ruiz" },
         savedAt: new Date().toISOString(),
       })
