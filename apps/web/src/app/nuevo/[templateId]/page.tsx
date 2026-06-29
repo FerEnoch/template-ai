@@ -19,17 +19,10 @@ function NewCasePageContent() {
   const { state, setTemplate, setCase, setLoading, setError, setStatus, setGenerationError, saveForm } =
     useCase();
 
-  const bootstrapInFlight = useRef(false);
-
   useEffect(() => {
     const controller = new AbortController();
 
     async function bootstrap() {
-      // Guard against duplicate bootstrap runs (StrictMode double-mount,
-      // dependency re-fires while a request is still in flight).
-      if (bootstrapInFlight.current) return;
-      bootstrapInFlight.current = true;
-
       setLoading(true);
       setError(null);
       try {
@@ -51,9 +44,11 @@ function NewCasePageContent() {
             : "No se pudo cargar el nuevo caso"
         );
       } finally {
-        if (bootstrapInFlight.current) {
+        // Only the active effect run may clear loading. The shared
+        // bootstrapInFlight ref was removed because it could not distinguish
+        // which run was active under StrictMode/Fast Refresh.
+        if (!controller.signal.aborted) {
           setLoading(false);
-          bootstrapInFlight.current = false;
         }
       }
     }
@@ -61,7 +56,6 @@ function NewCasePageContent() {
     void bootstrap();
     return () => {
       controller.abort();
-      bootstrapInFlight.current = false;
     };
   }, [templateId, setTemplate, setCase, setLoading, setError]);
 
