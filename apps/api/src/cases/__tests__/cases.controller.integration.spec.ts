@@ -234,6 +234,52 @@ describe("CasesController integration", () => {
 
       expect(res.status).toBe(404);
     });
+
+    it("should return the existing borrador on a second POST with the same template", async () => {
+      if (!app || !pool) return;
+      const user = await createUserAs(0, {
+        email: "cases-idempotent@example.com",
+        displayName: "Cases Idempotent",
+        externalSubject: "subj_cases_idempotent",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const post = async () =>
+        new Promise<{ status: number; body: unknown }>((resolve) => {
+          const req = http().request(
+            "POST",
+            "/api/cases",
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: JSON.parse(data),
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ templateId }));
+          req.end();
+        });
+
+      const first = await post();
+      const second = await post();
+
+      expect(first.status).toBe(201);
+      expect(second.status).toBe(200);
+      expect((second.body as Record<string, unknown>).id).toBe(
+        (first.body as Record<string, unknown>).id,
+      );
+
+      const count = await pool.query(
+        "SELECT COUNT(*)::int as count FROM casos WHERE user_id = $1 AND template_id = $2",
+        [user.id, templateId],
+      );
+      expect(count.rows[0].count).toBe(1);
+    });
   });
 
   describe("GET /api/cases", () => {
