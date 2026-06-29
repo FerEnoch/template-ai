@@ -165,7 +165,7 @@ export function TemplateCard({
         onClose={handleCloseDialog}
         onConfirm={handleConfirmDelete}
         isLoading={isDeleting}
-        templateName={template.name}
+        itemName={template.name}
       />
     </>
   );

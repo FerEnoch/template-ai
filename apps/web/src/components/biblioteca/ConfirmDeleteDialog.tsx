@@ -8,7 +8,7 @@ interface ConfirmDeleteDialogProps {
   readonly onClose: () => void;
   readonly onConfirm: () => void;
   readonly isLoading: boolean;
-  readonly templateName: string;
+  readonly itemName: string;
 }
 
 export function ConfirmDeleteDialog({
@@ -16,7 +16,7 @@ export function ConfirmDeleteDialog({
   onClose,
   onConfirm,
   isLoading,
-  templateName,
+  itemName,
 }: ConfirmDeleteDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -57,11 +57,11 @@ export function ConfirmDeleteDialog({
     >
       <div className="p-6">
         <h2 className="font-headline text-lg font-bold text-text-primary">
-          ¿Eliminar plantilla?
+          ¿Eliminar &quot;{itemName}&quot;?
         </h2>
         <p className="mt-2 font-body text-sm text-text-secondary">
-          Estás por eliminar &quot;{templateName}&quot;. Esta acción no se puede
-          deshacer. La plantilla se archivará y podrá ser recuperada dentro de
+          Estás por eliminar &quot;{itemName}&quot;. Esta acción no se puede
+          deshacer. El elemento se archivará y podrá ser recuperado dentro de
           los próximos 30 días.
         </p>
 

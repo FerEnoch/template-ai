@@ -444,7 +444,7 @@ export default function TemplateDetailPage({
           onClose={handleCloseDeleteDialog}
           onConfirm={handleConfirmDelete}
           isLoading={isDeleting}
-          templateName={template.name}
+          itemName={template.name}
         />
       </div>
     );

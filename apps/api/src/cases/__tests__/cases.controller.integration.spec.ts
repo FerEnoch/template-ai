@@ -328,5 +328,132 @@ describe("CasesController integration", () => {
 
       expect(res.status).toBe(404);
     });
+
+    it("should return 204 and archive an active case", async () => {
+      if (!app) return;
+      const user = await createUserAs(0, {
+        email: "cases-delete-active@example.com",
+        displayName: "Cases Delete Active",
+        externalSubject: "subj_cases_delete_active",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const created = await new Promise<{ status: number; body: { id: string } }>(
+        (resolve) => {
+          const req = http().request(
+            "POST",
+            "/api/cases",
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: JSON.parse(data),
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ templateId }));
+          req.end();
+        },
+      );
+
+      expect(created.status).toBe(201);
+
+      const deleted = await new Promise<{ status: number; body: string }>(
+        (resolve) => {
+          const req = http().request(
+            "DELETE",
+            `/api/cases/${created.body.id}`,
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({ status: res.statusCode ?? 0, body: data }),
+              );
+            },
+          );
+          req.end();
+        },
+      );
+
+      expect(deleted.status).toBe(204);
+      expect(deleted.body).toBe("");
+
+      if (pool) {
+        const result = await pool.query(
+          "SELECT status FROM casos WHERE id = $1",
+          [created.body.id],
+        );
+        expect(result.rows[0]?.status).toBe("archivado");
+      }
+    });
+
+    it("should return 204 when deleting an already-archived case", async () => {
+      if (!app) return;
+      const user = await createUserAs(0, {
+        email: "cases-delete-idempotent@example.com",
+        displayName: "Cases Delete Idempotent",
+        externalSubject: "subj_cases_delete_idempotent",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const created = await new Promise<{ status: number; body: { id: string } }>(
+        (resolve) => {
+          const req = http().request(
+            "POST",
+            "/api/cases",
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: JSON.parse(data),
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ templateId }));
+          req.end();
+        },
+      );
+
+      expect(created.status).toBe(201);
+
+      await new Promise<{ status: number }>((resolve) => {
+        const req = http().request(
+          "DELETE",
+          `/api/cases/${created.body.id}`,
+          (res: IncomingMessage) => {
+            res.on("end", () => resolve({ status: res.statusCode ?? 0 }));
+          },
+        );
+        req.end();
+      });
+
+      const second = await new Promise<{ status: number; body: string }>(
+        (resolve) => {
+          const req = http().request(
+            "DELETE",
+            `/api/cases/${created.body.id}`,
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({ status: res.statusCode ?? 0, body: data }),
+              );
+            },
+          );
+          req.end();
+        },
+      );
+
+      expect(second.status).toBe(204);
+      expect(second.body).toBe("");
+    });
   });
 });
