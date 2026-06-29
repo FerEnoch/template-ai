@@ -11,6 +11,11 @@ import {
 } from "react";
 import type { Template, Entity, Case } from "@template-ai/contracts";
 import { updateCase } from "@/lib/api/cases";
+import {
+  loadCaseFormDraft,
+  saveCaseFormDraft,
+  clearCaseFormDraft,
+} from "./caseFormStorage";
 
 export interface CaseState {
   template: Template | null;
@@ -159,6 +164,7 @@ interface CaseContextValue {
   saveForm: () => Promise<void>;
   addEntity: (entity: Entity) => void;
   removeEntity: (entityId: string) => void;
+  clearDraft: () => void;
 }
 
 const CaseContext = createContext<CaseContextValue | null>(null);
@@ -174,6 +180,8 @@ export function CaseProvider({
 }: CaseProviderProps) {
   const [state, dispatch] = useReducer(caseReducer, initialCaseState);
   const lastSavedFormData = useRef<Record<string, string>>({});
+  const lastHydratedCaseId = useRef<string | null>(null);
+  const writeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateField = useCallback((entityId: string, value: string) => {
     dispatch({ type: "UPDATE_FIELD", payload: { entityId, value } });
@@ -216,6 +224,10 @@ export function CaseProvider({
     dispatch({ type: "REMOVE_ENTITY", payload: entityId });
   }, []);
 
+  const clearDraft = useCallback(() => {
+    clearCaseFormDraft();
+  }, []);
+
   const saveForm = useCallback(async () => {
     if (!state.caseId || state.caseStatus !== "borrador") return;
     dispatch({ type: "SET_SAVE_STATUS", payload: "saving" });
@@ -251,6 +263,55 @@ export function CaseProvider({
     }
   }, [initialCase, setCase]);
 
+  // Hydrate formData from sessionStorage when a case is set
+  useEffect(() => {
+    if (!state.caseId || !state.template) return;
+    if (lastHydratedCaseId.current === state.caseId) return;
+
+    lastHydratedCaseId.current = state.caseId;
+    const draft = loadCaseFormDraft();
+    if (!draft || draft.caseId !== state.caseId) return;
+
+    const validEntityIds = new Set(state.template.entities.map((e) => e.id));
+    const filteredFormData = Object.fromEntries(
+      Object.entries(draft.formData).filter(([key]) => validEntityIds.has(key))
+    );
+
+    dispatch({ type: "SET_FORM_DATA", payload: filteredFormData });
+  }, [state.caseId, state.template]);
+
+  // Debounced write to sessionStorage on formData change
+  useEffect(() => {
+    if (!state.caseId || !state.template) return;
+
+    if (writeTimer.current) {
+      clearTimeout(writeTimer.current);
+    }
+
+    writeTimer.current = setTimeout(() => {
+      saveCaseFormDraft({
+        caseId: state.caseId,
+        templateId: state.template.id,
+        formData: state.formData,
+      });
+    }, 300);
+
+    return () => {
+      if (writeTimer.current) {
+        clearTimeout(writeTimer.current);
+      }
+    };
+  }, [state.caseId, state.template, state.formData]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (writeTimer.current) {
+        clearTimeout(writeTimer.current);
+      }
+    };
+  }, []);
+
   return (
     <CaseContext.Provider
       value={{
@@ -266,6 +327,7 @@ export function CaseProvider({
         saveForm,
         addEntity,
         removeEntity,
+        clearDraft,
       }}
     >
       {children}

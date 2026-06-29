@@ -1,7 +1,65 @@
-import { describe, it, expect } from "vitest";
-import { caseReducer, initialCaseState } from "../CaseContext";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, cleanup, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { useEffect, useState } from "react";
+import { caseReducer, initialCaseState, CaseProvider, useCase } from "../CaseContext";
 import type { CaseState, CaseAction } from "../CaseContext";
-import type { Template, Entity } from "@template-ai/contracts";
+import type { Template, Entity, Case } from "@template-ai/contracts";
+
+let mockStore: Record<string, string> = {};
+
+beforeEach(() => {
+  mockStore = {};
+  Object.defineProperty(globalThis, "sessionStorage", {
+    value: {
+      getItem: (key: string) => mockStore[key] ?? null,
+      setItem: (key: string, value: string) => {
+        mockStore[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete mockStore[key];
+      },
+      clear: () => {
+        mockStore = {};
+      },
+    },
+    writable: true,
+    configurable: true,
+  });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+function TestConsumer({
+  template,
+  caseItem,
+  onReady,
+}: {
+  template: Template;
+  caseItem: Case;
+  onReady?: (api: ReturnType<typeof useCase>) => void;
+}) {
+  const api = useCase();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    api.setTemplate(template);
+    api.setCase(caseItem);
+    setReady(true);
+    onReady?.(api);
+  }, []);
+
+  return (
+    <div>
+      <span data-testid="ready">{ready ? "ready" : "loading"}</span>
+      <span data-testid="caseId">{api.state.caseId ?? "none"}</span>
+      <span data-testid="formData">{JSON.stringify(api.state.formData)}</span>
+    </div>
+  );
+}
 
 const mockEntity: Entity = {
   id: "ent-1",
@@ -34,6 +92,17 @@ const mockTemplate: Template = {
   category: "Arrendamiento Urbano",
   createdAt: "2024-05-15T00:00:00Z",
   status: "published",
+};
+
+const mockCase: Case = {
+  id: "case-1",
+  userId: 1,
+  templateId: "tpl-1",
+  status: "borrador",
+  formData: {},
+  generatedText: null,
+  createdAt: "2024-05-15T00:00:00Z",
+  updatedAt: "2024-05-15T00:00:00Z",
 };
 
 describe("caseReducer", () => {
@@ -127,5 +196,195 @@ describe("caseReducer", () => {
       const result = caseReducer(state, action);
       expect(result.error).toBeNull();
     });
+  });
+});
+
+describe("CaseProvider", () => {
+  it("renders a child consumer", () => {
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer template={mockTemplate} caseItem={mockCase} />
+      </CaseProvider>
+    );
+    expect(getByTestId("ready")).toBeInTheDocument();
+  });
+
+  it("hydrates formData from sessionStorage when caseId matches", async () => {
+    mockStore["case-form-draft:v1"] = JSON.stringify({
+      caseId: "case-1",
+      templateId: "tpl-1",
+      formData: { "ent-1": "Julián Ruiz" },
+      savedAt: new Date().toISOString(),
+    });
+
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer template={mockTemplate} caseItem={mockCase} />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    expect(getByTestId("formData").textContent).toBe(
+      JSON.stringify({ "ent-1": "Julián Ruiz" })
+    );
+  });
+
+  it("drops stale entity keys during hydration", async () => {
+    mockStore["case-form-draft:v1"] = JSON.stringify({
+      caseId: "case-1",
+      templateId: "tpl-1",
+      formData: { "ent-1": "Julián Ruiz", "ent-stale": "old value" },
+      savedAt: new Date().toISOString(),
+    });
+
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer template={mockTemplate} caseItem={mockCase} />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    expect(getByTestId("formData").textContent).toBe(
+      JSON.stringify({ "ent-1": "Julián Ruiz" })
+    );
+  });
+
+  it("does not hydrate when draft caseId does not match", async () => {
+    mockStore["case-form-draft:v1"] = JSON.stringify({
+      caseId: "other-case",
+      templateId: "tpl-1",
+      formData: { "ent-1": "Julián Ruiz" },
+      savedAt: new Date().toISOString(),
+    });
+
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer template={mockTemplate} caseItem={mockCase} />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    expect(getByTestId("formData").textContent).toBe(JSON.stringify({}));
+  });
+
+  it("debounces sessionStorage write after UPDATE_FIELD", async () => {
+    vi.useFakeTimers();
+
+    let apiRef: ReturnType<typeof useCase> | undefined;
+
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer
+          template={mockTemplate}
+          caseItem={mockCase}
+          onReady={(api) => {
+            apiRef = api;
+          }}
+        />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    apiRef!.updateField("ent-1", "Julián Ruiz");
+    apiRef!.updateField("ent-1", "Julián Ruiz Updated");
+
+    expect(mockStore["case-form-draft:v1"]).toBeUndefined();
+
+    vi.advanceTimersByTime(300);
+
+    await waitFor(() =>
+      expect(mockStore["case-form-draft:v1"]).not.toBeUndefined()
+    );
+
+    const stored = JSON.parse(mockStore["case-form-draft:v1"]);
+    expect(stored.formData["ent-1"]).toBe("Julián Ruiz Updated");
+    expect(stored.caseId).toBe("case-1");
+    expect(stored.templateId).toBe("tpl-1");
+  });
+
+  it("clearDraft removes the sessionStorage key", async () => {
+    mockStore["case-form-draft:v1"] = JSON.stringify({
+      caseId: "case-1",
+      templateId: "tpl-1",
+      formData: { "ent-1": "Julián Ruiz" },
+      savedAt: new Date().toISOString(),
+    });
+
+    let apiRef: ReturnType<typeof useCase> | undefined;
+
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer
+          template={mockTemplate}
+          caseItem={mockCase}
+          onReady={(api) => {
+            apiRef = api;
+          }}
+        />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    apiRef!.clearDraft();
+
+    expect(mockStore["case-form-draft:v1"]).toBeUndefined();
+  });
+
+  it("hydrates only once per caseId", async () => {
+    const loadSpy = vi.fn(() =>
+      JSON.stringify({
+        caseId: "case-1",
+        templateId: "tpl-1",
+        formData: { "ent-1": "Julián Ruiz" },
+        savedAt: new Date().toISOString(),
+      })
+    );
+    Object.defineProperty(globalThis, "sessionStorage", {
+      value: {
+        getItem: loadSpy,
+        setItem: () => {},
+        removeItem: () => {},
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    let apiRef: ReturnType<typeof useCase> | undefined;
+
+    const { getByTestId, rerender } = render(
+      <CaseProvider>
+        <TestConsumer
+          template={mockTemplate}
+          caseItem={mockCase}
+          onReady={(api) => {
+            apiRef = api;
+          }}
+        />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    // Force a re-render by updating field
+    apiRef!.updateField("ent-1", "trigger re-render");
+
+    rerender(
+      <CaseProvider>
+        <TestConsumer
+          template={mockTemplate}
+          caseItem={mockCase}
+          onReady={(api) => {
+            apiRef = api;
+          }}
+        />
+      </CaseProvider>
+    );
+
+    expect(loadSpy).toHaveBeenCalledTimes(1);
   });
 });
