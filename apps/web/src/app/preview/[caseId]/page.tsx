@@ -13,6 +13,19 @@ import type { CaseWithTemplate } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
+const ERROR_TYPE_LABELS: Record<string, string> = {
+  NETWORK_ERROR: "Error de red",
+  RATE_LIMIT: "Límite alcanzado",
+  AUTH_ERROR: "Error de autenticación",
+  MODEL_NOT_FOUND: "Modelo no disponible",
+  INVALID_RESPONSE: "Respuesta inválida",
+  UNKNOWN: "Error desconocido",
+};
+
+function errorTypeLabel(errorType: string): string {
+  return ERROR_TYPE_LABELS[errorType] ?? errorType;
+}
+
 interface PreviewPageContentProps {
   caseId: string;
   router: AppRouterInstance;
@@ -50,8 +63,8 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     setIsRegenerating(true);
     setRegenError(null);
     try {
-      const updated = await generateCase(caseId);
-      setCaseItem(updated as CaseWithTemplate);
+      await generateCase(caseId);
+      await loadCase();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Error al regenerar el documento";
@@ -60,7 +73,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     } finally {
       setIsRegenerating(false);
     }
-  }, [caseId]);
+  }, [caseId, loadCase]);
 
   const handleReturnToForm = useCallback(() => {
     if (!caseItem) return;
@@ -126,9 +139,14 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
             </p>
             <div className="flex items-center gap-3">
               {regenError.errorType && (
-                <code className="text-xs font-mono bg-white/60 px-2 py-1 rounded text-danger">
-                  {regenError.errorType}
-                </code>
+                <details className="text-xs text-danger">
+                  <summary className="cursor-pointer font-label select-none">
+                    Detalles
+                  </summary>
+                  <code className="block mt-1 font-mono bg-white/60 px-2 py-1 rounded">
+                    {errorTypeLabel(regenError.errorType)}
+                  </code>
+                </details>
               )}
               <button
                 type="button"

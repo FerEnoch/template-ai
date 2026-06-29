@@ -13,7 +13,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      const error = this.extractMessage(exceptionResponse);
+      const { message: error, errorType } =
+        this.extractErrorDetails(exceptionResponse);
 
       // Log 5xx server errors with full stack; log 4xx client errors at warn level
       if (status >= 500) {
@@ -27,7 +28,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         );
       }
 
-      response.status(status).json({ error });
+      response.status(status).json({
+        error,
+        ...(errorType && { errorType }),
+      });
       return;
     }
 
@@ -92,51 +96,65 @@ export class HttpExceptionFilter implements ExceptionFilter {
   }
 
   /**
-   * Extracts a human-readable error message from an HttpException response.
+   * Extracts a human-readable error message and an optional machine-readable
+   * error type from an HttpException response.
    *
    * NestJS exception responses can be:
-   * - A plain string: "Not Found" → "Not Found"
-   * - An object with `message`: { statusCode: 400, message: "Validation failed" } → "Validation failed"
-   * - An object with `message` as array: { statusCode: 400, message: ["a", "b"] } → "a, b"
-   * - An object without `message`: { statusCode: 503, status: "not_ready" } → "not_ready"
+   * - A plain string: "Not Found" → { message: "Not Found" }
+   * - An object with `message`: { statusCode: 400, message: "Validation failed" }
+   *   → { message: "Validation failed" }
+   * - An object with `message` as array: { statusCode: 400, message: ["a", "b"] }
+   *   → { message: "a, b" }
+   * - An object without `message`: { statusCode: 503, status: "not_ready" }
+   *   → { message: "not_ready" }
+   * - An object with `errorType`: { message: "...", errorType: "NETWORK_ERROR" }
+   *   → { message: "...", errorType: "NETWORK_ERROR" }
    *
    * For objects without `message`, we try the `error` field first, then fall back
-   * to stringifying any remaining non-statusCode fields.
+   * to the first remaining non-statusCode string field as the error message.
    */
-  private extractMessage(response: string | object): string {
+  private extractErrorDetails(response: string | object): {
+    message: string;
+    errorType?: string;
+  } {
     if (typeof response === "string") {
-      return response;
+      return { message: response };
     }
 
     if (typeof response === "object" && response !== null) {
       const obj = response as Record<string, unknown>;
+      const errorType =
+        typeof obj.errorType === "string" ? obj.errorType : undefined;
 
       // Standard NestJS: { statusCode, message } or { statusCode, error, message }
       if ("message" in obj) {
         const message = obj.message;
         if (Array.isArray(message)) {
-          return message.join(", ");
+          return { message: message.join(", "), errorType };
         }
         if (typeof message === "string") {
-          return message;
+          return { message, errorType };
         }
       }
 
       // Some exceptions use { statusCode, error } without message
       if ("error" in obj && typeof obj.error === "string") {
-        return obj.error;
+        return { message: obj.error, errorType };
       }
 
       // Custom exception bodies like { status: "not_ready" } — extract the
       // first non-statusCode string field as the error message
       const meaningfulKeys = Object.keys(obj).filter((k) => k !== "statusCode");
       for (const key of meaningfulKeys) {
+        if (key === "errorType") continue;
         if (typeof obj[key] === "string") {
-          return obj[key] as string;
+          return { message: obj[key] as string, errorType };
         }
       }
+
+      return { message: "Internal server error", errorType };
     }
 
-    return "Internal server error";
+    return { message: "Internal server error" };
   }
 }

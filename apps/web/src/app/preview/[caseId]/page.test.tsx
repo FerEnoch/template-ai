@@ -129,7 +129,9 @@ describe("PreviewPageContent", () => {
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByText("NETWORK_ERROR")).toBeInTheDocument();
+    expect(screen.getByText("Detalles")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Detalles"));
+    expect(screen.getByText("Error de red")).toBeInTheDocument();
     expect(screen.getByTestId("document-viewer")).toBeInTheDocument();
   });
 

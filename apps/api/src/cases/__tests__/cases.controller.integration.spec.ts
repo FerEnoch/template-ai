@@ -8,7 +8,7 @@
  * Run with DATABASE_URL set to execute against a real PostgreSQL instance.
  */
 
-import { describe, expect, it, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, expect, it, beforeAll, afterAll, afterEach, vi } from "vitest";
 import type { INestApplication } from "@nestjs/common";
 import type { IncomingMessage } from "node:http";
 import type { Pool } from "pg";
@@ -327,6 +327,111 @@ describe("CasesController integration", () => {
       });
 
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe("POST /api/cases/:id/generate with failing AI service", () => {
+    let generateApp: INestApplication | null = null;
+
+    beforeAll(async () => {
+      if (!DATABASE_URL) return;
+
+      const { Test } = await import("@nestjs/testing");
+      const { DatabaseModule } = await import(
+        "../../infrastructure/postgres/database.module"
+      );
+      const { CasesController } = await import("../cases.controller");
+      const { CasesService } = await import("../cases.service");
+      const { DocumentGenerationService } = await import(
+        "../../ai/document-generation.service.js"
+      );
+
+      const moduleRef = await Test.createTestingModule({
+        imports: [DatabaseModule],
+        controllers: [CasesController],
+        providers: [
+          CasesService,
+          {
+            provide: DocumentGenerationService,
+            useValue: {
+              generate: vi.fn().mockResolvedValue({
+                success: false,
+                error: "Upstream unreachable",
+                errorType: "NETWORK_ERROR",
+              }),
+            },
+          },
+        ],
+      }).compile();
+
+      generateApp = moduleRef.createNestApplication();
+      const { HttpExceptionFilter } = await import(
+        "../../infrastructure/http/exception.filter"
+      );
+      generateApp.useGlobalFilters(new HttpExceptionFilter());
+      generateApp.setGlobalPrefix("api");
+      await generateApp.init();
+    });
+
+    afterAll(async () => {
+      if (generateApp) await generateApp.close();
+    });
+
+    it("should return 502 with both error and errorType in the response body", async () => {
+      if (!pool || !generateApp) return;
+
+      const user = await createUserAs(0, {
+        email: "cases-generate-fail@example.com",
+        displayName: "Cases Generate Fail",
+        externalSubject: "subj_cases_generate_fail",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const client = await pool.connect();
+      let caseId: string;
+      try {
+        await client.query("BEGIN");
+        await client.query(`SET LOCAL app.current_user_id = $1`, [user.id]);
+        const caseResult = await client.query(
+          `INSERT INTO casos (user_id, template_id, status, form_data)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id`,
+          [user.id, templateId, "borrador", {}],
+        );
+        caseId = caseResult.rows[0].id as string;
+        await client.query("COMMIT");
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      const res = await new Promise<{ status: number; body: unknown }>(
+        (resolve) => {
+          const req = generateApp!.getHttpServer().request(
+            "POST",
+            `/api/cases/${caseId}/generate`,
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: data ? JSON.parse(data) : {},
+                }),
+              );
+            },
+          );
+          req.end();
+        },
+      );
+
+      expect(res.status).toBe(502);
+      expect(res.body).toMatchObject({
+        error: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+        errorType: "NETWORK_ERROR",
+      });
     });
   });
 });
