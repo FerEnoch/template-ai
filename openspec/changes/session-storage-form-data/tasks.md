@@ -27,29 +27,29 @@ Chain strategy: size-exception
 
 ## Phase 1: Contract — `CaseFormDraftSchema`
 
-- [ ] 1.1 RED: add test in `packages/contracts/src/__tests__/` asserting `CaseFormDraftSchema` parses valid shape and rejects missing fields
-- [ ] 1.2 GREEN: add `CaseFormDraftSchema` and `type CaseFormDraft` in `packages/contracts/src/schemas.ts` after `WizardDraftSchema`
-- [ ] 1.3 Re-export schema + type from `packages/contracts/src/index.ts`
+- [x] 1.1 RED: add test in `packages/contracts/src/__tests__/` asserting `CaseFormDraftSchema` parses valid shape and rejects missing fields
+- [x] 1.2 GREEN: add `CaseFormDraftSchema` and `type CaseFormDraft` in `packages/contracts/src/schemas.ts` after `WizardDraftSchema`
+- [x] 1.3 Re-export schema + type from `packages/contracts/src/index.ts`
 
 ## Phase 2: Storage Module — `caseFormStorage.ts`
 
-- [ ] 2.1 RED: create `apps/web/src/lib/case/__tests__/caseFormStorage.test.ts` with round-trip, invalid JSON clears, schema-violation clears, missing `window`/`sessionStorage`, quota-throw degrades silently
-- [ ] 2.2 GREEN: create `apps/web/src/lib/case/caseFormStorage.ts` with `DRAFT_KEY = "case-form-draft:v1"` and `load/save/clearCaseFormDraft` (mirror `apps/web/src/lib/wizard/storage.ts`, swap `localStorage` → `sessionStorage`)
-- [ ] 2.3 Create `apps/web/src/lib/case/index.ts` re-exporting the three storage functions (mirror `wizard/index.ts`)
-- [ ] 2.4 Run `pnpm --filter @template-ai/web test apps/web/src/lib/case/__tests__/caseFormStorage.test.ts` — all green
+- [x] 2.1 RED: create `apps/web/src/lib/case/__tests__/caseFormStorage.test.ts` with round-trip, invalid JSON clears, schema-violation clears, missing `window`/`sessionStorage`, quota-throw degrades silently
+- [x] 2.2 GREEN: create `apps/web/src/lib/case/caseFormStorage.ts` with `DRAFT_KEY = "case-form-draft:v1"` and `load/save/clearCaseFormDraft` (mirror `apps/web/src/lib/wizard/storage.ts`, swap `localStorage` → `sessionStorage`)
+- [x] 2.3 Create `apps/web/src/lib/case/index.ts` re-exporting the three storage functions (mirror `wizard/index.ts`)
+- [x] 2.4 Run `pnpm --filter @template-ai/web test apps/web/src/lib/case/__tests__/caseFormStorage.test.ts` — all green
 
 ## Phase 3: CaseProvider — hydrate, debounced write, `clearDraft`
 
-- [ ] 3.1 RED: in `CaseContext.test.tsx`, add provider-level block: hydrate on mount w/ matching `caseId` (R3), stale-key drop (R4), debounced `setItem` after `UPDATE_FIELD` (R2), `clearDraft()` removes key (R5)
-- [ ] 3.2 GREEN: in `CaseContext.tsx`, add `lastHydratedCaseId` ref + hydrate `useEffect` on `[state.caseId, state.template]` (R3 ref guard, R4 intersect entities)
-- [ ] 3.3 GREEN: add debounced-write `useEffect` on `[state.caseId, state.template, state.formData]`, 300ms `setTimeout`, `clearTimeout` cleanup (R2)
-- [ ] 3.4 GREEN: add `clearDraft` `useCallback`; extend `CaseContextValue` and provider value (R5)
-- [ ] 3.5 Confirm existing `caseReducer` tests still pass; refactor if needed
+- [x] 3.1 RED: in `CaseContext.test.tsx`, add provider-level block: hydrate on mount w/ matching `caseId` (R3), stale-key drop (R4), debounced `setItem` after `UPDATE_FIELD` (R2), `clearDraft()` removes key (R5)
+- [x] 3.2 GREEN: in `CaseContext.tsx`, add `lastHydratedCaseId` ref + hydrate `useEffect` on `[state.caseId, state.template]` (R3 ref guard, R4 intersect entities)
+- [x] 3.3 GREEN: add debounced-write `useEffect` on `[state.caseId, state.template, state.formData]`, 300ms `setTimeout`, `clearTimeout` cleanup (R2)
+- [x] 3.4 GREEN: add `clearDraft` `useCallback`; extend `CaseContextValue` and provider value (R5)
+- [x] 3.5 Confirm existing `caseReducer` tests still pass; refactor if needed
 
 ## Phase 4: Page Wire-up + Final Verification
 
-- [ ] 4.1 In `apps/web/src/app/nuevo/[templateId]/page.tsx`, destructure `clearDraft` from `useCase()`
-- [ ] 4.2 Call `clearDraft()` after `await saveForm()` resolves inside `handleSave`'s try block (R5, no clear on save fail)
-- [ ] 4.3 Call `clearDraft()` after successful `router.push` in `handleGenerate` (R5)
-- [ ] 4.4 Run `pnpm --filter @template-ai/web test`, `pnpm typecheck`, `pnpm lint`, `pnpm format` — all pass
-- [ ] 4.5 Verify no regression: 30s auto-save fires, wizard `localStorage` unaffected, generation path intact
+- [x] 4.1 In `apps/web/src/app/nuevo/[templateId]/page.tsx`, destructure `clearDraft` from `useCase()`
+- [x] 4.2 Call `clearDraft()` after `await saveForm()` resolves inside `handleSave`'s try block (R5, no clear on save fail)
+- [x] 4.3 Call `clearDraft()` after successful `router.push` in `handleGenerate` (R5)
+- [x] 4.4 Run `pnpm --filter @template-ai/web test`, `pnpm typecheck`, `pnpm lint`, `pnpm format` — all pass
+- [x] 4.5 Verify no regression: 30s auto-save fires, wizard `localStorage` unaffected, generation path intact
