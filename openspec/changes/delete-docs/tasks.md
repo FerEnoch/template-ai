@@ -48,6 +48,6 @@ Chain strategy: pending
 
 ## Phase 5: Verification
 
-- [ ] 5.1 `pnpm typecheck` (root) green.
-- [ ] 5.2 `pnpm --filter @template-ai/api test` and `pnpm --filter @template-ai/web test` both green.
-- [ ] 5.3 `grep -r "templateName" apps/web/src/components/biblioteca apps/web/src/app/biblioteca` returns no matches.
+- [x] 5.1 `pnpm typecheck` (root) green.
+- [x] 5.2 `pnpm --filter @template-ai/api test` and `pnpm --filter @template-ai/web test` both green.
+- [x] 5.3 `grep -r "templateName" apps/web/src/components/biblioteca apps/web/src/app/biblioteca` returns no matches.

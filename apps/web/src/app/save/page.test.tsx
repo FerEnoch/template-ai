@@ -52,8 +52,12 @@ describe("SaveContent", () => {
 
   const mockSetStep = vi.fn();
   const mockReset = vi.fn();
-  const mockRouter = { push: vi.fn(), replace: vi.fn() };
-  const mockSearchParams = new URLSearchParams({ step: WizardStep.SAVE });
+  const mockRouter = { push: vi.fn(), replace: vi.fn() } as unknown as ReturnType<
+    typeof import("next/navigation").useRouter
+  >;
+  const mockSearchParams = new URLSearchParams({
+    step: WizardStep.SAVE,
+  }) as unknown as ReturnType<typeof import("next/navigation").useSearchParams>;
 
   beforeEach(() => {
     vi.spyOn(global, "fetch").mockResolvedValue(

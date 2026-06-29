@@ -41,10 +41,14 @@ function createMockCachePort(): CachePort {
   return {
     get: vi.fn(async () => null),
     set: vi.fn(async () => {}),
-    getOrSet: vi.fn(async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
-      factory(),
+    getOrSet: vi.fn(
+      async <T,>(
+        _key: string,
+        _ttl: number,
+        factory: () => Promise<T>,
+      ): Promise<T> => factory(),
     ),
-  };
+  } as CachePort;
 }
 
 // ---------------------------------------------------------------------------

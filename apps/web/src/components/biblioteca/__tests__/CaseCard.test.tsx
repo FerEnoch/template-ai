@@ -5,8 +5,12 @@ import { CaseCard } from "../CaseList";
 import type { Case } from "@template-ai/contracts";
 
 beforeAll(() => {
-  HTMLDialogElement.prototype.showModal = vi.fn();
-  HTMLDialogElement.prototype.close = vi.fn();
+  HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+    this.open = true;
+  });
+  HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement) {
+    this.open = false;
+  });
 });
 
 afterEach(() => {
@@ -92,7 +96,9 @@ describe("CaseCard", () => {
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /eliminar/i })).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: /eliminar documento/i }),
+      ).toBeDisabled();
     });
   });
 

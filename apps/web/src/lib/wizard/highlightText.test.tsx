@@ -26,6 +26,7 @@ function createEntity(
         : undefined,
     reviewed: false,
     excluded: false,
+    userCreated: false,
   };
 }
 
