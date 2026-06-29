@@ -29,6 +29,10 @@ vi.mock("../config/ai.js", () => ({
     maxTokens: 8192,
     temperature: 0.1,
   },
+  AI_GENERATION_CONFIG: {
+    maxTokens: 8192,
+    temperature: 0.1,
+  },
   CACHE_CONFIG: {
     enabled: false,
     responseCacheTtl: 604800,
@@ -42,9 +46,10 @@ function createMockCachePort(): CachePort {
   return {
     get: vi.fn(async () => null),
     set: vi.fn(async () => {}),
-    getOrSet: vi.fn(async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
-      factory(),
-    ),
+    getOrSet: vi.fn(
+      async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
+        factory(),
+    ) as CachePort["getOrSet"],
   };
 }
 
