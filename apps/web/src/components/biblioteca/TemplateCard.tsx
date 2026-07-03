@@ -80,9 +80,13 @@ export function TemplateCard({
       setIsDialogOpen(false);
       onDelete?.(template.id);
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Error al eliminar la plantilla"
-      );
+      const message =
+        err instanceof TypeError
+          ? "No se pudo conectar con el servidor. Verificá tu conexión e intentá nuevamente."
+          : err instanceof Error
+            ? err.message
+            : "Error al eliminar la plantilla";
+      setDeleteError(message);
       onDeleteError?.();
     } finally {
       setIsDeleting(false);

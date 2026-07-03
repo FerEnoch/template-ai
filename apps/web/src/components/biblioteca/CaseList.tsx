@@ -177,9 +177,13 @@ export function CaseCard({
       setIsDialogOpen(false);
       onDelete?.(caseData.id);
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Error al eliminar el documento",
-      );
+      const message =
+        err instanceof TypeError
+          ? "No se pudo conectar con el servidor. Verificá tu conexión e intentá nuevamente."
+          : err instanceof Error
+            ? err.message
+            : "Error al eliminar el documento";
+      setDeleteError(message);
       onDeleteError?.();
     } finally {
       setIsDeleting(false);
