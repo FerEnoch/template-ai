@@ -76,8 +76,9 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
 
 function createMockPostgresService(setup: {
   caseRecords?: CaseRecord[];
-  createdRecord?: CaseRecord;
+  createdRecord?: CaseRecord | null;
   findByIdRecord?: CaseRecord | null;
+  findBorradorByTemplateRecord?: CaseRecord | null;
   templateExists?: boolean;
   updateRecord?: CaseRecord | null;
 }): {
@@ -88,6 +89,7 @@ function createMockPostgresService(setup: {
     caseRecords = [],
     createdRecord,
     findByIdRecord = null,
+    findBorradorByTemplateRecord = null,
     templateExists = true,
     updateRecord = null,
   } = setup;
@@ -113,8 +115,12 @@ function createMockPostgresService(setup: {
       });
     }
 
-    // INSERT INTO casos (create) — returns only the generated id
+    // INSERT INTO casos (create) — returns only the generated id.
+    // Pass createdRecord: null to simulate an ON CONFLICT (rowCount 0 → 23505).
     if (sql.includes("INSERT INTO casos")) {
+      if (createdRecord === null) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
       const record = createdRecord ?? makeCaseRecord();
       return Promise.resolve({
         rowCount: 1,
@@ -144,6 +150,35 @@ function createMockPostgresService(setup: {
             created_at: findByIdRecord.createdAt,
             updated_at: findByIdRecord.updatedAt,
             ...makeTemplateRow({ id: findByIdRecord.templateId }),
+          },
+        ],
+      });
+    }
+
+    // SELECT existing borrador by user_id + template_id (findBorradorByTemplate)
+    if (
+      sql.includes("SELECT") &&
+      sql.includes("FROM casos") &&
+      sql.includes("WHERE c.user_id =") &&
+      sql.includes("c.template_id") &&
+      sql.includes("borrador")
+    ) {
+      if (!findBorradorByTemplateRecord) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [
+          {
+            id: findBorradorByTemplateRecord.id,
+            user_id: findBorradorByTemplateRecord.userId,
+            template_id: findBorradorByTemplateRecord.templateId,
+            status: findBorradorByTemplateRecord.status,
+            form_data: findBorradorByTemplateRecord.formData,
+            generated_text: findBorradorByTemplateRecord.generatedText,
+            created_at: findBorradorByTemplateRecord.createdAt,
+            updated_at: findBorradorByTemplateRecord.updatedAt,
+            ...makeTemplateRow({ id: findBorradorByTemplateRecord.templateId }),
           },
         ],
       });
@@ -277,6 +312,29 @@ describe("CasesService", () => {
       await expect(
         service.create(0, { templateId: "non-existent-uuid" }),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should reuse existing borrador on INSERT conflict via ON CONFLICT + refetch", async () => {
+      const existing = makeCaseRecord({
+        id: "existing-borrador-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: { "ent-1": "existing data" },
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        // createdRecord: null → mock returns rowCount 0 (ON CONFLICT DO NOTHING)
+        // which triggers the 23505 → refetch path in the service.
+        createdRecord: null,
+        findBorradorByTemplateRecord: existing,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.id).toBe("existing-borrador-uuid");
+      expect(result.formData).toEqual({ "ent-1": "existing data" });
     });
   });
 

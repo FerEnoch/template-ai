@@ -39,6 +39,20 @@ export interface UpdateCaseData {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Detect PostgreSQL unique violation (error code 23505). */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as Record<string, unknown>).code === "23505"
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
@@ -69,13 +83,28 @@ export class CasesService {
       }
 
       const repo = new CasesRepository(client);
-      let record;
+
+      // INSERT-first with ON CONFLICT DO NOTHING (backed by a partial unique
+      // index). Catches the synthetic 23505 error thrown by the repository
+      // when a borrador already exists and refetches it. This avoids the
+      // TOCTOU race of a SELECT-then-INSERT pattern.
       try {
-        record = await repo.create({
+        const record = await repo.create({
           userId,
           templateId: data.templateId,
         });
+        return this.mapToResponse(record);
       } catch (error) {
+        if (isUniqueViolation(error)) {
+          const existing = await repo.findBorradorByTemplate(
+            userId,
+            data.templateId,
+          );
+          if (existing) {
+            return this.mapToResponse(existing);
+          }
+        }
+
         this.logger.error(
           `Failed to create case for template ${data.templateId} (user ${userId}): ${error instanceof Error ? error.message : String(error)}`,
           error instanceof Error ? error.stack : undefined,
@@ -84,8 +113,6 @@ export class CasesService {
           "No se pudo crear el caso. Intentá nuevamente.",
         );
       }
-
-      return this.mapToResponse(record);
     });
   }
 

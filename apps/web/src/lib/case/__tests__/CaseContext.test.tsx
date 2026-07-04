@@ -337,6 +337,41 @@ describe("CaseProvider", () => {
     expect(mockStore[DRAFT_KEY]).toBeUndefined();
   });
 
+  it("clearDraft cancels a pending debounced write and prevents it from firing", async () => {
+    let apiRef: ReturnType<typeof useCase> | undefined;
+
+    const { getByTestId } = render(
+      <CaseProvider>
+        <TestConsumer
+          template={mockTemplate}
+          caseItem={mockCase}
+          onReady={(api) => {
+            apiRef = api;
+          }}
+        />
+      </CaseProvider>
+    );
+
+    await waitFor(() => expect(getByTestId("ready").textContent).toBe("ready"));
+
+    // Type to schedule a debounced write (300ms timer)
+    apiRef!.updateField("ent-1", "Pending value");
+
+    // Wait for the re-render so the debounced write effect schedules its timer
+    await waitFor(() =>
+      expect(getByTestId("formData").textContent).toBe(
+        JSON.stringify({ "ent-1": "Pending value" })
+      )
+    );
+
+    // Immediately clear before the 300ms timer fires
+    apiRef!.clearDraft("550e8400-e29b-41d4-a716-446655440000");
+
+    // Wait past the debounce window — the cancelled write must NOT have fired
+    await new Promise((r) => setTimeout(r, 400));
+    expect(mockStore[DRAFT_KEY]).toBeUndefined();
+  });
+
   it("hydrates only once per caseId", async () => {
     const loadSpy = vi.fn(() =>
       JSON.stringify({
