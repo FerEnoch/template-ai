@@ -10,6 +10,7 @@ import {
   BadRequestException,
   Logger,
   Res,
+  HttpCode,
 } from "@nestjs/common";
 import {
   CreateCaseRequestSchema,
@@ -145,7 +146,8 @@ export class CasesController {
    * DELETE /api/cases/:id — archive a case (soft delete).
    */
   @Delete(":id")
-  public async archive(@Param("id") id: string): Promise<CaseResponse> {
-    return this.casesService.archive(0, id);
+  @HttpCode(204)
+  public async archive(@Param("id") id: string): Promise<void> {
+    await this.casesService.archive(0, id);
   }
 }

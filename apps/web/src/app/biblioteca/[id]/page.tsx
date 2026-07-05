@@ -314,9 +314,13 @@ export default function TemplateDetailPage({
       setIsDialogOpen(false);
       router.push("/biblioteca");
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Error al eliminar la plantilla"
-      );
+      const message =
+        err instanceof TypeError
+          ? "No se pudo conectar con el servidor. Verificá tu conexión e intentá nuevamente."
+          : err instanceof Error
+            ? err.message
+            : "Error al eliminar la plantilla";
+      setDeleteError(message);
     } finally {
       setIsDeleting(false);
     }
@@ -444,7 +448,7 @@ export default function TemplateDetailPage({
           onClose={handleCloseDeleteDialog}
           onConfirm={handleConfirmDelete}
           isLoading={isDeleting}
-          templateName={template.name}
+          itemName={template.name}
         />
       </div>
     );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -7,8 +8,10 @@ import {
   AlertTriangle,
   Loader2,
   Files,
+  Trash2,
 } from "lucide-react";
 import type { Case, Template } from "@template-ai/contracts";
+import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
 
 interface CaseListProps {
   readonly cases: Case[];
@@ -16,6 +19,8 @@ interface CaseListProps {
   readonly isLoading: boolean;
   readonly error: string | null;
   readonly onRetry?: () => void;
+  readonly onDelete?: (id: string) => void;
+  readonly onDeleteError?: () => void;
 }
 
 const statusConfig: Record<
@@ -126,44 +131,143 @@ function ErrorState({
   );
 }
 
-interface CaseCardProps {
+export interface CaseCardProps {
   readonly caseData: Case;
-  readonly templateName: string;
+  readonly displayName: string;
+  readonly onDelete?: (id: string) => void;
+  readonly onDeleteError?: () => void;
 }
 
-function CaseCard({ caseData, templateName }: CaseCardProps) {
+export function CaseCard({
+  caseData,
+  displayName,
+  onDelete,
+  onDeleteError,
+}: CaseCardProps) {
   const status = statusConfig[caseData.status];
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteError(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    if (isDeleting) return;
+    setIsDialogOpen(false);
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/cases/${caseData.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Error al eliminar el documento");
+      }
+
+      setIsDialogOpen(false);
+      onDelete?.(caseData.id);
+    } catch (err) {
+      const message =
+        err instanceof TypeError
+          ? "No se pudo conectar con el servidor. Verificá tu conexión e intentá nuevamente."
+          : err instanceof Error
+            ? err.message
+            : "Error al eliminar el documento";
+      setDeleteError(message);
+      onDeleteError?.();
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleRetryDelete = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void handleConfirmDelete();
+  };
+
+  const canDelete = caseData.status !== "archivado";
 
   return (
-    <Link
-      href={`/preview/${caseData.id}`}
-      className="group block w-full rounded-xl border border-border bg-surface p-5 text-left shadow-sm transition-all duration-150 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
-    >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-            <FileText className="h-5 w-5 text-accent" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
-              {templateName}
-            </h3>
-          </div>
-        </div>
-        <span
-          className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${status.className}`}
-        >
-          {status.label}
-        </span>
-      </div>
+    <>
+      <Link
+        href={`/preview/${caseData.id}`}
+        className="group relative block w-full rounded-xl border border-border bg-surface p-5 text-left shadow-sm transition-all duration-150 hover:border-accent/30 hover:shadow-md active:scale-[0.99]"
+      >
+        {canDelete && (
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            disabled={isDeleting}
+            title="Eliminar documento"
+            aria-label="Eliminar documento"
+            className="absolute right-3 top-3 z-10 inline-flex items-center justify-center rounded-md p-1.5 text-danger opacity-0 transition-all duration-150 hover:bg-danger/10 focus:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </button>
+        )}
 
-      <div className="flex items-center gap-4 border-t border-border pt-3 font-label text-xs text-text-secondary">
-        <span className="flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5" />
-          {formatDate(caseData.createdAt)}
-        </span>
-      </div>
-    </Link>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10">
+              <FileText className="h-5 w-5 text-accent" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
+                {displayName}
+              </h3>
+            </div>
+          </div>
+          <span
+            className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${status.className}`}
+          >
+            {status.label}
+          </span>
+        </div>
+
+        {deleteError && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs font-bold text-danger">
+            <span>{deleteError}</span>
+            <button
+              type="button"
+              onClick={handleRetryDelete}
+              className="shrink-0 underline underline-offset-2 hover:text-danger/80"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-4 border-t border-border pt-3 font-label text-xs text-text-secondary">
+          <span className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5" />
+            {formatDate(caseData.createdAt)}
+          </span>
+        </div>
+      </Link>
+
+      <ConfirmDeleteDialog
+        isOpen={isDialogOpen}
+        onClose={handleCloseDialog}
+        onConfirm={handleConfirmDelete}
+        isLoading={isDeleting}
+        itemName={displayName}
+      />
+    </>
   );
 }
 
@@ -173,6 +277,8 @@ export function CaseList({
   isLoading,
   error,
   onRetry,
+  onDelete,
+  onDeleteError,
 }: CaseListProps) {
   if (isLoading) {
     return (
@@ -198,7 +304,9 @@ export function CaseList({
         <CaseCard
           key={caseData.id}
           caseData={caseData}
-          templateName={resolveTemplateName(caseData.templateId, templates)}
+          displayName={resolveTemplateName(caseData.templateId, templates)}
+          onDelete={onDelete}
+          onDeleteError={onDeleteError}
         />
       ))}
     </div>

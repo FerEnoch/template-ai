@@ -25,8 +25,9 @@ const MOCK_ENTITY: Entity = {
   group: "PARTES",
   confidence: "ALTA",
   sourceSpan: { start: 10, end: 20 },
-  reviewed: false,
-  excluded: false,
+    reviewed: false,
+    excluded: false,
+    userCreated: false,
 };
 
 const MOCK_ENTITY_BAJA: Entity = {
