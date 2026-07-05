@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { AppShell } from "@/components/shell/app-shell";
@@ -41,6 +41,8 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
   } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const regenerateInFlight = useRef(false);
+  const regenerateControllerRef = useRef<AbortController | null>(null);
 
   const loadCase = useCallback(async () => {
     setLoading(true);
@@ -57,23 +59,35 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
 
   useEffect(() => {
     void loadCase();
+    return () => {
+      regenerateControllerRef.current?.abort();
+    };
   }, [loadCase]);
 
   const handleRegenerate = useCallback(async () => {
+    if (regenerateInFlight.current) return;
+    regenerateInFlight.current = true;
+    const regenerateController = new AbortController();
+    regenerateControllerRef.current = regenerateController;
     setIsRegenerating(true);
     setRegenError(null);
     try {
-      await generateCase(caseId);
-      await loadCase();
+      const updated = await generateCase(caseId, regenerateController.signal);
+      setCaseItem(updated as CaseWithTemplate);
     } catch (err) {
+      // Aborted fetches are expected on unmount / cleanup; don't surface them.
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
       const message =
         err instanceof Error ? err.message : "Error al regenerar el documento";
       const errorType = err instanceof ApiError ? err.errorType : undefined;
       setRegenError({ message, errorType });
     } finally {
+      regenerateInFlight.current = false;
       setIsRegenerating(false);
     }
-  }, [caseId, loadCase]);
+  }, [caseId]);
 
   const handleReturnToForm = useCallback(() => {
     if (!caseItem) return;

@@ -10,6 +10,7 @@
 
 import { describe, expect, it, beforeAll, afterAll, afterEach } from "vitest";
 import { Pool } from "pg";
+import { CasesRepository } from "../../infrastructure/postgres/repositories/cases.repository";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -53,7 +54,7 @@ async function createUserAs(
   const client = await p.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+    await client.query(`SET LOCAL app.current_user_id = ${ownerId}`);
     const result = await client.query(
       `INSERT INTO users (email, display_name, external_subject)
        VALUES ($1, $2, $3)
@@ -78,7 +79,7 @@ async function createTemplateAs(
   const client = await p.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+    await client.query(`SET LOCAL app.current_user_id = ${ownerId}`);
     const result = await client.query(
       `INSERT INTO templates (user_id, name, document_id, category)
        VALUES ($1, $2, $3, $4)
@@ -108,7 +109,7 @@ async function createDocumentAs(
   const client = await p.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+    await client.query(`SET LOCAL app.current_user_id = ${ownerId}`);
     const result = await client.query(
       `INSERT INTO documents (user_id, filename, mime_type, size_bytes)
        VALUES ($1, $2, $3, $4)
@@ -130,7 +131,7 @@ async function countCasosAs(ownerId: number): Promise<number> {
   const client = await p.connect();
   try {
     await client.query("BEGIN");
-    await client.query(`SET LOCAL app.current_user_id = $1`, [ownerId]);
+    await client.query(`SET LOCAL app.current_user_id = ${ownerId}`);
     const result = await client.query(
       "SELECT COUNT(*)::int as count FROM casos",
     );
@@ -263,7 +264,7 @@ describe("0009_casos RLS and constraints", () => {
       const clientA = await p.connect();
       try {
         await clientA.query("BEGIN");
-        await clientA.query(`SET LOCAL app.current_user_id = $1`, [userA.id]);
+        await clientA.query(`SET LOCAL app.current_user_id = ${userA.id}`);
         await clientA.query(
           `INSERT INTO casos (user_id, template_id, status, form_data)
            VALUES ($1, $2, $3, $4)`,
@@ -281,7 +282,7 @@ describe("0009_casos RLS and constraints", () => {
       const clientB = await p.connect();
       try {
         await clientB.query("BEGIN");
-        await clientB.query(`SET LOCAL app.current_user_id = $1`, [userB.id]);
+        await clientB.query(`SET LOCAL app.current_user_id = ${userB.id}`);
         await clientB.query(
           `INSERT INTO casos (user_id, template_id, status, form_data)
            VALUES ($1, $2, $3, $4)`,
@@ -329,7 +330,7 @@ describe("0009_casos RLS and constraints", () => {
       const client = await p.connect();
       try {
         await client.query("BEGIN");
-        await client.query(`SET LOCAL app.current_user_id = $1`, [user.id]);
+        await client.query(`SET LOCAL app.current_user_id = ${user.id}`);
         await client.query(
           `INSERT INTO casos (user_id, template_id, status, form_data)
            VALUES ($1, $2, $3, $4)`,
@@ -357,7 +358,7 @@ describe("0009_casos RLS and constraints", () => {
       const client = await p.connect();
       try {
         await client.query("BEGIN");
-        await client.query(`SET LOCAL app.current_user_id = $1`, [user.id]);
+        await client.query(`SET LOCAL app.current_user_id = ${user.id}`);
         await client.query(
           `INSERT INTO casos (user_id, template_id, status, form_data)
            VALUES ($1, $2, $3, $4)`,
@@ -405,7 +406,7 @@ describe("0009_casos RLS and constraints", () => {
       const client = await p.connect();
       try {
         await client.query("BEGIN");
-        await client.query(`SET LOCAL app.current_user_id = $1`, [user.id]);
+        await client.query(`SET LOCAL app.current_user_id = ${user.id}`);
         await client.query(
           `INSERT INTO casos (user_id, template_id, status, form_data)
            VALUES ($1, $2, $3, $4)`,
@@ -418,6 +419,102 @@ describe("0009_casos RLS and constraints", () => {
         expect((e as Error).message).toMatch(
           /foreign key|constraint|violates/i,
         );
+      } finally {
+        client.release();
+      }
+    });
+  });
+
+  describe("findBorradorByUserAndTemplate", () => {
+    it("returns the single borrador for a user and template", async () => {
+      if (!pool) return;
+      const user = await createUserAs(0, {
+        email: "casos-find-borrador@example.com",
+        displayName: "Casos Find Borrador",
+        externalSubject: "subj_casos_find_borrador",
+      });
+      const doc = await createDocumentAs(user.id, {
+        userId: user.id,
+        filename: "find-borrador.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 100,
+      });
+      const template = await createTemplateAs(user.id, {
+        userId: user.id,
+        name: "Find Borrador Template",
+        documentId: doc.id,
+      });
+
+      const p = requirePool();
+      const client = await p.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(`SET LOCAL app.current_user_id = ${user.id}`);
+
+        const inserted = await client.query(
+          `INSERT INTO casos (user_id, template_id, status, form_data)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id`,
+          [user.id, template.id, "borrador", "{}"],
+        );
+        await client.query("COMMIT");
+
+        const repo = new CasesRepository(client as never);
+        const found = await repo.findBorradorByUserAndTemplate(
+          user.id,
+          template.id,
+        );
+
+        expect(found).not.toBeNull();
+        expect(found!.id).toBe(inserted.rows[0].id as string);
+      } finally {
+        client.release();
+      }
+    });
+
+    it("enforces at most one borrador per user and template at the DB level", async () => {
+      if (!pool) return;
+      const user = await createUserAs(0, {
+        email: "casos-unique-borrador@example.com",
+        displayName: "Casos Unique Borrador",
+        externalSubject: "subj_casos_unique_borrador",
+      });
+      const doc = await createDocumentAs(user.id, {
+        userId: user.id,
+        filename: "unique-borrador.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 100,
+      });
+      const template = await createTemplateAs(user.id, {
+        userId: user.id,
+        name: "Unique Borrador Template",
+        documentId: doc.id,
+      });
+
+      const p = requirePool();
+      const client = await p.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(`SET LOCAL app.current_user_id = ${user.id}`);
+
+        await client.query(
+          `INSERT INTO casos (user_id, template_id, status, form_data)
+           VALUES ($1, $2, $3, $4)`,
+          [user.id, template.id, "borrador", "{}"],
+        );
+
+        await expect(
+          client.query(
+            `INSERT INTO casos (user_id, template_id, status, form_data)
+             VALUES ($1, $2, $3, $4)`,
+            [user.id, template.id, "borrador", "{}"],
+          ),
+        ).rejects.toThrow(/unique|duplicate|constraint/i);
+
+        await client.query("ROLLBACK");
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
       } finally {
         client.release();
       }

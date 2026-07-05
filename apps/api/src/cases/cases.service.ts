@@ -39,6 +39,20 @@ export interface UpdateCaseData {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Detect PostgreSQL unique violation (error code 23505). */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as Record<string, unknown>).code === "23505"
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
 
@@ -54,8 +68,17 @@ export class CasesService {
   /**
    * Create a new case from a template.
    * Validates the template exists before inserting.
+   * If a borrador for the same (user, template) already exists, returns it
+   * without inserting a new row.
+   *
+   * The partial unique index on (user_id, template_id) WHERE status='borrador'
+   * makes the INSERT race-safe: if a concurrent request creates the borrador
+   * first, we catch the unique violation and return the existing row.
    */
-  async create(userId: number, data: CreateCaseData): Promise<CaseResponse> {
+  async create(
+    userId: number,
+    data: CreateCaseData,
+  ): Promise<{ case: CaseResponse; created: boolean }> {
     return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
       // Verify template exists
       const tplResult = await client.query(
@@ -69,6 +92,16 @@ export class CasesService {
       }
 
       const repo = new CasesRepository(client);
+
+      // Idempotency: reuse an existing borrador for this (user, template).
+      const existing = await repo.findBorradorByUserAndTemplate(
+        userId,
+        data.templateId,
+      );
+      if (existing) {
+        return { case: this.mapToResponse(existing), created: false };
+      }
+
       let record;
       try {
         record = await repo.create({
@@ -76,6 +109,21 @@ export class CasesService {
           templateId: data.templateId,
         });
       } catch (error) {
+        if (isUniqueViolation(error)) {
+          // Another concurrent request created the borrador first.
+          // Re-fetch and return the existing row so callers remain idempotent.
+          const existingAfterRace = await repo.findBorradorByUserAndTemplate(
+            userId,
+            data.templateId,
+          );
+          if (existingAfterRace) {
+            return {
+              case: this.mapToResponse(existingAfterRace),
+              created: false,
+            };
+          }
+        }
+
         this.logger.error(
           `Failed to create case for template ${data.templateId} (user ${userId}): ${error instanceof Error ? error.message : String(error)}`,
           error instanceof Error ? error.stack : undefined,
@@ -85,7 +133,7 @@ export class CasesService {
         );
       }
 
-      return this.mapToResponse(record);
+      return { case: this.mapToResponse(record), created: true };
     });
   }
 

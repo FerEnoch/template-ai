@@ -136,6 +136,28 @@ export class CasesRepository {
     return result.rows.map(rowToCase);
   }
 
+  async findBorradorByUserAndTemplate(
+    userId: number,
+    templateId: string,
+  ): Promise<CaseRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT ${CASE_SELECT}
+        FROM casos c
+        ${CASE_JOIN}
+        WHERE c.user_id = $1 AND c.template_id = $2 AND c.status = 'borrador'
+        ORDER BY c.created_at ASC LIMIT 1
+      `,
+      [userId, templateId],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToCase(result.rows[0]);
+  }
+
   async updateFormData(
     id: string,
     formData: Record<string, string>,
