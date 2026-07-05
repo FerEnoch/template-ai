@@ -148,11 +148,10 @@ export class CasesRepository {
           UPDATE casos
           SET form_data = $1, updated_at = now()
           WHERE id = $2
-          RETURNING id
+          RETURNING *
         )
         SELECT ${CASE_SELECT}
-        FROM updated
-        JOIN casos c ON c.id = updated.id
+        FROM updated c
         ${CASE_JOIN}
       `,
       [JSON.stringify(formData), id],
@@ -175,11 +174,10 @@ export class CasesRepository {
           UPDATE casos
           SET status = $1, updated_at = now()
           WHERE id = $2
-          RETURNING id
+          RETURNING *
         )
         SELECT ${CASE_SELECT}
-        FROM updated
-        JOIN casos c ON c.id = updated.id
+        FROM updated c
         ${CASE_JOIN}
       `,
       [status, id],
@@ -202,11 +200,10 @@ export class CasesRepository {
           UPDATE casos
           SET name = $1, updated_at = now()
           WHERE id = $2
-          RETURNING id
+          RETURNING *
         )
         SELECT ${CASE_SELECT}
-        FROM updated
-        JOIN casos c ON c.id = updated.id
+        FROM updated c
         ${CASE_JOIN}
       `,
       [name, id],
@@ -229,11 +226,10 @@ export class CasesRepository {
           UPDATE casos
           SET generated_text = $1, status = 'generado', updated_at = now()
           WHERE id = $2 AND status != 'archivado'
-          RETURNING id
+          RETURNING *
         )
         SELECT ${CASE_SELECT}
-        FROM updated
-        JOIN casos c ON c.id = updated.id
+        FROM updated c
         ${CASE_JOIN}
       `,
       [generatedText, id],

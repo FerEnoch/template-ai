@@ -40,6 +40,20 @@ export interface UpdateCaseData {
   name?: string | null;
 }
 
+/**
+ * Detect a PostgreSQL unique-violation error (SQLSTATE 23505), raised by the
+ * partial UNIQUE (user_id, name) index on casos when renaming a case to a
+ * name another case of the same user already owns.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as Record<string, unknown>).code === "23505"
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -179,13 +193,22 @@ export class CasesService {
         throw new NotFoundException(`Case with id "${id}" not found`);
       }
 
-      const updated = await repo.updateName(id, name);
+      try {
+        const updated = await repo.updateName(id, name);
 
-      if (!updated) {
-        throw new NotFoundException(`Case with id "${id}" not found`);
+        if (!updated) {
+          throw new NotFoundException(`Case with id "${id}" not found`);
+        }
+
+        return this.mapToResponse(updated);
+      } catch (error: unknown) {
+        if (isUniqueViolation(error)) {
+          throw new ConflictException(
+            `Ya existe un documento llamado "${name}". Elegí otro nombre.`,
+          );
+        }
+        throw error;
       }
-
-      return this.mapToResponse(updated);
     });
   }
 

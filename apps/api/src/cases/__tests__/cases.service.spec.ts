@@ -81,6 +81,7 @@ function createMockPostgresService(setup: {
   findByIdRecord?: CaseRecord | null;
   templateExists?: boolean;
   updateRecord?: CaseRecord | null;
+  updateConflict?: boolean;
 }): {
   mockPostgres: PostgresService;
   mockClient: { query: ReturnType<typeof vi.fn> };
@@ -91,6 +92,7 @@ function createMockPostgresService(setup: {
     findByIdRecord = null,
     templateExists = true,
     updateRecord = null,
+    updateConflict = false,
   } = setup;
 
   const mockClient = { query: vi.fn() };
@@ -174,8 +176,15 @@ function createMockPostgresService(setup: {
       });
     }
 
-    // UPDATE casos (updateFormData / updateStatus)
+    // UPDATE casos (updateFormData / updateStatus / updateName / updateGeneratedText)
     if (sql.includes("UPDATE casos")) {
+      if (updateConflict) {
+        return Promise.reject(
+          Object.assign(new Error("duplicate key value violates unique constraint"), {
+            code: "23505",
+          }),
+        );
+      }
       if (!updateRecord) {
         return Promise.resolve({ rowCount: 0, rows: [] });
       }
@@ -520,6 +529,28 @@ describe("CasesService", () => {
       await expect(
         service.updateName(0, "non-existent", "Custom Case Name"),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw ConflictException on unique constraint violation", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Old Name",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateConflict: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateName(0, "case-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.updateName(0, "case-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow('Ya existe un documento llamado "Duplicate Name". Elegí otro nombre.');
     });
   });
 

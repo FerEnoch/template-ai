@@ -33,6 +33,11 @@ export function EditableName({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  // Synchronous guard against the double-save triggered when `disabled={isPending}`
+  // blurs the input right after Enter/blur starts a transition. `isPending` only
+  // flips on the next React render, so a ref is needed to block the blur handler
+  // running in the same tick.
+  const savingRef = useRef(false);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -83,6 +88,7 @@ export function EditableName({
   }, [value]);
 
   const handleSave = useCallback(() => {
+    if (savingRef.current) return; // a save is already in-flight (Enter or blur)
     const trimmed = draft.trim();
     const validationError = validate(trimmed);
     if (validationError) {
@@ -98,6 +104,9 @@ export function EditableName({
     const previousValue = value;
     // Optimistically update local state so the input feels responsive.
     setDraft(trimmed);
+    // Hold the guard synchronously so the blur triggered by `disabled={isPending}`
+    // does not fire a second `onSave` with the same value.
+    savingRef.current = true;
 
     startTransition(async () => {
       try {
@@ -113,6 +122,8 @@ export function EditableName({
             : "Error al guardar el nombre. Intentá nuevamente.",
         );
         // Keep edit mode open so the inline error is visible and retryable.
+      } finally {
+        savingRef.current = false;
       }
     });
   }, [draft, value, validate, onSave]);

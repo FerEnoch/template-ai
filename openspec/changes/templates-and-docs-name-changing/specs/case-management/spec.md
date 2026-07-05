@@ -24,13 +24,20 @@ The system MUST define a `Case` type with fields: `id` (uuid), `templateId` (uui
 
 ### Requirement: Case rename endpoint
 
-`PATCH /api/cases/:id` MUST accept an optional `name` field (string, max 200 chars, nullable). The endpoint MUST enforce RLS — only the case owner can rename. Case names have NO uniqueness constraint.
+`PATCH /api/cases/:id` MUST accept an optional `name` field (string, max 200 chars, nullable). The endpoint MUST enforce RLS — only the case owner can rename. Non-null case names MUST be unique per user via a partial UNIQUE (user_id, name) index that exempts NULL names (so unnamed documents keep falling back to their template name). A duplicate rename MUST return 409 with a Spanish message.
 
 #### Scenario: Rename case via PATCH
 
 - GIVEN a case with id "abc-123" owned by userId 0
 - WHEN `PATCH /api/cases/abc-123` is called with `{ name: "Nuevo nombre" }`
 - THEN the case name updates to "Nuevo nombre"
+
+#### Scenario: Duplicate case name returns 409
+
+- GIVEN a case owned by userId 0 already named "Contrato Pérez"
+- WHEN userId 0 renames another case to "Contrato Pérez"
+- THEN the response is 409
+- AND the error message is `Ya existe un documento llamado "Contrato Pérez". Elegí otro nombre.`
 
 #### Scenario: Cross-user rename returns 404
 
