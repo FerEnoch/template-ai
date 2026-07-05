@@ -126,6 +126,37 @@ export class TemplatesService {
   }
 
   /**
+   * Rename a template. Relies on the UNIQUE (user_id, name) constraint to
+   * detect duplicate names atomically. Catches unique violation (code 23505)
+   * and throws ConflictException with the same Spanish message used by create.
+   */
+  async updateName(userId: number, id: string, name: string): Promise<TemplateResponse> {
+    return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
+      const repo = new TemplatesRepository(client);
+
+      const existing = await repo.findById(id);
+      if (!existing) {
+        throw new NotFoundException(`Template with id "${id}" not found`);
+      }
+
+      try {
+        const updated = await repo.updateName(id, name);
+        if (!updated) {
+          throw new NotFoundException(`Template with id "${id}" not found`);
+        }
+        return this.mapToResponse(updated);
+      } catch (error: unknown) {
+        if (isUniqueViolation(error)) {
+          throw new ConflictException(
+            `Ya existe una plantilla llamada "${name}". Elegí otro nombre.`,
+          );
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
    * Soft-delete a template and optionally cascade to its source document
    * and generated cases.
    *

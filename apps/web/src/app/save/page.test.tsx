@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { SaveContent } from "./page";
+import { SaveContent } from "./SaveContent";
 import { WizardProvider } from "@/lib/wizard/WizardContext";
 import { WizardStep } from "@/lib/wizard/types";
 import type { WizardState } from "@/lib/wizard/types";
 import type { Entity } from "@template-ai/contracts";
+import type { ReadonlyURLSearchParams } from "next/navigation";
 
 // Mock Next.js navigation
 vi.mock("next/navigation", () => ({
@@ -52,12 +53,15 @@ describe("SaveContent", () => {
 
   const mockSetStep = vi.fn();
   const mockReset = vi.fn();
-  const mockRouter = { push: vi.fn(), replace: vi.fn() } as unknown as ReturnType<
-    typeof import("next/navigation").useRouter
-  >;
-  const mockSearchParams = new URLSearchParams({
-    step: WizardStep.SAVE,
-  }) as unknown as ReturnType<typeof import("next/navigation").useSearchParams>;
+  const mockRouter = {
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  } as unknown as ReturnType<typeof import("next/navigation").useRouter>;
+  const mockSearchParams = new URLSearchParams({ step: WizardStep.SAVE }) as ReadonlyURLSearchParams;
 
   beforeEach(() => {
     vi.spyOn(global, "fetch").mockResolvedValue(

@@ -121,6 +121,24 @@ export class TemplatesRepository {
     return rowToTemplate(result.rows[0]);
   }
 
+  async updateName(id: string, name: string): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        UPDATE templates
+        SET name = $1
+        WHERE id = $2
+        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+      `,
+      [name, id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
   async updateStatus(id: string, status: string): Promise<TemplateRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `

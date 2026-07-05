@@ -11,9 +11,9 @@ const mockEntity: Entity = {
   group: "PARTES",
   confidence: "ALTA",
   sourceSpan: { start: 10, end: 20 },
-    reviewed: false,
-    excluded: false,
-    userCreated: false,
+  reviewed: false,
+  excluded: false,
+  userCreated: false,
 };
 
 const mockEntity2: Entity = {
@@ -23,9 +23,15 @@ const mockEntity2: Entity = {
   group: "INMUEBLE",
   confidence: "MEDIA",
   sourceSpan: { start: 30, end: 45 },
+<<<<<<< HEAD
     reviewed: true,
     excluded: false,
     userCreated: false,
+=======
+  reviewed: true,
+  excluded: false,
+  userCreated: false,
+>>>>>>> feature/templates-and-docs-name-changing
 };
 
 describe("wizardReducer", () => {

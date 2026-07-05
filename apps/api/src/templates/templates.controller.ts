@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, NotFoundException, BadRequestException, HttpCode, Logger } from "@nestjs/common";
-import { TemplateSchema } from "@template-ai/contracts";
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, NotFoundException, BadRequestException, HttpCode, Logger } from "@nestjs/common";
+import { TemplateSchema, UpdateTemplateNameSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
@@ -122,6 +122,43 @@ export class TemplatesController {
     };
 
     return this.templatesService.create(data);
+  }
+
+  /**
+   * PATCH /templates/:id — rename a template.
+   * Validates the request body using UpdateTemplateNameSchema.
+   * Returns 409 if the new name conflicts with another template for the user.
+   */
+  @Patch(":id")
+  public async update(
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ): Promise<TemplateResponse> {
+    if (
+      body === null ||
+      body === undefined ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      throw new BadRequestException(
+        "El cuerpo de la solicitud debe incluir un campo name válido.",
+      );
+    }
+
+    const parsed = UpdateTemplateNameSchema.safeParse(body);
+
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      const path = firstError.path.join(".");
+      this.logger.warn(
+        `Template rename validation failed: path=${path}, message=${firstError.message}`,
+      );
+      throw new BadRequestException(
+        `Error de validación${path ? ` en "${path}"` : ""}: ${firstError.message}`,
+      );
+    }
+
+    return this.templatesService.updateName(0, id, parsed.data.name);
   }
 
   /**

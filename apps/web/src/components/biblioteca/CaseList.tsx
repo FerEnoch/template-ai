@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { Case, Template } from "@template-ai/contracts";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { EditableName } from "./EditableName";
 
 interface CaseListProps {
   readonly cases: Case[];
@@ -21,6 +22,7 @@ interface CaseListProps {
   readonly onRetry?: () => void;
   readonly onDelete?: (id: string) => void;
   readonly onDeleteError?: () => void;
+  readonly onRename?: (id: string, name: string | null) => Promise<void>;
 }
 
 const statusConfig: Record<
@@ -133,18 +135,21 @@ function ErrorState({
 
 export interface CaseCardProps {
   readonly caseData: Case;
-  readonly displayName: string;
+  readonly templateName: string;
   readonly onDelete?: (id: string) => void;
   readonly onDeleteError?: () => void;
+  readonly onRename?: (id: string, name: string | null) => Promise<void>;
 }
 
 export function CaseCard({
   caseData,
-  displayName,
+  templateName,
   onDelete,
   onDeleteError,
+  onRename,
 }: CaseCardProps) {
   const status = statusConfig[caseData.status];
+  const displayName = caseData.name ?? templateName;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -227,9 +232,16 @@ export function CaseCard({
               <FileText className="h-5 w-5 text-accent" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
-                {displayName}
-              </h3>
+              <EditableName
+                value={displayName}
+                onSave={async (name) => {
+                  await onRename?.(caseData.id, name);
+                }}
+              >
+                <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
+                  {displayName}
+                </h3>
+              </EditableName>
             </div>
           </div>
           <span
@@ -279,6 +291,7 @@ export function CaseList({
   onRetry,
   onDelete,
   onDeleteError,
+  onRename,
 }: CaseListProps) {
   if (isLoading) {
     return (
@@ -304,9 +317,10 @@ export function CaseList({
         <CaseCard
           key={caseData.id}
           caseData={caseData}
-          displayName={resolveTemplateName(caseData.templateId, templates)}
+          templateName={resolveTemplateName(caseData.templateId, templates)}
           onDelete={onDelete}
           onDeleteError={onDeleteError}
+          onRename={onRename}
         />
       ))}
     </div>

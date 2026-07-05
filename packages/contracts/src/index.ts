@@ -13,6 +13,7 @@ export {
   CaseWithTemplateSchema,
   CreateCaseRequestSchema,
   UpdateCaseFormDataSchema,
+  UpdateTemplateNameSchema,
   GenerateDocumentResponseSchema,
   ExportRequestSchema,
   type Document,
@@ -26,6 +27,7 @@ export {
   type CaseWithTemplate,
   type CreateCaseRequest,
   type UpdateCaseFormData,
+  type UpdateTemplateName,
   type GenerateDocumentResponse,
   type ExportRequest,
 } from "./schemas.js";

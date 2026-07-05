@@ -3,12 +3,14 @@ import Link from "next/link";
 import { FileText, Calendar, Tag, Trash2, Loader2 } from "lucide-react";
 import type { Template } from "@template-ai/contracts";
 import { ConfirmDeleteDialog } from "./ConfirmDeleteDialog";
+import { EditableName } from "./EditableName";
 
 interface TemplateCardProps {
   readonly template: Template;
   readonly onClick?: (template: Template) => void;
   readonly onDelete?: (id: string) => void;
   readonly onDeleteError?: () => void;
+  readonly onRename?: (id: string, name: string) => Promise<void>;
 }
 
 const statusConfig: Record<
@@ -45,6 +47,7 @@ export function TemplateCard({
   onClick,
   onDelete,
   onDeleteError,
+  onRename,
 }: TemplateCardProps) {
   const status = statusConfig[template.status];
   const entityCount = template.entities.length;
@@ -125,9 +128,16 @@ export function TemplateCard({
               <FileText className="h-5 w-5 text-accent" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
-                {template.name}
-              </h3>
+              <EditableName
+                value={template.name}
+                onSave={async (name) => {
+                  await onRename?.(template.id, name);
+                }}
+              >
+                <h3 className="font-headline text-base font-semibold leading-tight text-text-primary group-hover:text-accent">
+                  {template.name}
+                </h3>
+              </EditableName>
               {template.description && (
                 <p className="mt-0.5 line-clamp-1 font-body text-sm text-text-secondary">
                   {template.description}

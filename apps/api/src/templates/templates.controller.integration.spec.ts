@@ -268,4 +268,185 @@ describe("Templates integration: GET + POST /api/templates", () => {
 
     expect(res2.status).toBe(409);
   });
+
+  describe("PATCH /api/templates/:id", () => {
+    it("renames a template and returns the updated record", async () => {
+      if (!pool || !app) return;
+
+      const request = (await import("supertest")).default;
+
+      await createUserAs(0, {
+        email: "tmpl-rename-int@example.com",
+        displayName: "Tmpl Rename Int",
+        externalSubject: "subj_tmpl_rename_int",
+      });
+
+      const documentId = await insertDocumentForTemplates();
+
+      const createRes = await request(app.getHttpServer())
+        .post("/api/templates")
+        .send({
+          name: "Original Name",
+          description: "A standard lease agreement",
+          documentId,
+          entities: [],
+          category: "legal",
+          status: "draft",
+        });
+
+      expect(createRes.status).toBe(201);
+      const templateId = createRes.body.id as string;
+
+      const patchRes = await request(app.getHttpServer())
+        .patch(`/api/templates/${templateId}`)
+        .send({ name: "Renamed Template" });
+
+      expect(patchRes.status).toBe(200);
+      expect(patchRes.body).toMatchObject({
+        id: templateId,
+        name: "Renamed Template",
+        description: "A standard lease agreement",
+        documentId,
+        category: "legal",
+        status: "draft",
+        createdAt: expect.any(String),
+      });
+    });
+
+    it("returns 409 when renaming to a duplicate name", async () => {
+      if (!pool || !app) return;
+
+      const request = (await import("supertest")).default;
+
+      await createUserAs(0, {
+        email: "tmpl-rename-dup-int@example.com",
+        displayName: "Tmpl Rename Dup Int",
+        externalSubject: "subj_tmpl_rename_dup_int",
+      });
+
+      const documentId = await insertDocumentForTemplates();
+
+      const res1 = await request(app.getHttpServer())
+        .post("/api/templates")
+        .send({
+          name: "First Name",
+          description: "First one",
+          documentId,
+          entities: [],
+          category: "legal",
+          status: "draft",
+        });
+
+      expect(res1.status).toBe(201);
+
+      const res2 = await request(app.getHttpServer())
+        .post("/api/templates")
+        .send({
+          name: "Second Name",
+          description: "Second one",
+          documentId,
+          entities: [],
+          category: "legal",
+          status: "draft",
+        });
+
+      expect(res2.status).toBe(201);
+      const secondId = res2.body.id as string;
+
+      const patchRes = await request(app.getHttpServer())
+        .patch(`/api/templates/${secondId}`)
+        .send({ name: "First Name" });
+
+      expect(patchRes.status).toBe(409);
+    });
+
+    it("returns 404 when renaming a template owned by another user", async () => {
+      if (!pool || !app) return;
+
+      const request = (await import("supertest")).default;
+
+      const otherUser = await createUserAs(1, {
+        email: "tmpl-rename-other-int@example.com",
+        displayName: "Tmpl Rename Other Int",
+        externalSubject: "subj_tmpl_rename_other_int",
+      });
+
+      const documentId = await insertDocumentForTemplates();
+
+      // Create template under a different user; controller hardcodes userId=0
+      // so it should not be visible and return 404.
+      const createRes = await request(app.getHttpServer())
+        .post("/api/templates")
+        .send({
+          name: "Other User Template",
+          description: "Owned by another user",
+          documentId,
+          entities: [],
+          category: "legal",
+          status: "draft",
+        });
+
+      // The template is created for user 0 because the controller hardcodes userId=0.
+      // To test cross-user isolation we rely on RLS: insert directly as the other user.
+      let templateId: string;
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(`SET LOCAL app.current_user_id = $1`, [otherUser.id]);
+        const tplResult = await client.query(
+          `INSERT INTO templates (user_id, name, document_id, category)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id`,
+          [otherUser.id, "Cross-User Template", documentId, "legal"],
+        );
+        await client.query("COMMIT");
+        templateId = tplResult.rows[0].id as string;
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      const patchRes = await request(app.getHttpServer())
+        .patch(`/api/templates/${templateId}`)
+        .send({ name: "Hijacked Name" });
+
+      expect(patchRes.status).toBe(404);
+    });
+
+    it("returns 400 when the new name is too short", async () => {
+      if (!pool || !app) return;
+
+      const request = (await import("supertest")).default;
+
+      await createUserAs(0, {
+        email: "tmpl-rename-short-int@example.com",
+        displayName: "Tmpl Rename Short Int",
+        externalSubject: "subj_tmpl_rename_short_int",
+      });
+
+      const documentId = await insertDocumentForTemplates();
+
+      const createRes = await request(app.getHttpServer())
+        .post("/api/templates")
+        .send({
+          name: "Valid Name",
+          description: "A standard lease agreement",
+          documentId,
+          entities: [],
+          category: "legal",
+          status: "draft",
+        });
+
+      expect(createRes.status).toBe(201);
+      const templateId = createRes.body.id as string;
+
+      const patchRes = await request(app.getHttpServer())
+        .patch(`/api/templates/${templateId}`)
+        .send({ name: "ab" });
+
+      expect(patchRes.status).toBe(400);
+    });
+  });
 });

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/app-shell";
 import { TemplateGrid } from "@/components/biblioteca/TemplateGrid";
 import { CaseList } from "@/components/biblioteca/CaseList";
+import { updateTemplateName } from "@/lib/api/templates";
+import { updateCase } from "@/lib/api/cases";
 import type { Template, Case } from "@template-ai/contracts";
 
 export default function BibliotecaPage() {
@@ -68,6 +70,58 @@ export default function BibliotecaPage() {
     fetchCases();
   }, [fetchCases]);
 
+  const handleRenameTemplate = useCallback(
+    async (id: string, name: string) => {
+      let previousTemplates: Template[] = [];
+      setTemplates((prev) => {
+        previousTemplates = prev;
+        return prev.map((template) =>
+          template.id === id ? { ...template, name } : template,
+        );
+      });
+
+      try {
+        const updated = await updateTemplateName(id, name);
+        setTemplates((prev) =>
+          prev.map((template) =>
+            template.id === id ? { ...template, name: updated.name } : template,
+          ),
+        );
+      } catch (error) {
+        setTemplates(previousTemplates);
+        throw error;
+      }
+    },
+    [],
+  );
+
+  const handleRenameCase = useCallback(
+    async (id: string, name: string | null) => {
+      let previousCases: Case[] = [];
+      setCases((prev) => {
+        previousCases = prev;
+        return prev.map((caseItem) =>
+          caseItem.id === id ? { ...caseItem, name } : caseItem,
+        );
+      });
+
+      try {
+        const updated = await updateCase(id, { name });
+        setCases((prev) =>
+          prev.map((caseItem) =>
+            caseItem.id === id
+              ? { ...caseItem, name: updated.name ?? null }
+              : caseItem,
+          ),
+        );
+      } catch (error) {
+        setCases(previousCases);
+        throw error;
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
@@ -115,6 +169,7 @@ export default function BibliotecaPage() {
             onRetry={fetchTemplates}
             onDelete={handleDelete}
             onDeleteError={handleDeleteError}
+            onRename={handleRenameTemplate}
           />
         </section>
 
@@ -143,6 +198,7 @@ export default function BibliotecaPage() {
             onRetry={fetchCases}
             onDelete={handleDeleteCase}
             onDeleteError={handleDeleteCaseError}
+            onRename={handleRenameCase}
           />
         </section>
       </div>

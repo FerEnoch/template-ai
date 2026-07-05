@@ -157,6 +157,33 @@ describe("UpdateCaseFormDataSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts optional name for renaming", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      name: "Renamed Case",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Renamed Case");
+    }
+  });
+
+  it("accepts name as null", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      name: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBeNull();
+    }
+  });
+
+  it("rejects a name over 200 characters", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      name: "a".repeat(201),
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("GenerateDocumentResponseSchema", () => {

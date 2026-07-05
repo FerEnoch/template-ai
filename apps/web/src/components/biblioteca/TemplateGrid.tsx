@@ -10,6 +10,7 @@ interface TemplateGridProps {
   readonly onRetry?: () => void;
   readonly onDelete?: (id: string) => void;
   readonly onDeleteError?: () => void;
+  readonly onRename?: (id: string, name: string) => Promise<void>;
 }
 
 function SkeletonCard() {
@@ -87,6 +88,7 @@ export function TemplateGrid({
   onRetry,
   onDelete,
   onDeleteError,
+  onRename,
 }: TemplateGridProps) {
   if (isLoading) {
     return (
@@ -114,6 +116,7 @@ export function TemplateGrid({
           template={template}
           onDelete={onDelete}
           onDeleteError={onDeleteError}
+          onRename={onRename}
         />
       ))}
     </div>

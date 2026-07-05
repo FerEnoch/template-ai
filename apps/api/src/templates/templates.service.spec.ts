@@ -28,8 +28,11 @@ function createMockPostgresService(setup: {
   templateRecords?: TemplateRecord[];
   createdRecord?: TemplateRecord;
   existingByName?: TemplateRecord | null;
+  findByIdRecord?: TemplateRecord | null;
+  updatedRecord?: TemplateRecord | null;
+  updateConflict?: boolean;
 }): { mockPostgres: PostgresService; mockClient: { query: ReturnType<typeof vi.fn> } } {
-  const { templateRecords = [], createdRecord, existingByName = null } = setup;
+  const { templateRecords = [], createdRecord, existingByName = null, findByIdRecord = null, updatedRecord = null, updateConflict = false } = setup;
 
   const mockClient = { query: vi.fn() };
 
@@ -83,6 +86,27 @@ function createMockPostgresService(setup: {
       });
     }
 
+    // SELECT template by id (findById)
+    if (sql.includes("SELECT") && sql.includes("FROM templates") && sql.includes("WHERE id =")) {
+      if (!findByIdRecord) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [{
+          id: findByIdRecord.id,
+          user_id: findByIdRecord.userId,
+          name: findByIdRecord.name,
+          description: findByIdRecord.description,
+          document_id: findByIdRecord.documentId,
+          category: findByIdRecord.category,
+          status: findByIdRecord.status,
+          entities: findByIdRecord.entities,
+          created_at: findByIdRecord.createdAt,
+        }],
+      });
+    }
+
     // INSERT INTO templates (create)
     if (sql.includes("INSERT INTO templates")) {
       const record = createdRecord ?? makeTemplateRecord();
@@ -99,6 +123,34 @@ function createMockPostgresService(setup: {
           // pg driver parses JSONB to JS objects on read
           entities: record.entities,
           created_at: record.createdAt,
+        }],
+      });
+    }
+
+    // UPDATE templates (updateName / updateStatus)
+    if (sql.includes("UPDATE templates")) {
+      if (updateConflict) {
+        const error = new Error(
+          'duplicate key value violates unique constraint "templates_name_unique_per_user"',
+        );
+        (error as unknown as Record<string, unknown>).code = "23505";
+        return Promise.reject(error);
+      }
+      if (!updatedRecord) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [{
+          id: updatedRecord.id,
+          user_id: updatedRecord.userId,
+          name: updatedRecord.name,
+          description: updatedRecord.description,
+          document_id: updatedRecord.documentId,
+          category: updatedRecord.category,
+          status: updatedRecord.status,
+          entities: updatedRecord.entities,
+          created_at: updatedRecord.createdAt,
         }],
       });
     }
@@ -431,6 +483,61 @@ describe("TemplatesService", () => {
       });
 
       expect(insertCalled).toBe(true);
+    });
+  });
+
+  describe("updateName", () => {
+    it("should update a template name and return the updated record", async () => {
+      const existing = makeTemplateRecord({
+        id: "tmpl-uuid-1",
+        name: "Old Name",
+      });
+      const updated = makeTemplateRecord({
+        id: "tmpl-uuid-1",
+        name: "New Name",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updatedRecord: updated,
+      });
+      const service = new TemplatesService(mockPostgres);
+
+      const result = await service.updateName(0, "tmpl-uuid-1", "New Name");
+
+      expect(result.name).toBe("New Name");
+    });
+
+    it("should throw NotFoundException when template does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new TemplatesService(mockPostgres);
+
+      await expect(
+        service.updateName(0, "nonexistent", "New Name"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw ConflictException on unique constraint violation", async () => {
+      const existing = makeTemplateRecord({
+        id: "tmpl-uuid-1",
+        name: "Old Name",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateConflict: true,
+      });
+      const service = new TemplatesService(mockPostgres);
+
+      await expect(
+        service.updateName(0, "tmpl-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.updateName(0, "tmpl-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow('Ya existe una plantilla llamada "Duplicate Name". Elegí otro nombre.');
     });
   });
 });

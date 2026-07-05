@@ -55,6 +55,7 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
     userId: 0,
     templateId: "tmpl-uuid-1",
     status: "borrador",
+    name: null,
     formData: {},
     generatedText: null,
     createdAt: new Date("2025-06-01T10:00:00Z"),
@@ -83,6 +84,7 @@ function createMockPostgresService(setup: {
   findBorradorRecord?: CaseRecord | null;
   templateExists?: boolean;
   updateRecord?: CaseRecord | null;
+  updateConflict?: boolean;
 }): {
   mockPostgres: PostgresService;
   mockClient: { query: ReturnType<typeof vi.fn> };
@@ -95,6 +97,7 @@ function createMockPostgresService(setup: {
     findBorradorRecord = null,
     templateExists = true,
     updateRecord = null,
+    updateConflict = false,
   } = setup;
 
   const mockClient = { query: vi.fn() };
@@ -176,6 +179,7 @@ function createMockPostgresService(setup: {
             user_id: findByIdRecord.userId,
             template_id: findByIdRecord.templateId,
             status: findByIdRecord.status,
+            name: findByIdRecord.name,
             form_data: findByIdRecord.formData,
             generated_text: findByIdRecord.generatedText,
             created_at: findByIdRecord.createdAt,
@@ -199,6 +203,7 @@ function createMockPostgresService(setup: {
           user_id: r.userId,
           template_id: r.templateId,
           status: r.status,
+          name: r.name,
           form_data: r.formData,
           generated_text: r.generatedText,
           created_at: r.createdAt,
@@ -208,8 +213,15 @@ function createMockPostgresService(setup: {
       });
     }
 
-    // UPDATE casos (updateFormData / updateStatus)
+    // UPDATE casos (updateFormData / updateStatus / updateName / updateGeneratedText)
     if (sql.includes("UPDATE casos")) {
+      if (updateConflict) {
+        return Promise.reject(
+          Object.assign(new Error("duplicate key value violates unique constraint"), {
+            code: "23505",
+          }),
+        );
+      }
       if (!updateRecord) {
         return Promise.resolve({ rowCount: 0, rows: [] });
       }
@@ -221,6 +233,7 @@ function createMockPostgresService(setup: {
             user_id: updateRecord.userId,
             template_id: updateRecord.templateId,
             status: updateRecord.status,
+            name: updateRecord.name,
             form_data: updateRecord.formData,
             generated_text: updateRecord.generatedText,
             created_at: updateRecord.createdAt,
@@ -547,6 +560,87 @@ describe("CasesService", () => {
           formData: { ent_1: "value" },
         }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("updateName", () => {
+    it("should update a case name and return the updated record", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Custom Case Name",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", "Custom Case Name");
+
+      expect(result.name).toBe("Custom Case Name");
+    });
+
+    it("should pass null through to clear the custom case name", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Old Custom Name",
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", null);
+
+      expect(result.name).toBeNull();
+    });
+
+    it("should throw NotFoundException when case does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateName(0, "non-existent", "Custom Case Name"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw ConflictException on unique constraint violation", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Old Name",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateConflict: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateName(0, "case-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.updateName(0, "case-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow('Ya existe un documento llamado "Duplicate Name". Elegí otro nombre.');
     });
   });
 
