@@ -106,8 +106,16 @@ describe("PreviewPageContent", () => {
       expect(mockGenerateCase).toHaveBeenCalledTimes(2);
     });
 
-    expect(mockGenerateCase).toHaveBeenNthCalledWith(1, "case-1");
-    expect(mockGenerateCase).toHaveBeenNthCalledWith(2, "case-1");
+    expect(mockGenerateCase).toHaveBeenNthCalledWith(
+      1,
+      "case-1",
+      expect.any(AbortSignal),
+    );
+    expect(mockGenerateCase).toHaveBeenNthCalledWith(
+      2,
+      "case-1",
+      expect.any(AbortSignal),
+    );
   });
 
   it("renders a Spanish banner with the errorType when regeneration fails", async () => {
