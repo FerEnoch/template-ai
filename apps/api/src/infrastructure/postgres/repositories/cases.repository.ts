@@ -65,20 +65,27 @@ export class CasesRepository {
   constructor(private readonly client: PoolClient) {}
 
   async create(input: CreateCaseInput): Promise<CaseRecord> {
-    const insertResult = await this.client.query<Record<string, unknown>>(
+    const result = await this.client.query<Record<string, unknown>>(
       `
         INSERT INTO casos (user_id, template_id, status, form_data)
         VALUES ($1, $2, 'borrador', '{}')
+        ON CONFLICT (user_id, template_id) WHERE status = 'borrador' DO NOTHING
         RETURNING id
       `,
       [input.userId, input.templateId],
     );
 
-    if (insertResult.rowCount === 0 || !insertResult.rows[0]) {
-      throw new Error("Failed to insert case");
+    // Conflict: a borrador for this (user, template) already exists.
+    // Signal the caller to refetch via a synthetic unique-violation error.
+    if (result.rowCount === 0 || !result.rows[0]) {
+      const conflictErr = new Error(
+        "borrador already exists for this user and template"
+      );
+      (conflictErr as unknown as Record<string, unknown>).code = "23505";
+      throw conflictErr;
     }
 
-    const id = insertResult.rows[0]["id"] as string;
+    const id = result.rows[0]["id"] as string;
     const found = await this.findById(id);
 
     if (!found) {
@@ -97,6 +104,29 @@ export class CasesRepository {
         WHERE c.id = $1
       `,
       [id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToCase(result.rows[0]);
+  }
+
+  async findBorradorByTemplate(
+    userId: number,
+    templateId: string,
+  ): Promise<CaseRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT ${CASE_SELECT}
+        FROM casos c
+        ${CASE_JOIN}
+        WHERE c.user_id = $1 AND c.template_id = $2 AND c.status = 'borrador'
+        ORDER BY c.updated_at DESC
+        LIMIT 1
+      `,
+      [userId, templateId],
     );
 
     if (result.rowCount === 0 || result.rows.length === 0) {

@@ -97,6 +97,14 @@ export const WizardDraftSchema = z.object({
   savedAt: z.string().datetime(),
 });
 
+// Case form draft schema: transient new-case form state persisted in sessionStorage
+export const CaseFormDraftSchema = z.object({
+  caseId: z.string().uuid(),
+  templateId: z.string().uuid(),
+  formData: z.record(z.string(), z.string()),
+  savedAt: z.string().datetime(),
+});
+
 // --- Case schemas ---
 
 // Case status enum: lifecycle states for a legal case
@@ -160,6 +168,7 @@ export type Entity = z.infer<typeof EntitySchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 export type Template = z.infer<typeof TemplateSchema>;
 export type WizardDraft = z.infer<typeof WizardDraftSchema>;
+export type CaseFormDraft = z.infer<typeof CaseFormDraftSchema>;
 export type ClassifySpanRequest = z.infer<typeof ClassifySpanRequestSchema>;
 export type ClassifySpanResponse = z.infer<typeof ClassifySpanResponseSchema>;
 export type Case = z.infer<typeof CaseSchema>;

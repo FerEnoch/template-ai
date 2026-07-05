@@ -16,8 +16,17 @@ function NewCasePageContent() {
   const params = useParams();
   const router = useRouter();
   const templateId = params.templateId as string;
-  const { state, setTemplate, setCase, setLoading, setError, setStatus, setGenerationError, saveForm } =
-    useCase();
+  const {
+    state,
+    setTemplate,
+    setCase,
+    setLoading,
+    setError,
+    setStatus,
+    setGenerationError,
+    saveForm,
+    clearDraft,
+  } = useCase();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,12 +71,15 @@ function NewCasePageContent() {
   const handleSave = useCallback(async () => {
     try {
       await saveForm();
+      if (state.caseId) {
+        clearDraft(state.caseId);
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Error al guardar el borrador"
       );
     }
-  }, [saveForm, setError]);
+  }, [saveForm, setError, clearDraft, state.caseId]);
 
   const generationInFlight = useRef(false);
   const generateControllerRef = useRef<AbortController | null>(null);
@@ -92,6 +104,7 @@ function NewCasePageContent() {
         generateController.signal
       );
       router.push(`/preview/${generated.id}`);
+      clearDraft(state.caseId);
     } catch (err) {
       // Aborted fetches are expected on unmount / cleanup; don't surface them.
       if (err instanceof Error && err.name === "AbortError") {
@@ -127,7 +140,7 @@ function NewCasePageContent() {
     } finally {
       generationInFlight.current = false;
     }
-  }, [state.caseId, saveForm, router, setStatus, setGenerationError]);
+  }, [state.caseId, saveForm, router, setStatus, setGenerationError, clearDraft]);
 
   if (state.loading) {
     return (

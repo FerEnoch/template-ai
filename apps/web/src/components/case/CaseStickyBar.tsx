@@ -44,13 +44,25 @@ export function CaseStickyBar({
                 {error}
               </p>
             </>
+          ) : status === "saved" ? (
+            <span className="flex items-center gap-2 rounded-full bg-success/10 px-3 py-1 transition-all duration-300">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <p className="font-label text-sm font-semibold text-success">
+                Borrador guardado
+              </p>
+            </span>
+          ) : status === "saving" ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin text-accent" />
+              <p className="font-label text-sm font-medium text-text-secondary">
+                Guardando borrador...
+              </p>
+            </>
           ) : (
             <>
               <CheckCircle2 className="h-5 w-5 text-text-disabled" />
               <p className="font-label text-sm font-medium text-text-secondary">
-                {status === "saving" && "Guardando borrador..."}
-                {status === "saved" && "Borrador guardado"}
-                {status === "idle" && `${filled} de ${total} campos completados`}
+                {filled} de {total} campos completados
               </p>
             </>
           )}

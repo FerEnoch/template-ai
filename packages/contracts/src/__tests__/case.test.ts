@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   CaseStatus,
   CaseSchema,
+  CaseFormDraftSchema,
   CreateCaseRequestSchema,
   UpdateCaseFormDataSchema,
   GenerateDocumentResponseSchema,
@@ -225,6 +226,74 @@ describe("ExportRequestSchema", () => {
 
   it("rejects missing format", () => {
     const result = ExportRequestSchema.safeParse({});
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("CaseFormDraftSchema", () => {
+  const validDraft = {
+    caseId: "550e8400-e29b-41d4-a716-446655440000",
+    templateId: "660e8400-e29b-41d4-a716-446655440001",
+    formData: { "ent-1": "Juan Pérez" },
+    savedAt: "2025-01-01T00:00:00.000Z",
+  };
+
+  it("parses a valid case form draft", () => {
+    const result = CaseFormDraftSchema.safeParse(validDraft);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.caseId).toBe(validDraft.caseId);
+      expect(result.data.templateId).toBe(validDraft.templateId);
+      expect(result.data.formData).toEqual(validDraft.formData);
+      expect(result.data.savedAt).toBe(validDraft.savedAt);
+    }
+  });
+
+  it("accepts empty formData", () => {
+    const result = CaseFormDraftSchema.safeParse({
+      ...validDraft,
+      formData: {},
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects missing caseId", () => {
+    const { caseId, ...withoutCaseId } = validDraft;
+    const result = CaseFormDraftSchema.safeParse(withoutCaseId);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing templateId", () => {
+    const { templateId, ...withoutTemplateId } = validDraft;
+    const result = CaseFormDraftSchema.safeParse(withoutTemplateId);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing formData", () => {
+    const { formData, ...withoutFormData } = validDraft;
+    const result = CaseFormDraftSchema.safeParse(withoutFormData);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing savedAt", () => {
+    const { savedAt, ...withoutSavedAt } = validDraft;
+    const result = CaseFormDraftSchema.safeParse(withoutSavedAt);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-string formData values", () => {
+    const result = CaseFormDraftSchema.safeParse({
+      ...validDraft,
+      formData: { "ent-1": 123 },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid uuid caseId", () => {
+    const result = CaseFormDraftSchema.safeParse({
+      ...validDraft,
+      caseId: "not-a-uuid",
+    });
     expect(result.success).toBe(false);
   });
 });
