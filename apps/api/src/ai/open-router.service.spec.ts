@@ -1,4 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { Logger } from "@nestjs/common";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import type { CachePort } from "../infrastructure/redis/index.js";
 
@@ -28,6 +29,10 @@ vi.mock("../config/ai.js", () => ({
     maxTokens: 8192,
     temperature: 0.1,
   },
+  AI_GENERATION_CONFIG: {
+    maxTokens: 8192,
+    temperature: 0.1,
+  },
   CACHE_CONFIG: {
     enabled: false,
     responseCacheTtl: 604800,
@@ -41,9 +46,10 @@ function createMockCachePort(): CachePort {
   return {
     get: vi.fn(async () => null),
     set: vi.fn(async () => {}),
-    getOrSet: vi.fn(async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
-      factory(),
-    ),
+    getOrSet: vi.fn(
+      async (_key: string, _ttl: number, factory: () => Promise<unknown>) =>
+        factory(),
+    ) as CachePort["getOrSet"],
   };
 }
 
@@ -427,5 +433,52 @@ describe("OpenRouterService", () => {
         expect((err as OpenRouterError).code).toBe("NETWORK_ERROR");
       }
     });
+  });
+
+  describe("generateDocument structured error logging", () => {
+    const userPrompt = "CONFIDENTIAL_USER_PROMPT_DO_NOT_LOG";
+    let loggerErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      loggerErrorSpy = vi
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      loggerErrorSpy.mockRestore();
+    });
+
+    it.each([
+      { status: 401, body: "auth failure", code: "AUTH_ERROR" },
+      { status: 404, body: "model missing", code: "MODEL_NOT_FOUND" },
+      { status: 429, body: "rate limited", code: "RATE_LIMIT" },
+      { status: 500, body: "server error body fragment", code: "API_ERROR" },
+      { status: 0, body: undefined, code: "NETWORK_ERROR" },
+    ])(
+      "logs status $status and body fragment before throwing $code",
+      async ({ status, body, code }) => {
+        const error = new Error("OpenAI error");
+        Object.defineProperty(error, "status", { value: status });
+        if (body !== undefined) {
+          Object.defineProperty(error, "body", { value: body });
+        }
+        mockCreate.mockRejectedValue(error);
+
+        await expect(
+          service.generateDocument("system", userPrompt),
+        ).rejects.toThrow(OpenRouterError);
+
+        expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
+        const log = loggerErrorSpy.mock.calls[0]![0] as string;
+
+        expect(log).toContain(`status=${status}`);
+        if (body !== undefined) {
+          expect(log).toContain(body.slice(0, 30));
+          expect(log.length).toBeLessThanOrEqual(200);
+        }
+        expect(log).not.toContain(userPrompt);
+      },
+    );
   });
 });

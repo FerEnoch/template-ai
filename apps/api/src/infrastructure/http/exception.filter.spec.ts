@@ -132,4 +132,23 @@ describe("HttpExceptionFilter", () => {
     expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith({ error: "Unauthorized" });
   });
+
+  it("should preserve errorType from custom exception response body", () => {
+    const { host, status, json } = createMockHost();
+    const exception = new HttpException(
+      {
+        message: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+        errorType: "NETWORK_ERROR",
+      },
+      502,
+    );
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(502);
+    expect(json).toHaveBeenCalledWith({
+      error: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+      errorType: "NETWORK_ERROR",
+    });
+  });
 });

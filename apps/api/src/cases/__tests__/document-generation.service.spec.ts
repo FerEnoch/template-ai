@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { Logger } from "@nestjs/common";
 
 // Mock AI_CONFIG before any imports that transitively load config/ai.ts
 vi.mock("../../config/ai.js", () => ({
@@ -206,6 +207,39 @@ describe("DocumentGenerationService", () => {
 
       expect(result.success).toBe(false);
       expect(mockGenerateDocument).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("error logging", () => {
+    it("logs the full error stack after exhausting INVALID_RESPONSE retries", async () => {
+      vi.useFakeTimers();
+      const loggerErrorSpy = vi
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => {});
+
+      mockGenerateDocument
+        .mockRejectedValueOnce(new OpenRouterError("e1", "INVALID_RESPONSE"))
+        .mockRejectedValueOnce(new OpenRouterError("e2", "INVALID_RESPONSE"))
+        .mockRejectedValueOnce(new OpenRouterError("e3", "INVALID_RESPONSE"));
+
+      const generatePromise = service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
+
+      await vi.runAllTimersAsync();
+      const result = await generatePromise;
+
+      expect(result.success).toBe(false);
+      expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        "Document generation failed",
+        expect.stringContaining("e3"),
+      );
+
+      loggerErrorSpy.mockRestore();
+      vi.useRealTimers();
     });
   });
 });

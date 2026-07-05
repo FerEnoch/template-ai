@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  BadGatewayException,
 } from "@nestjs/common";
 import { CasesService } from "../cases.service";
 import { DocumentGenerationService } from "../../ai/document-generation.service.js";
@@ -491,6 +492,61 @@ describe("CasesService", () => {
       await expect(service.archive(0, "non-existent")).rejects.toThrow(
         NotFoundException,
       );
+    });
+  });
+
+  describe("generate", () => {
+    it("throws BadGatewayException with Spanish message and NETWORK_ERROR errorType", async () => {
+      const generationService = {
+        generate: vi.fn().mockResolvedValue({
+          success: false,
+          errorType: "NETWORK_ERROR",
+        }),
+      } as unknown as DocumentGenerationService;
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: makeCaseRecord(),
+      });
+      const service = new CasesService(mockPostgres, generationService);
+
+      await expect(service.generate(0, "case-uuid-1")).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      try {
+        await service.generate(0, "case-uuid-1");
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        const response = (error as BadGatewayException).getResponse();
+        expect(response).toMatchObject({
+          message: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+          errorType: "NETWORK_ERROR",
+        });
+      }
+    });
+
+    it("throws BadGatewayException with UNKNOWN errorType when generation lacks errorType", async () => {
+      const generationService = {
+        generate: vi.fn().mockResolvedValue({
+          success: false,
+        }),
+      } as unknown as DocumentGenerationService;
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: makeCaseRecord(),
+      });
+      const service = new CasesService(mockPostgres, generationService);
+
+      try {
+        await service.generate(0, "case-uuid-1");
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        const response = (error as BadGatewayException).getResponse();
+        expect(response).toMatchObject({
+          message: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+          errorType: "UNKNOWN",
+        });
+      }
     });
   });
 });

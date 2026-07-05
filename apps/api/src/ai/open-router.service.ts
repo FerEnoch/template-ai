@@ -551,6 +551,11 @@ export class OpenRouterService {
       }
 
       const status = (error as { status?: number })?.status ?? 0;
+      const body = (error as { body?: unknown }).body;
+      const bodyFragment = (JSON.stringify(body) ?? "undefined").slice(0, 200);
+      this.logger.error(
+        `OpenRouter API error: status=${status}, body=${bodyFragment}`,
+      );
 
       if (status === 401) {
         throw new OpenRouterError("Invalid OPENROUTER_API_KEY", "AUTH_ERROR");

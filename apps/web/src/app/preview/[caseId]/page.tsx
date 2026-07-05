@@ -2,24 +2,43 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { AppShell } from "@/components/shell/app-shell";
 import { DocumentViewer } from "@/components/preview/DocumentViewer";
 import { VerificationChecklist } from "@/components/preview/VerificationChecklist";
 import { ExportPanel } from "@/components/preview/ExportPanel";
 import { ExportSpinner } from "@/components/preview/ExportSpinner";
-import { fetchCase, generateCase } from "@/lib/api/cases";
+import { fetchCase, generateCase, ApiError } from "@/lib/api/cases";
 import type { CaseWithTemplate } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
-export default function PreviewPage() {
-  const params = useParams();
-  const router = useRouter();
-  const caseId = params.caseId as string;
+const ERROR_TYPE_LABELS: Record<string, string> = {
+  NETWORK_ERROR: "Error de red",
+  RATE_LIMIT: "Límite alcanzado",
+  AUTH_ERROR: "Error de autenticación",
+  MODEL_NOT_FOUND: "Modelo no disponible",
+  INVALID_RESPONSE: "Respuesta inválida",
+  UNKNOWN: "Error desconocido",
+};
 
+function errorTypeLabel(errorType: string): string {
+  return ERROR_TYPE_LABELS[errorType] ?? errorType;
+}
+
+interface PreviewPageContentProps {
+  caseId: string;
+  router: AppRouterInstance;
+}
+
+export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) {
   const [caseItem, setCaseItem] = useState<CaseWithTemplate | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [regenError, setRegenError] = useState<{
+    message: string;
+    errorType?: string;
+  } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -42,18 +61,19 @@ export default function PreviewPage() {
 
   const handleRegenerate = useCallback(async () => {
     setIsRegenerating(true);
-    setError(null);
+    setRegenError(null);
     try {
-      const updated = await generateCase(caseId);
-      setCaseItem(updated as CaseWithTemplate);
+      await generateCase(caseId);
+      await loadCase();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error al regenerar el documento"
-      );
+      const message =
+        err instanceof Error ? err.message : "Error al regenerar el documento";
+      const errorType = err instanceof ApiError ? err.errorType : undefined;
+      setRegenError({ message, errorType });
     } finally {
       setIsRegenerating(false);
     }
-  }, [caseId]);
+  }, [caseId, loadCase]);
 
   const handleReturnToForm = useCallback(() => {
     if (!caseItem) return;
@@ -81,7 +101,7 @@ export default function PreviewPage() {
           </p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => void loadCase()}
             className="rounded bg-accent px-4 py-2 font-label text-sm font-medium text-white hover:bg-accent-hover"
           >
             Reintentar
@@ -110,6 +130,36 @@ export default function PreviewPage() {
         Revisá el documento final antes de exportar. Podés editar cualquier
         párrafo.
       </div>
+
+      {regenError && (
+        <div className="w-full bg-danger/10 border-b border-danger/20 px-6 py-3">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <p className="text-sm text-danger font-label">
+              {regenError.message}
+            </p>
+            <div className="flex items-center gap-3">
+              {regenError.errorType && (
+                <details className="text-xs text-danger">
+                  <summary className="cursor-pointer font-label select-none">
+                    Detalles
+                  </summary>
+                  <code className="block mt-1 font-mono bg-white/60 px-2 py-1 rounded">
+                    {errorTypeLabel(regenError.errorType)}
+                  </code>
+                </details>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleRegenerate()}
+                disabled={isRegenerating}
+                className="text-sm font-label font-medium text-danger hover:text-danger/80 disabled:opacity-50"
+              >
+                Reintentar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full px-6 py-8 gap-8">
         <div className="flex-grow w-full md:w-2/3">
@@ -186,4 +236,10 @@ export default function PreviewPage() {
       </main>
     </AppShell>
   );
+}
+
+export default function PreviewPage() {
+  const params = useParams();
+  const router = useRouter();
+  return <PreviewPageContent caseId={params.caseId as string} router={router} />;
 }

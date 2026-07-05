@@ -20,7 +20,8 @@ export interface ExtractedTextResponse {
 export class ApiError extends Error {
   constructor(
     message: string,
-    public readonly status: number
+    public readonly status: number,
+    public readonly errorType?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -57,47 +58,60 @@ function fallbackMessageForStatus(status: number): string {
   }
 }
 
+export interface ParsedApiError {
+  message: string;
+  errorType?: string;
+}
+
 /**
- * Parse a non-OK response body into a user-friendly message.
+ * Parse a non-OK response body into a user-friendly message and optional
+ * machine-readable error type.
  *
  * The backend exception filter returns `{ error: "..." }` JSON. We extract
  * that field. If the body isn't JSON or has no error field, we fall back to
  * a status-based Spanish message so the user never sees raw JSON or an
  * unhelpful English status text.
  */
-async function parseErrorResponse(response: Response): Promise<string> {
+export async function parseErrorResponse(
+  response: Response,
+): Promise<ParsedApiError> {
   let body: string;
   try {
     body = await response.text();
   } catch {
-    return fallbackMessageForStatus(response.status);
+    return { message: fallbackMessageForStatus(response.status) };
   }
 
   if (body.trim()) {
     try {
       const parsed = JSON.parse(body) as Record<string, unknown>;
-      if (typeof parsed.error === "string" && parsed.error.trim()) {
-        return parsed.error;
-      }
-      if (typeof parsed.message === "string" && parsed.message.trim()) {
-        return parsed.message;
-      }
+      const message =
+        (typeof parsed.error === "string" && parsed.error.trim())
+          ? parsed.error
+          : (typeof parsed.message === "string" && parsed.message.trim())
+            ? parsed.message
+            : fallbackMessageForStatus(response.status);
+      const errorType =
+        typeof parsed.errorType === "string" ? parsed.errorType : undefined;
+      return { message, errorType };
     } catch {
-      // Body is plain text — use it directly if it's short and readable
+      // Body is plain text — use it directly if it's short, readable and
+      // the status is a client error. Server errors always get a Spanish
+      // fallback so the user never sees raw HTTP status text.
       const text = body.trim();
-      if (text.length > 0 && text.length <= 200) {
-        return text;
+      if (response.status < 500 && text.length > 0 && text.length <= 200) {
+        return { message: text };
       }
     }
   }
 
-  return fallbackMessageForStatus(response.status);
+  return { message: fallbackMessageForStatus(response.status) };
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const message = await parseErrorResponse(response);
-    throw new ApiError(message, response.status);
+    const { message, errorType } = await parseErrorResponse(response);
+    throw new ApiError(message, response.status, errorType);
   }
   return response.json() as Promise<T>;
 }
