@@ -352,7 +352,7 @@ describe("CasesService", () => {
       expect(result.created).toBe(false);
 
       const insertCalls = (mockClient.query as ReturnType<typeof vi.fn>).mock.calls.filter(
-        ([sql]: [string]) => sql.includes("INSERT INTO casos"),
+        (call: unknown[]) => typeof call[0] === "string" && call[0].includes("INSERT INTO casos"),
       );
       expect(insertCalls).toHaveLength(0);
     });
@@ -366,7 +366,7 @@ describe("CasesService", () => {
       });
 
       const uniqueViolation = new Error("duplicate key value violates unique constraint");
-      (uniqueViolation as Record<string, unknown>).code = "23505";
+      (uniqueViolation as unknown as Record<string, unknown>).code = "23505";
 
       const { mockPostgres } = createMockPostgresService({
         findBorradorRecord: existing,

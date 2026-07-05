@@ -37,7 +37,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ status: "archivado" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
       />,
     );
 
@@ -50,7 +50,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ status: "borrador" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
       />,
     );
 
@@ -62,7 +62,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ status: "borrador" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
       />,
     );
 
@@ -85,7 +85,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ status: "borrador" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
       />,
     );
 
@@ -114,7 +114,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ id: "case-uuid-1", status: "borrador" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
         onDelete={onDelete}
       />,
     );
@@ -140,7 +140,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ status: "borrador" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
         onDeleteError={onDeleteError}
       />,
     );
@@ -166,7 +166,7 @@ describe("CaseCard", () => {
     render(
       <CaseCard
         caseData={makeCase({ id: "case-uuid-1", status: "borrador" })}
-        displayName="Caso #1"
+        templateName="Caso #1"
       />,
     );
 

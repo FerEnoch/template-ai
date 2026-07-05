@@ -723,14 +723,14 @@ describe("CasesController integration", () => {
       if (!DATABASE_URL) return;
 
       const { Test } = await import("@nestjs/testing");
-      const { DatabaseModule } = await import(
-        "../../infrastructure/postgres/database.module"
-      );
+      // @ts-ignore - dynamic imports for optional integration test
+      const { DatabaseModule } = await import("../../infrastructure/postgres/database.module");
+      // @ts-ignore - dynamic imports for optional integration test
       const { CasesController } = await import("../cases.controller");
+      // @ts-ignore - dynamic imports for optional integration test
       const { CasesService } = await import("../cases.service");
-      const { DocumentGenerationService } = await import(
-        "../../ai/document-generation.service.js"
-      );
+      // @ts-ignore - dynamic imports for optional integration test
+      const { DocumentGenerationService } = await import("../../ai/document-generation.service");
 
       const moduleRef = await Test.createTestingModule({
         imports: [DatabaseModule],
@@ -751,9 +751,8 @@ describe("CasesController integration", () => {
       }).compile();
 
       generateApp = moduleRef.createNestApplication();
-      const { HttpExceptionFilter } = await import(
-        "../../infrastructure/http/exception.filter"
-      );
+      // @ts-ignore - dynamic imports for optional integration test
+      const { HttpExceptionFilter } = await import("../../infrastructure/http/exception.filter");
       generateApp.useGlobalFilters(new HttpExceptionFilter());
       generateApp.setGlobalPrefix("api");
       await generateApp.init();
