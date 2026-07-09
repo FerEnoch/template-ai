@@ -80,7 +80,7 @@ export function EditableTitle({
   return (
     <div
       onClick={handleWrapperClick}
-      className={cn("w-full", className)}
+      className={cn("w-full relative", className)}
       data-testid="editable-title-wrapper"
     >
       <input
@@ -102,6 +102,15 @@ export function EditableTitle({
           isPending && "animate-pulse opacity-80"
         )}
       />
+      <button
+        type="button"
+        onClick={handleIconClick}
+        aria-label="Editar título"
+        data-testid="editable-title-icon"
+        className="absolute -right-8 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-900 focus:opacity-100"
+      >
+        <Pencil className="h-4 w-4" />
+      </button>
       {error && (
         <p
           id="editable-title-error"

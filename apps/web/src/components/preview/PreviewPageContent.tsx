@@ -7,7 +7,7 @@ import { DocumentViewer } from "@/components/preview/DocumentViewer";
 import { VerificationChecklist } from "@/components/preview/VerificationChecklist";
 import { ExportPanel } from "@/components/preview/ExportPanel";
 import { ExportSpinner } from "@/components/preview/ExportSpinner";
-import { fetchCase, generateCase, ApiError } from "@/lib/api/cases";
+import { fetchCase, generateCase, updateCase, ApiError } from "@/lib/api/cases";
 import type { CaseWithTemplate } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
 import { ArrowLeft, RefreshCw } from "lucide-react";
@@ -92,6 +92,19 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     if (!caseItem) return;
     router.push(`/nuevo/${caseItem.template.id}`);
   }, [caseItem, router]);
+
+  const handleRenameTitle = useCallback(
+    async (name: string, signal?: AbortSignal) => {
+      const updated = await updateCase(caseId, { name }, signal);
+      setCaseItem(
+        (current) =>
+          current
+            ? ({ ...current, name: updated.name, updatedAt: updated.updatedAt } as CaseWithTemplate)
+            : current
+      );
+    },
+    [caseId]
+  );
 
   if (loading) {
     return (
@@ -185,6 +198,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
                 current ? { ...current, generatedText: text } : current
               )
             }
+            onRenameTitle={handleRenameTitle}
           />
         </div>
 
