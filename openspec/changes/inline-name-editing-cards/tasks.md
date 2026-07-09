@@ -32,11 +32,11 @@ Delivery: `force-chained` / `feature-branch-chain`. Tracker `feature/inline-name
 
 ## PR 3 — Wire `/biblioteca/[id]` + `/nuevo/[templateId]`
 
-- [ ] 3.1 `app/biblioteca/[id]/page.tsx`: `handleRenameTemplate(name, signal)` → `updateTemplateName(id, name, signal)` + `setTemplate`; wrap `<h1>` with `EditableName value={template.name} onSave={handleRenameTemplate}`.
-- [ ] 3.2 `components/case/CaseProgress.tsx`: add required `onRename` prop; wrap `<h1>` with `EditableName value={caseName ?? template.name} onSave={onRename}`.
-- [ ] 3.3 `components/case/NewCaseLayout.tsx`: accept `onRename`, forward to `CaseProgress`.
-- [ ] 3.4 `app/nuevo/[templateId]/page.tsx`: `handleRenameCase(name, signal)` → `updateCase(id, { name }, signal)` + `dispatch({ type: 'SET_CASE_NAME', payload: name })`; pass to `NewCaseLayout onRename={...}`. Add `SET_CASE_NAME` to `CaseContext` reducer if absent.
-- [ ] 3.5 Integration tests: mock API, click+change+Enter, assert PATCH + state; PATCH failure does NOT dispatch `SET_CASE_NAME` and reverts UI.
+- [x] 3.1 `app/biblioteca/[id]/page.tsx`: `handleRenameTemplate(name, signal)` → `updateTemplateName(id, name, signal)` + `setTemplate`; wrap `<h1>` with `EditableName value={template.name} onSave={handleRenameTemplate}`.
+- [x] 3.2 `components/case/CaseProgress.tsx`: add required `onRename` prop; wrap `<h1>` with `EditableName value={caseName ?? template.name} onSave={onRename}`.
+- [x] 3.3 `components/case/NewCaseLayout.tsx`: accept `onRename`, forward to `CaseProgress`.
+- [x] 3.4 `app/nuevo/[templateId]/page.tsx`: `handleRenameCase(name, signal)` → `updateCase(id, { name }, signal)` + `dispatch({ type: 'SET_CASE_NAME', payload: name })`; pass to `NewCaseLayout onRename={...}`. Add `SET_CASE_NAME` to `CaseContext` reducer if absent.
+- [x] 3.5 Integration tests: mock API, click+change+Enter, assert PATCH + state; PATCH failure does NOT dispatch `SET_CASE_NAME` and reverts UI.
 
 ## PR 4 — Wire `/preview/[caseId]` + E2E
 
