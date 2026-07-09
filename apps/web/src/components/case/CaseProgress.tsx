@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, Tag, Calendar } from "lucide-react";
+import { EditableName } from "@/components/biblioteca/EditableName";
 import type { Template } from "@template-ai/contracts";
 
 interface CaseProgressProps {
@@ -9,6 +10,7 @@ interface CaseProgressProps {
   readonly filled: number;
   readonly total: number;
   readonly progress: number;
+  readonly onRename: (name: string, signal?: AbortSignal) => Promise<void>;
 }
 
 function formatDate(isoDate: string): string {
@@ -25,6 +27,7 @@ export function CaseProgress({
   filled,
   total,
   progress,
+  onRename,
 }: CaseProgressProps) {
   return (
     <div className="space-y-6">
@@ -36,9 +39,15 @@ export function CaseProgress({
           <FileText className="h-5 w-5 text-text-disabled" />
         </div>
 
-        <h1 className="font-headline text-xl font-bold leading-tight text-text-primary">
-          {caseName ?? template.name}
-        </h1>
+        <EditableName
+          value={caseName ?? template.name}
+          onSave={onRename}
+          inputClassName="font-headline text-xl font-bold leading-tight text-text-primary w-full rounded-md border border-border bg-surface px-2 py-1 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          <h1 className="font-headline text-xl font-bold leading-tight text-text-primary">
+            {caseName ?? template.name}
+          </h1>
+        </EditableName>
 
         <div className="mt-2 space-y-1">
           <p className="flex items-center gap-2 font-label text-xs text-text-secondary">
