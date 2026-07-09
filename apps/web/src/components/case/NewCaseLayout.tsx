@@ -12,7 +12,7 @@ interface NewCaseLayoutProps {
 
 export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
   const { state } = useCase();
-  const { template, entities, formData, progress, saveStatus, status, generationError } = state;
+  const { template, entities, formData, progress, saveStatus, status, generationError, caseName } = state;
 
   const filled = entities.filter(
     (entity) => (formData[entity.id] ?? "").trim() !== ""
@@ -37,6 +37,7 @@ export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
       <aside className="md:w-1/4">
         <CaseProgress
           template={template}
+          caseName={caseName}
           filled={filled}
           total={total}
           progress={progress}

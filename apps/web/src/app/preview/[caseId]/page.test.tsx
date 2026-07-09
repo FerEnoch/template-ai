@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { PreviewPageContent } from "./page";
+import { PreviewPageContent } from "@/components/preview/PreviewPageContent";
 import { ApiError } from "@/lib/api/cases";
 import type { CaseWithTemplate } from "@/lib/api/cases";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";

@@ -5,6 +5,7 @@ import type { Template } from "@template-ai/contracts";
 
 interface CaseProgressProps {
   readonly template: Template;
+  readonly caseName?: string | null;
   readonly filled: number;
   readonly total: number;
   readonly progress: number;
@@ -20,6 +21,7 @@ function formatDate(isoDate: string): string {
 
 export function CaseProgress({
   template,
+  caseName,
   filled,
   total,
   progress,
@@ -35,7 +37,7 @@ export function CaseProgress({
         </div>
 
         <h1 className="font-headline text-xl font-bold leading-tight text-text-primary">
-          {template.name}
+          {caseName ?? template.name}
         </h1>
 
         <div className="mt-2 space-y-1">
