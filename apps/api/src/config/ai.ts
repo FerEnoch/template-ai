@@ -30,6 +30,26 @@ export const AI_CONFIG = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Document generation config: higher token budget and temperature for
+// generating full legal documents from template entities + form data.
+// Override via AI_GENERATION_MAX_TOKENS and AI_GENERATION_TEMPERATURE.
+// ---------------------------------------------------------------------------
+const genMaxTokensRaw = process.env.AI_GENERATION_MAX_TOKENS?.trim();
+const genMaxTokens = genMaxTokensRaw !== undefined && genMaxTokensRaw !== ""
+  ? Number(genMaxTokensRaw)
+  : 16384;
+
+const genTempRaw = process.env.AI_GENERATION_TEMPERATURE?.trim();
+const genTemp = genTempRaw !== undefined && genTempRaw !== ""
+  ? Number(genTempRaw)
+  : 0.3;
+
+export const AI_GENERATION_CONFIG = {
+  maxTokens: genMaxTokens,
+  temperature: genTemp,
+} as const;
+
+// ---------------------------------------------------------------------------
 // Cache configuration: Redis-backed AI response and text extraction cache.
 // AI_CACHE_ENABLED gates all cache operations (default: false).
 // TTLs default to 7 days (604800s). Max entry size: 1MB.

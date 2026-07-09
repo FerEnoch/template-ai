@@ -1,0 +1,735 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import {
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  BadGatewayException,
+} from "@nestjs/common";
+import { CasesService } from "../cases.service";
+import { DocumentGenerationService } from "../../ai/document-generation.service.js";
+import { PostgresService, type TransactionContext } from "../../infrastructure/postgres/postgres.service";
+import type { CaseRecord } from "../../infrastructure/postgres/repositories/cases.repository";
+
+const mockGenerationService = {
+  generate: vi.fn().mockResolvedValue({
+    success: true,
+    generatedText: "Generated legal document text",
+  }),
+} as unknown as DocumentGenerationService;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeTemplateRow(
+  overrides: Partial<{
+    id: string;
+    name: string;
+    description: string;
+    documentId: string | null;
+    category: string;
+    status: string;
+    entities: unknown[];
+    createdAt: Date;
+    deletedAt: Date | null;
+    userId: number;
+  }> = {},
+) {
+  return {
+    t_id: overrides.id ?? "tmpl-uuid-1",
+    t_user_id: overrides.userId ?? 0,
+    t_name: overrides.name ?? "Test Template",
+    t_description: overrides.description ?? "Test description",
+    t_document_id: overrides.documentId ?? null,
+    t_category: overrides.category ?? "general",
+    t_status: overrides.status ?? "published",
+    t_entities: overrides.entities ?? [],
+    t_created_at: overrides.createdAt ?? new Date("2025-06-01T10:00:00Z"),
+    t_deleted_at: overrides.deletedAt ?? null,
+  };
+}
+
+function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
+  return {
+    id: "case-uuid-1",
+    userId: 0,
+    templateId: "tmpl-uuid-1",
+    status: "borrador",
+    name: null,
+    formData: {},
+    generatedText: null,
+    createdAt: new Date("2025-06-01T10:00:00Z"),
+    updatedAt: new Date("2025-06-01T10:00:00Z"),
+    template: {
+      id: overrides.templateId ?? "tmpl-uuid-1",
+      userId: 0,
+      name: "Test Template",
+      description: "Test description",
+      documentId: null,
+      category: "general",
+      status: "published",
+      entities: [],
+      createdAt: new Date("2025-06-01T10:00:00Z"),
+      deletedAt: null,
+    },
+    ...overrides,
+  };
+}
+
+function createMockPostgresService(setup: {
+  caseRecords?: CaseRecord[];
+  createdRecord?: CaseRecord;
+  createError?: Error;
+  findByIdRecord?: CaseRecord | null;
+  findBorradorRecord?: CaseRecord | null;
+  templateExists?: boolean;
+  updateRecord?: CaseRecord | null;
+  updateConflict?: boolean;
+}): {
+  mockPostgres: PostgresService;
+  mockClient: { query: ReturnType<typeof vi.fn> };
+} {
+  const {
+    caseRecords = [],
+    createdRecord,
+    createError,
+    findByIdRecord = null,
+    findBorradorRecord = null,
+    templateExists = true,
+    updateRecord = null,
+    updateConflict = false,
+  } = setup;
+
+  const mockClient = { query: vi.fn() };
+
+  mockClient.query.mockImplementation((sql: string, params?: unknown[]) => {
+    if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
+      return Promise.resolve({ rowCount: 0, rows: [] });
+    }
+    if (sql.includes("SET LOCAL")) {
+      return Promise.resolve({ rowCount: 0, rows: [] });
+    }
+
+    // Check template exists (for create)
+    if (sql.includes("SELECT") && sql.includes("FROM templates") && sql.includes("WHERE id =")) {
+      if (!templateExists) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [{ id: params?.[0] ?? "tmpl-uuid-1", user_id: 0 }],
+      });
+    }
+
+    // Find existing borrador by (user_id, template_id)
+    if (
+      sql.includes("SELECT") &&
+      sql.includes("FROM casos") &&
+      sql.includes("WHERE c.user_id =") &&
+      sql.includes("c.status = 'borrador'") &&
+      sql.includes("ORDER BY c.created_at ASC LIMIT 1")
+    ) {
+      if (!findBorradorRecord) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [
+          {
+            id: findBorradorRecord.id,
+            user_id: findBorradorRecord.userId,
+            template_id: findBorradorRecord.templateId,
+            status: findBorradorRecord.status,
+            form_data: findBorradorRecord.formData,
+            generated_text: findBorradorRecord.generatedText,
+            created_at: findBorradorRecord.createdAt,
+            updated_at: findBorradorRecord.updatedAt,
+            ...makeTemplateRow({ id: findBorradorRecord.templateId }),
+          },
+        ],
+      });
+    }
+
+    // INSERT INTO casos (create) — returns only the generated id
+    if (sql.includes("INSERT INTO casos")) {
+      if (createError) {
+        return Promise.reject(createError);
+      }
+      const record = createdRecord ?? makeCaseRecord();
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [{ id: record.id }],
+      });
+    }
+
+    // SELECT casos by id (findById)
+    if (
+      sql.includes("SELECT") &&
+      sql.includes("FROM casos") &&
+      (sql.includes("WHERE id =") || sql.includes("WHERE c.id ="))
+    ) {
+      if (!findByIdRecord) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [
+          {
+            id: findByIdRecord.id,
+            user_id: findByIdRecord.userId,
+            template_id: findByIdRecord.templateId,
+            status: findByIdRecord.status,
+            name: findByIdRecord.name,
+            form_data: findByIdRecord.formData,
+            generated_text: findByIdRecord.generatedText,
+            created_at: findByIdRecord.createdAt,
+            updated_at: findByIdRecord.updatedAt,
+            ...makeTemplateRow({ id: findByIdRecord.templateId }),
+          },
+        ],
+      });
+    }
+
+    // SELECT casos by user_id (findByUserId)
+    if (
+      sql.includes("SELECT") &&
+      sql.includes("FROM casos") &&
+      (sql.includes("WHERE user_id =") || sql.includes("WHERE c.user_id ="))
+    ) {
+      return Promise.resolve({
+        rowCount: caseRecords.length,
+        rows: caseRecords.map((r) => ({
+          id: r.id,
+          user_id: r.userId,
+          template_id: r.templateId,
+          status: r.status,
+          name: r.name,
+          form_data: r.formData,
+          generated_text: r.generatedText,
+          created_at: r.createdAt,
+          updated_at: r.updatedAt,
+          ...makeTemplateRow({ id: r.templateId }),
+        })),
+      });
+    }
+
+    // UPDATE casos (updateFormData / updateStatus / updateName / updateGeneratedText)
+    if (sql.includes("UPDATE casos")) {
+      if (updateConflict) {
+        return Promise.reject(
+          Object.assign(new Error("duplicate key value violates unique constraint"), {
+            code: "23505",
+          }),
+        );
+      }
+      if (!updateRecord) {
+        return Promise.resolve({ rowCount: 0, rows: [] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [
+          {
+            id: updateRecord.id,
+            user_id: updateRecord.userId,
+            template_id: updateRecord.templateId,
+            status: updateRecord.status,
+            name: updateRecord.name,
+            form_data: updateRecord.formData,
+            generated_text: updateRecord.generatedText,
+            created_at: updateRecord.createdAt,
+            updated_at: updateRecord.updatedAt,
+            ...makeTemplateRow({ id: updateRecord.templateId }),
+          },
+        ],
+      });
+    }
+
+    return Promise.resolve({ rowCount: 0, rows: [] });
+  });
+
+  const mockPostgres = {
+    withOwnerTransaction: vi.fn(
+      async (
+        ownerId: number,
+        cb: (ctx: TransactionContext) => Promise<unknown>,
+      ) => {
+        await mockClient.query("BEGIN");
+        await mockClient.query(`SET LOCAL app.current_user_id = $1`, [
+          ownerId,
+        ]);
+        const result = await cb({ client: mockClient as never, ownerId });
+        await mockClient.query("COMMIT");
+        return result;
+      },
+    ),
+  } as unknown as PostgresService;
+
+  return { mockPostgres, mockClient };
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("CasesService", () => {
+  describe("create", () => {
+    it("should create a case with status borrador and empty form_data", async () => {
+      const created = makeCaseRecord({
+        id: "new-case-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: {},
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        createdRecord: created,
+        findByIdRecord: created,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.created).toBe(true);
+      expect(result.case.id).toBe("new-case-uuid");
+      expect(result.case.status).toBe("borrador");
+      expect(result.case.templateId).toBe("tmpl-uuid-1");
+      expect(result.case.formData).toEqual({});
+    });
+
+    it("should create a case with embedded template", async () => {
+      const created = makeCaseRecord({
+        id: "new-case-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: {},
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        createdRecord: created,
+        findByIdRecord: created,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.case.template).toBeDefined();
+      expect(result.case.template.id).toBe("tmpl-uuid-1");
+      expect(result.case.template.name).toBe("Test Template");
+    });
+
+    it("should throw NotFoundException when template does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        templateExists: false,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.create(0, { templateId: "non-existent-uuid" }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should return existing borrador without inserting when one already exists", async () => {
+      const existing = makeCaseRecord({
+        id: "existing-case-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: { ent_1: "previous" },
+      });
+
+      const { mockPostgres, mockClient } = createMockPostgresService({
+        findBorradorRecord: existing,
+        findByIdRecord: existing,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.case.id).toBe("existing-case-uuid");
+      expect(result.case.status).toBe("borrador");
+      expect(result.created).toBe(false);
+
+      const insertCalls = (mockClient.query as ReturnType<typeof vi.fn>).mock.calls.filter(
+        (call: unknown[]) => typeof call[0] === "string" && call[0].includes("INSERT INTO casos"),
+      );
+      expect(insertCalls).toHaveLength(0);
+    });
+
+    it("should return existing borrador when INSERT loses a unique-violation race", async () => {
+      const existing = makeCaseRecord({
+        id: "race-case-uuid",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+        formData: {},
+      });
+
+      const uniqueViolation = new Error("duplicate key value violates unique constraint");
+      (uniqueViolation as unknown as Record<string, unknown>).code = "23505";
+
+      const { mockPostgres } = createMockPostgresService({
+        findBorradorRecord: existing,
+        findByIdRecord: existing,
+        createError: uniqueViolation,
+        templateExists: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.create(0, { templateId: "tmpl-uuid-1" });
+
+      expect(result.case.id).toBe("race-case-uuid");
+      expect(result.created).toBe(false);
+    });
+  });
+
+  describe("findOne", () => {
+    it("should return a case by id", async () => {
+      const record = makeCaseRecord({
+        id: "case-uuid-1",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: record,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.findOne(0, "case-uuid-1");
+
+      expect(result.id).toBe("case-uuid-1");
+      expect(result.templateId).toBe("tmpl-uuid-1");
+    });
+
+    it("should throw NotFoundException when case is not found", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.findOne(0, "non-existent"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should return the embedded template in the response", async () => {
+      const record = makeCaseRecord({
+        id: "case-uuid-1",
+        templateId: "tmpl-uuid-1",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: record,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.findOne(0, "case-uuid-1");
+
+      expect(result.template).toBeDefined();
+      expect(result.template.id).toBe("tmpl-uuid-1");
+      expect(result.template.name).toBe("Test Template");
+    });
+  });
+
+  describe("list", () => {
+    it("should return all cases for the user", async () => {
+      const records = [
+        makeCaseRecord({ id: "case-1", status: "borrador" }),
+        makeCaseRecord({ id: "case-2", status: "generado" }),
+      ];
+
+      const { mockPostgres } = createMockPostgresService({
+        caseRecords: records,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.list(0);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].id).toBe("case-1");
+      expect(result[1].id).toBe("case-2");
+    });
+
+    it("should filter cases by status when provided", async () => {
+      const records = [
+        makeCaseRecord({ id: "case-1", status: "borrador" }),
+      ];
+
+      const { mockPostgres } = createMockPostgresService({
+        caseRecords: records,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.list(0, "borrador");
+
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe("borrador");
+    });
+
+    it("should return empty array when no cases exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        caseRecords: [],
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.list(0);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("updateFormData", () => {
+    it("should update form data on a borrador case", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "borrador",
+        formData: {},
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "borrador",
+        formData: { ent_1: "Juan Pérez" },
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateFormData(0, "case-uuid-1", {
+        formData: { ent_1: "Juan Pérez" },
+      });
+
+      expect(result.formData).toEqual({ ent_1: "Juan Pérez" });
+    });
+
+    it("should allow updating a generado case (supports re-generation)", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "generado",
+        formData: { ent_1: "old" },
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "generado",
+        formData: { ent_1: "value" },
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateFormData(0, "case-uuid-1", {
+        formData: { ent_1: "value" },
+      });
+
+      expect(result.formData).toEqual({ ent_1: "value" });
+    });
+
+    it("should throw ConflictException when updating an archivado case", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "archivado",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateFormData(0, "case-uuid-1", {
+          formData: { ent_1: "value" },
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it("should throw NotFoundException when case does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateFormData(0, "non-existent", {
+          formData: { ent_1: "value" },
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("updateName", () => {
+    it("should update a case name and return the updated record", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Custom Case Name",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", "Custom Case Name");
+
+      expect(result.name).toBe("Custom Case Name");
+    });
+
+    it("should pass null through to clear the custom case name", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Old Custom Name",
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", null);
+
+      expect(result.name).toBeNull();
+    });
+
+    it("should throw NotFoundException when case does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateName(0, "non-existent", "Custom Case Name"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw ConflictException on unique constraint violation", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Old Name",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateConflict: true,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateName(0, "case-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow(ConflictException);
+
+      await expect(
+        service.updateName(0, "case-uuid-1", "Duplicate Name"),
+      ).rejects.toThrow('Ya existe un documento llamado "Duplicate Name". Elegí otro nombre.');
+    });
+  });
+
+  describe("archive", () => {
+    it("should archive a case by setting status to archivado", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "exportado",
+      });
+      const archived = makeCaseRecord({
+        id: "case-uuid-1",
+        status: "archivado",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: archived,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.archive(0, "case-uuid-1");
+
+      expect(result.status).toBe("archivado");
+    });
+
+    it("should throw NotFoundException when archiving a non-existent case", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(service.archive(0, "non-existent")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe("generate", () => {
+    it("throws BadGatewayException with Spanish message and NETWORK_ERROR errorType", async () => {
+      const generationService = {
+        generate: vi.fn().mockResolvedValue({
+          success: false,
+          errorType: "NETWORK_ERROR",
+        }),
+      } as unknown as DocumentGenerationService;
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: makeCaseRecord(),
+      });
+      const service = new CasesService(mockPostgres, generationService);
+
+      await expect(service.generate(0, "case-uuid-1")).rejects.toThrow(
+        BadGatewayException,
+      );
+
+      try {
+        await service.generate(0, "case-uuid-1");
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        const response = (error as BadGatewayException).getResponse();
+        expect(response).toMatchObject({
+          message: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+          errorType: "NETWORK_ERROR",
+        });
+      }
+    });
+
+    it("throws BadGatewayException with UNKNOWN errorType when generation lacks errorType", async () => {
+      const generationService = {
+        generate: vi.fn().mockResolvedValue({
+          success: false,
+        }),
+      } as unknown as DocumentGenerationService;
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: makeCaseRecord(),
+      });
+      const service = new CasesService(mockPostgres, generationService);
+
+      try {
+        await service.generate(0, "case-uuid-1");
+      } catch (error) {
+        expect(error).toBeInstanceOf(BadGatewayException);
+        const response = (error as BadGatewayException).getResponse();
+        expect(response).toMatchObject({
+          message: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+          errorType: "UNKNOWN",
+        });
+      }
+    });
+  });
+});

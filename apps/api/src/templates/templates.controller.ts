@@ -1,24 +1,36 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
-import { TemplateSchema } from "@template-ai/contracts";
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, NotFoundException, BadRequestException, HttpCode, Logger } from "@nestjs/common";
+import { TemplateSchema, UpdateTemplateNameSchema } from "@template-ai/contracts";
 import { TemplatesService } from "./templates.service";
+import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import type { CreateTemplateData, TemplateResponse } from "./templates.service";
 
 // Build the creation schema: omit server-generated fields and status (backend
 // defaults to "draft" when not provided — see controller create() method).
 const CreateTemplateBody = TemplateSchema.omit({ id: true, createdAt: true, status: true });
 
+/** Parse a boolean query parameter: "true" or "1" → true; everything else → false. */
+function parseBool(value?: string): boolean {
+  return value === "true" || value === "1";
+}
+
 @Controller("templates")
 export class TemplatesController {
   private readonly logger = new Logger(TemplatesController.name);
 
-  public constructor(private readonly templatesService: TemplatesService) {}
+  public constructor(
+    private readonly templatesService: TemplatesService,
+    private readonly postgres: PostgresService,
+  ) {}
 
   /**
    * GET /templates — list all templates for the current user.
+   * Pass ?includeArchived=true to include soft-deleted templates.
    */
   @Get()
-  public async findAll(): Promise<TemplateResponse[]> {
-    return this.templatesService.list(0);
+  public async findAll(
+    @Query("includeArchived") includeArchived?: string,
+  ): Promise<TemplateResponse[]> {
+    return this.templatesService.list(0, parseBool(includeArchived));
   }
 
   /**
@@ -33,6 +45,32 @@ export class TemplatesController {
     }
 
     return template;
+  }
+
+  /**
+   * GET /templates/:id/extracted-text — return the extracted text from the
+   * template's associated document analysis results.
+   */
+  @Get(":id/extracted-text")
+  public async getExtractedText(
+    @Param("id") id: string,
+  ): Promise<{ extractedText: string | null }> {
+    const template = await this.templatesService.findOne(0, id);
+
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const result = await client.query(
+        `SELECT extracted_text FROM analysis_results WHERE document_id = $1`,
+        [template.documentId],
+      );
+
+      if (result.rowCount === 0 || result.rows.length === 0) {
+        return { extractedText: null };
+      }
+
+      return {
+        extractedText: (result.rows[0].extracted_text as string) ?? null,
+      };
+    });
   }
 
   /**
@@ -84,5 +122,65 @@ export class TemplatesController {
     };
 
     return this.templatesService.create(data);
+  }
+
+  /**
+   * PATCH /templates/:id — rename a template.
+   * Validates the request body using UpdateTemplateNameSchema.
+   * Returns 409 if the new name conflicts with another template for the user.
+   */
+  @Patch(":id")
+  public async update(
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ): Promise<TemplateResponse> {
+    if (
+      body === null ||
+      body === undefined ||
+      typeof body !== "object" ||
+      Array.isArray(body)
+    ) {
+      throw new BadRequestException(
+        "El cuerpo de la solicitud debe incluir un campo name válido.",
+      );
+    }
+
+    const parsed = UpdateTemplateNameSchema.safeParse(body);
+
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0];
+      const path = firstError.path.join(".");
+      this.logger.warn(
+        `Template rename validation failed: path=${path}, message=${firstError.message}`,
+      );
+      throw new BadRequestException(
+        `Error de validación${path ? ` en "${path}"` : ""}: ${firstError.message}`,
+      );
+    }
+
+    return this.templatesService.updateName(0, id, parsed.data.name);
+  }
+
+  /**
+   * DELETE /templates/:id — soft-delete a template.
+   *
+   * Query params:
+   * - deleteSourceFile=true|false (default false) — also delete the source document and its file.
+   * - deleteGeneratedCases=true|false (default false) — archive cases generated from this template.
+   *
+   * Idempotent: returns 204 even if the template is already archived.
+   * Returns 404 if the template does not exist.
+   */
+  @Delete(":id")
+  @HttpCode(204)
+  public async remove(
+    @Param("id") id: string,
+    @Query("deleteSourceFile") deleteSourceFile?: string,
+    @Query("deleteGeneratedCases") deleteGeneratedCases?: string,
+  ): Promise<void> {
+    await this.templatesService.delete(0, id, {
+      deleteSourceFile: parseBool(deleteSourceFile),
+      deleteGeneratedCases: parseBool(deleteGeneratedCases),
+    });
   }
 }

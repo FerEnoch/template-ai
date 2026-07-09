@@ -467,6 +467,31 @@ describe("ReviewService", () => {
       expect(result.label).toBe("COMPRADOR");
       expect(mockOpenRouter.classifySpan).toHaveBeenCalledTimes(2);
     });
+
+    it("should retry once on INVALID_RESPONSE", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      vi.spyOn(mockOpenRouter, "classifySpan")
+        .mockRejectedValueOnce(new OpenRouterError("Invalid JSON response", "INVALID_RESPONSE"))
+        .mockResolvedValueOnce({
+          label: "VENDEDOR",
+          group: "PARTES",
+          value: "María López",
+        });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "María López",
+        sourceSpan: { start: 0, end: 11 },
+        context: "context",
+      });
+
+      expect(result.label).toBe("VENDEDOR");
+      expect(mockOpenRouter.classifySpan).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("createEntity", () => {

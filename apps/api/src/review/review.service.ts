@@ -213,8 +213,8 @@ export class ReviewService {
       return await this.openRouter.classifySpan(text, context);
     } catch (error) {
       if (error instanceof OpenRouterError) {
-        // Retry once on NETWORK_ERROR or API_ERROR (transient)
-        if (error.code === "NETWORK_ERROR" || error.code === "API_ERROR") {
+        // Retry once on NETWORK_ERROR, API_ERROR, or INVALID_RESPONSE (transient / malformed-output retry)
+        if (error.code === "NETWORK_ERROR" || error.code === "API_ERROR" || error.code === "INVALID_RESPONSE") {
           this.logger.warn(
             `classifySpan failed (${error.code}), retrying once...`,
           );

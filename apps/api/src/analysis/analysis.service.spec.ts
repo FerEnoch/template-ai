@@ -37,6 +37,7 @@ function makeEntityRecord(overrides: Partial<EntityRecord> = {}): EntityRecord {
     sourceSpan: { start: 142, end: 163 },
     reviewed: false,
     excluded: false,
+    userCreated: false,
     ...overrides,
   };
 }
@@ -51,6 +52,7 @@ function makeDocumentRecord(overrides: Partial<DocumentRecord> = {}): DocumentRe
     status: "uploaded",
     uploadedAt: new Date("2026-05-27T10:30:00.000Z"),
     filePath: "/uploads/test.pdf",
+    contentHash: null,
     ...overrides,
   };
 }

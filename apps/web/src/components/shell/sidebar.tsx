@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Home,
   FolderOpen,
-  FileText,
   Archive,
   BarChart3,
   Settings,
@@ -17,7 +16,6 @@ interface SidebarProps {
 const navItems = [
   { label: "Inicio", icon: Home, href: "/" },
   { label: "Biblioteca", icon: FolderOpen, href: "/biblioteca" },
-  { label: "Plantillas", icon: FileText, href: "#" },
   { label: "Archivo", icon: Archive, href: "#" },
   { label: "Plan y uso", icon: BarChart3, href: "#" },
   { label: "Configuración", icon: Settings, href: "#" },

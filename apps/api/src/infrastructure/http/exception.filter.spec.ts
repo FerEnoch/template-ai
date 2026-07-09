@@ -72,14 +72,43 @@ describe("HttpExceptionFilter", () => {
     expect(json).toHaveBeenCalledWith({ error: "email must be valid, name is required" });
   });
 
-  it("should return 500 with generic message for non-HttpException errors", () => {
+  it("should return 500 with user-safe message for non-HttpException errors", () => {
     const { host, status, json } = createMockHost();
     const exception = new Error("Something broke");
 
     filter.catch(exception, host);
 
     expect(status).toHaveBeenCalledWith(500);
-    expect(json).toHaveBeenCalledWith({ error: "Internal server error" });
+    expect(json).toHaveBeenCalledWith({
+      error: "Ocurrió un error inesperado. Intentá nuevamente.",
+    });
+  });
+
+  it("should map ECONNREFUSED to 503 Service Unavailable", () => {
+    const { host, status, json } = createMockHost();
+    const exception = Object.assign(new Error("connect ECONNREFUSED"), {
+      code: "ECONNREFUSED",
+    });
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(503);
+    expect(json).toHaveBeenCalledWith({
+      error: "Service temporarily unavailable. Please try again.",
+    });
+  });
+
+  it("should map AbortError to 504 Gateway Timeout", () => {
+    const { host, status, json } = createMockHost();
+    const exception = new Error("The operation was aborted");
+    exception.name = "AbortError";
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(504);
+    expect(json).toHaveBeenCalledWith({
+      error: "Request timed out. Please try again.",
+    });
   });
 
   it("should handle ServiceUnavailableException with custom object body (health check pattern)", () => {
@@ -102,5 +131,24 @@ describe("HttpExceptionFilter", () => {
 
     expect(status).toHaveBeenCalledWith(401);
     expect(json).toHaveBeenCalledWith({ error: "Unauthorized" });
+  });
+
+  it("should preserve errorType from custom exception response body", () => {
+    const { host, status, json } = createMockHost();
+    const exception = new HttpException(
+      {
+        message: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+        errorType: "NETWORK_ERROR",
+      },
+      502,
+    );
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(502);
+    expect(json).toHaveBeenCalledWith({
+      error: "No se pudo contactar al servicio de IA. Intentá nuevamente.",
+      errorType: "NETWORK_ERROR",
+    });
   });
 });

@@ -13,6 +13,7 @@ const mockEntity: Entity = {
   sourceSpan: { start: 10, end: 20 },
   reviewed: false,
   excluded: false,
+  userCreated: false,
 };
 
 const mockEntity2: Entity = {
@@ -24,6 +25,7 @@ const mockEntity2: Entity = {
   sourceSpan: { start: 30, end: 45 },
   reviewed: true,
   excluded: false,
+  userCreated: false,
 };
 
 describe("wizardReducer", () => {
