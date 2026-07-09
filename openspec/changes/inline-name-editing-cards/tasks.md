@@ -25,10 +25,10 @@ Delivery: `force-chained` / `feature-branch-chain`. Tracker `feature/inline-name
 
 ## PR 2 — `EditableTitle`
 
-- [ ] 2.1 Create `components/preview/EditableTitle.tsx` (`{ value, onSave, children, className, inputClassName, minLength, maxLength }`). Consumes `useInlineEdit`. Non-editing = `children` + `Pencil` icon on `group-hover`; icon click → `startEdit`; wrapper stops propagation.
-- [ ] 2.2 Input: `font-headline`, focus ring, `aria-invalid`, `aria-describedby`; respect overrides. Error via `errorClassName`.
-- [ ] 2.3 Add `EditableTitle.test.tsx`: icon hidden default + visible on hover; icon click focuses pre-filled input; Enter saves, Escape reverts, blur saves, blur-unchanged skips; < 3 inline error; rejection reverts; icon click does not bubble.
-- [ ] 2.4 Export from `preview/index.ts`. Typecheck + tests pass.
+- [x] 2.1 Create `components/preview/EditableTitle.tsx` (`{ value, onSave, children, className, inputClassName, minLength, maxLength }`). Consumes `useInlineEdit`. Non-editing = `children` + `Pencil` icon on `group-hover`; icon click → `startEdit`; wrapper stops propagation.
+- [x] 2.2 Input: `font-headline`, focus ring, `aria-invalid`, `aria-describedby`; respect overrides. Error via `errorClassName`.
+- [x] 2.3 Add `EditableTitle.test.tsx`: icon hidden default + visible on hover; icon click focuses pre-filled input; Enter saves, Escape reverts, blur saves, blur-unchanged skips; < 3 inline error; rejection reverts; icon click does not bubble.
+- [x] 2.4 Export from `preview/index.ts`. Typecheck + tests pass.
 
 ## PR 3 — Wire `/biblioteca/[id]` + `/nuevo/[templateId]`
 
