@@ -10,6 +10,7 @@ import {
   createCase,
   generateCase,
   fetchCase,
+  updateCase,
 } from "@/lib/api/cases";
 
 function NewCasePageContent() {
@@ -18,6 +19,7 @@ function NewCasePageContent() {
   const templateId = params.templateId as string;
   const {
     state,
+    dispatch,
     setTemplate,
     setCase,
     setLoading,
@@ -80,6 +82,15 @@ function NewCasePageContent() {
       );
     }
   }, [saveForm, setError, clearDraft, state.caseId]);
+
+  const handleRenameCase = useCallback(
+    async (name: string, signal?: AbortSignal) => {
+      if (!state.caseId) return;
+      await updateCase(state.caseId, { name }, signal);
+      dispatch({ type: "SET_CASE_NAME", payload: name });
+    },
+    [state.caseId, dispatch]
+  );
 
   const generationInFlight = useRef(false);
   const generateControllerRef = useRef<AbortController | null>(null);
@@ -167,7 +178,13 @@ function NewCasePageContent() {
     );
   }
 
-  return <NewCaseLayout onSave={handleSave} onGenerate={handleGenerate} />;
+  return (
+    <NewCaseLayout
+      onSave={handleSave}
+      onGenerate={handleGenerate}
+      onRename={handleRenameCase}
+    />
+  );
 }
 
 export default function NuevoCasoPage() {
