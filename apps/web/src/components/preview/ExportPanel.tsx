@@ -9,7 +9,8 @@ import { updateCase } from "@/lib/api/cases";
 
 export interface ExportPanelProps {
   readonly caseId: string;
-  readonly templateSlug: string;
+  readonly filenameSlug: string;
+  readonly displayTitle: string;
   readonly generatedText: string;
   readonly onExportStart?: (format: ExportFormat) => void;
   readonly onExportComplete?: () => void;
@@ -18,7 +19,8 @@ export interface ExportPanelProps {
 
 export function ExportPanel({
   caseId,
-  templateSlug,
+  filenameSlug,
+  displayTitle,
   generatedText,
   onExportStart,
   onExportComplete,
@@ -33,11 +35,11 @@ export function ExportPanel({
       setError(null);
       onExportStart?.(format);
       try {
-        const filename = buildFilename(templateSlug, caseId, format);
+        const filename = buildFilename(filenameSlug, caseId, format);
         const blob =
           format === "pdf"
-            ? generatePdf({ text: generatedText, title: templateSlug })
-            : await generateDocx({ text: generatedText, title: templateSlug });
+            ? generatePdf({ text: generatedText, title: displayTitle })
+            : await generateDocx({ text: generatedText, title: displayTitle });
 
         triggerDownload(blob, filename);
         await updateCase(caseId, { status: "exportado" });
@@ -53,7 +55,7 @@ export function ExportPanel({
         setExporting(null);
       }
     },
-    [caseId, generatedText, onExportComplete, onExportError, onExportStart, templateSlug]
+    [caseId, generatedText, onExportComplete, onExportError, onExportStart, filenameSlug, displayTitle]
   );
 
   const isExporting = exporting !== null;

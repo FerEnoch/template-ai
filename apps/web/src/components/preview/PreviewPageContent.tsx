@@ -142,6 +142,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     return null;
   }
 
+  const displayName = caseItem.name ?? caseItem.template.name;
   const generatedAt = new Date(caseItem.updatedAt).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "long",
@@ -207,7 +208,8 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
 
           <ExportPanel
             caseId={caseItem.id}
-            templateSlug={slugify(caseItem.name ?? caseItem.template.name)}
+            displayTitle={displayName}
+            filenameSlug={slugify(displayName)}
             generatedText={caseItem.generatedText}
             onExportStart={() => setIsExporting(true)}
             onExportComplete={() => {
