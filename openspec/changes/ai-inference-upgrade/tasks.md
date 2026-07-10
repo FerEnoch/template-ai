@@ -32,11 +32,11 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4: PR#4 — FewShotProvider + GroupsService
 
-- [ ] 4.1 RED `few-shot-provider.spec.ts`: 3-most-recent, excluded filtered, empty→"", budget truncate+WARNING
-- [ ] 4.2 GREEN `few-shot-provider.ts`: `getExamples`, `formatBlock`, 25% `AI_MAX_TOKENS` cap, query fail→""+WARNING
-- [ ] 4.3 RED `groups.service.spec.ts`: naming validation, approve→joins, reject→GENERAL
-- [ ] 4.4 GREEN `groups.service.ts`: `resolve`, `approve/reject` via `TemplatesRepository` + entity reassignment
-- [ ] 4.5 register both in `ai.module.ts`
+- [x] 4.1 RED `few-shot-provider.spec.ts`: 3-most-recent, excluded filtered, empty→"", budget truncate+WARNING
+- [x] 4.2 GREEN `few-shot-provider.ts`: `getExamples`, `formatBlock`, 25% `AI_MAX_TOKENS` cap, query fail→""+WARNING
+- [x] 4.3 RED `groups.service.spec.ts`: naming validation, approve→joins, reject→GENERAL
+- [x] 4.4 GREEN `groups.service.ts`: `resolve`, `approve/reject` via `TemplatesRepository` + entity reassignment
+- [x] 4.5 register both in `ai.module.ts`
 
 ## Phase 5: PR#5 — OpenRouterService + DocumentAnalysisService
 
