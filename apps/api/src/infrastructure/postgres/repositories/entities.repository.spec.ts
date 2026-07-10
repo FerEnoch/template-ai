@@ -32,6 +32,7 @@ const sampleRow: Record<string, unknown> = {
   confidence: "ALTA",
   source_span: { start: 0, end: 10 },
   reviewed: false,
+  reviewed_at: null,
   excluded: false,
   user_created: false,
 };
@@ -66,6 +67,7 @@ describe("EntitiesRepository", () => {
         confidence: "ALTA",
         sourceSpan: { start: 0, end: 10 },
         reviewed: false,
+        reviewedAt: null,
         excluded: false,
         userCreated: false,
       } satisfies EntityRecord);
@@ -302,6 +304,119 @@ describe("EntitiesRepository", () => {
         expect.stringContaining("user_created"),
         expect.arrayContaining([false]),
       );
+    });
+  });
+
+  describe("reviewedAt mapping", () => {
+    it("maps reviewed_at from the row", async () => {
+      const reviewedRow = { ...sampleRow, reviewed: true, reviewed_at: new Date("2026-01-15T10:30:00Z") };
+      const { client } = mockPoolClient([reviewedRow]);
+      repo = new EntitiesRepository(client);
+
+      const result = await repo.findById("550e8400-e29b-41d4-a716-446655440000");
+      expect(result).toEqual(
+        expect.objectContaining({
+          reviewed: true,
+          reviewedAt: new Date("2026-01-15T10:30:00Z"),
+        }),
+      );
+    });
+
+    it("maps null reviewed_at", async () => {
+      const { client } = mockPoolClient([sampleRow]);
+      repo = new EntitiesRepository(client);
+
+      const result = await repo.findById("550e8400-e29b-41d4-a716-446655440000");
+      expect(result).toEqual(expect.objectContaining({ reviewedAt: null }));
+    });
+  });
+
+  describe("update reviewedAt", () => {
+    it("sets reviewed_at to NOW() when reviewed transitions to true", async () => {
+      const reviewedAt = new Date("2026-01-15T10:30:00Z");
+      const updatedRow = { ...sampleRow, reviewed: true, reviewed_at: reviewedAt };
+      const { client, querySpy } = mockPoolClient([updatedRow]);
+      repo = new EntitiesRepository(client);
+
+      const result = await repo.update("550e8400-e29b-41d4-a716-446655440000", {
+        reviewed: true,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ reviewed: true, reviewedAt }));
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(/reviewed_at\s*=\s*NOW\(\)/i);
+    });
+
+    it("sets reviewed_at to NULL when reviewed transitions to false", async () => {
+      const updatedRow = { ...sampleRow, reviewed: false, reviewed_at: null };
+      const { client, querySpy } = mockPoolClient([updatedRow]);
+      repo = new EntitiesRepository(client);
+
+      const result = await repo.update("550e8400-e29b-41d4-a716-446655440000", {
+        reviewed: false,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ reviewed: false, reviewedAt: null }));
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(/reviewed_at\s*=\s*NULL/i);
+    });
+
+    it("leaves reviewed_at untouched when reviewed is not provided", async () => {
+      const reviewedAt = new Date("2026-01-15T10:30:00Z");
+      const updatedRow = { ...sampleRow, label: "Updated", reviewed_at: reviewedAt };
+      const { client, querySpy } = mockPoolClient([updatedRow]);
+      repo = new EntitiesRepository(client);
+
+      await repo.update("550e8400-e29b-41d4-a716-446655440000", { label: "Updated" });
+      const sql = querySpy.mock.calls[0][0] as string;
+      // Extract SET clause: everything between "SET" and "WHERE".
+      const setClause = sql.match(/SET\s+(.+?)\s+WHERE/s)?.[1] ?? "";
+      expect(setClause).not.toMatch(/reviewed_at/i);
+    });
+  });
+
+  describe("findReviewedForFewShot", () => {
+    it("queries reviewed non-excluded entities ordered by reviewed_at DESC with LIMIT 3", async () => {
+      const fewShotRows: Record<string, unknown>[] = [
+        {
+          ...sampleRow,
+          id: "550e8400-e29b-41d4-a716-446655440003",
+          reviewed: true,
+          reviewed_at: new Date("2026-01-15T12:00:00Z"),
+          label: "Most recent",
+        },
+        {
+          ...sampleRow,
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          reviewed: true,
+          reviewed_at: new Date("2026-01-15T11:00:00Z"),
+          label: "Second",
+        },
+      ];
+      const { client, querySpy } = mockPoolClient(fewShotRows);
+      repo = new EntitiesRepository(client);
+
+      const result = await repo.findReviewedForFewShot(42);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].label).toBe("Most recent");
+      expect(result[1].label).toBe("Second");
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(/reviewed\s*=\s*true/i);
+      expect(sql).toMatch(/excluded\s*=\s*false/i);
+      expect(sql).toMatch(/ORDER BY\s+(?:e\.)?reviewed_at\s+DESC/i);
+      expect(sql).toMatch(/LIMIT\s+3/i);
+      expect(querySpy).toHaveBeenCalledWith(expect.any(String), [42]);
+    });
+
+    it("returns empty array when no reviewed entities exist", async () => {
+      const { client, querySpy } = mockPoolClient([]);
+      repo = new EntitiesRepository(client);
+
+      const result = await repo.findReviewedForFewShot(42);
+
+      expect(result).toEqual([]);
+      expect(querySpy).toHaveBeenCalledWith(expect.any(String), [42]);
     });
   });
 });
