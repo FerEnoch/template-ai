@@ -8,7 +8,7 @@ import { VerificationChecklist } from "@/components/preview/VerificationChecklis
 import { ExportPanel } from "@/components/preview/ExportPanel";
 import { ExportSpinner } from "@/components/preview/ExportSpinner";
 import { fetchCase, generateCase, updateCase, ApiError } from "@/lib/api/cases";
-import type { CaseWithTemplate } from "@/lib/api/cases";
+import type { CaseWithTemplateResponse } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
@@ -31,7 +31,7 @@ interface PreviewPageContentProps {
 }
 
 export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) {
-  const [caseItem, setCaseItem] = useState<CaseWithTemplate | null>(null);
+  const [caseItem, setCaseItem] = useState<CaseWithTemplateResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [regenError, setRegenError] = useState<{
@@ -72,7 +72,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     setRegenError(null);
     try {
       const updated = await generateCase(caseId, regenerateController.signal);
-      setCaseItem(updated as CaseWithTemplate);
+      setCaseItem(updated as CaseWithTemplateResponse);
     } catch (err) {
       // Aborted fetches are expected on unmount / cleanup; don't surface them.
       if (err instanceof Error && err.name === "AbortError") {
@@ -99,7 +99,32 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
       setCaseItem(
         (current) =>
           current
-            ? ({ ...current, name: updated.name, updatedAt: updated.updatedAt } as CaseWithTemplate)
+            ? ({ ...current, name: updated.name, updatedAt: updated.updatedAt } as CaseWithTemplateResponse)
+            : current
+      );
+    },
+    [caseId]
+  );
+
+  const handleRenameContentTitle = useCallback(
+    async (value: string, signal?: AbortSignal) => {
+      const updated = await updateCase(
+        caseId,
+        { contentTitle: value },
+        signal
+      );
+      setCaseItem(
+        (current) =>
+          current
+            ? ({
+                ...current,
+                contentTitle: updated.contentTitle ?? null,
+                effectiveTitle:
+                  updated.contentTitle ??
+                  updated.name ??
+                  current.template.name,
+                updatedAt: updated.updatedAt,
+              } as CaseWithTemplateResponse)
             : current
       );
     },
@@ -142,7 +167,8 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     return null;
   }
 
-  const displayName = caseItem.name ?? caseItem.template.name;
+  const effectiveTitle =
+    caseItem.contentTitle ?? caseItem.name ?? caseItem.template.name;
   const generatedAt = new Date(caseItem.updatedAt).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "long",
@@ -200,6 +226,9 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
               )
             }
             onRenameTitle={handleRenameTitle}
+            contentTitle={caseItem.contentTitle}
+            onRenameContentTitle={handleRenameContentTitle}
+            contentTitleFallback={caseItem.name ?? caseItem.template.name}
           />
         </div>
 
@@ -208,8 +237,8 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
 
           <ExportPanel
             caseId={caseItem.id}
-            displayTitle={displayName}
-            filenameSlug={slugify(displayName)}
+            displayTitle={effectiveTitle}
+            filenameSlug={slugify(effectiveTitle)}
             generatedText={caseItem.generatedText}
             onExportStart={() => setIsExporting(true)}
             onExportComplete={() => {

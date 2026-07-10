@@ -8,6 +8,11 @@ import type {
 
 export type { CaseWithTemplate };
 
+export interface CaseWithTemplateResponse extends CaseWithTemplate {
+  contentTitle: string | null;
+  effectiveTitle: string;
+}
+
 export interface ExtractedTextResponse {
   extractedText: string | null;
 }
@@ -161,9 +166,9 @@ export async function createCase(
   return handleResponse<Case>(response);
 }
 
-export async function fetchCase(id: string): Promise<CaseWithTemplate> {
+export async function fetchCase(id: string): Promise<CaseWithTemplateResponse> {
   const response = await safeFetch(`/api/cases/${id}`);
-  return handleResponse<CaseWithTemplate>(response);
+  return handleResponse<CaseWithTemplateResponse>(response);
 }
 
 export async function updateCase(

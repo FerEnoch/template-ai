@@ -15,6 +15,12 @@ export interface DocumentViewerProps {
     name: string,
     signal?: AbortSignal
   ) => Promise<void>;
+  readonly contentTitle?: string | null;
+  readonly onRenameContentTitle?: (
+    value: string,
+    signal?: AbortSignal
+  ) => Promise<void>;
+  readonly contentTitleFallback?: string;
 }
 
 export function DocumentViewer({
@@ -23,6 +29,9 @@ export function DocumentViewer({
   generatedText,
   onUpdate,
   onRenameTitle,
+  contentTitle,
+  onRenameContentTitle,
+  contentTitleFallback,
 }: DocumentViewerProps) {
   const [paragraphs, setParagraphs] = useState<string[]>(() =>
     splitParagraphs(generatedText)
@@ -77,6 +86,30 @@ export function DocumentViewer({
           <h1 className="font-headline text-3xl font-bold text-center mb-16 tracking-tight text-stone-900">
             {title}
           </h1>
+        )}
+
+        {onRenameContentTitle && (
+          <div className="text-center mb-10">
+            <p className="text-[11px] font-label font-bold text-stone-400 uppercase tracking-widest mb-2">
+              Título del documento
+            </p>
+            <EditableTitle
+              value={contentTitle ?? ""}
+              onSave={onRenameContentTitle}
+              className="inline-block"
+              inputClassName="w-full rounded-md border border-border bg-surface px-2 py-1 text-center font-headline text-xl font-bold leading-tight text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {contentTitle ? (
+                <h2 className="font-headline text-xl font-bold text-center tracking-tight text-stone-900">
+                  {contentTitle}
+                </h2>
+              ) : (
+                <h2 className="font-headline text-xl font-bold text-center tracking-tight text-stone-400">
+                  {contentTitleFallback}
+                </h2>
+              )}
+            </EditableTitle>
+          </div>
         )}
 
         {error && (
