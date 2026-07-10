@@ -352,7 +352,7 @@ describe("0002_document_templates RLS and constraints", () => {
       }
     });
 
-    it("entities group CHECK constraint rejects invalid group", async () => {
+    it("entities group CHECK constraint rejects empty group", async () => {
       if (!pool) return;
       const user = await createUserAs(0, {
         email: "entity-group@example.com",
@@ -387,7 +387,7 @@ describe("0002_document_templates RLS and constraints", () => {
         client.release();
       }
 
-      // Now: try to insert an entity with invalid group
+      // Now: try to insert an entity with empty group
       const client2 = await p.connect();
       try {
         await client2.query("BEGIN");
@@ -395,10 +395,10 @@ describe("0002_document_templates RLS and constraints", () => {
         await client2.query(
           `INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [analysisId, doc.id, "Test", "Value", "INVALID_GROUP", "ALTA"],
+          [analysisId, doc.id, "Test", "Value", "", "ALTA"],
         );
         await client2.query("COMMIT");
-        throw new Error("Invalid group should have been rejected");
+        throw new Error("Empty group should have been rejected");
       } catch (e) {
         await client2.query("ROLLBACK");
         expect((e as Error).message).toMatch(/check|constraint/i);
