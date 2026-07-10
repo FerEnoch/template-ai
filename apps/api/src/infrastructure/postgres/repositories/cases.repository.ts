@@ -7,6 +7,7 @@ export interface CaseRecord {
   templateId: string;
   status: string;
   name: string | null;
+  contentTitle: string | null;
   formData: Record<string, string>;
   generatedText: string | null;
   createdAt: Date;
@@ -20,7 +21,7 @@ export interface CreateCaseInput {
 }
 
 const CASE_SELECT = `
-  c.id, c.user_id, c.template_id, c.status, c.name, c.form_data, c.generated_text, c.created_at, c.updated_at,
+  c.id, c.user_id, c.template_id, c.status, c.name, c.content_title, c.form_data, c.generated_text, c.created_at, c.updated_at,
   t.id AS t_id, t.user_id AS t_user_id, t.name AS t_name, t.description AS t_description,
   t.document_id AS t_document_id, t.category AS t_category, t.status AS t_status,
   t.entities AS t_entities, t.created_at AS t_created_at, t.deleted_at AS t_deleted_at
@@ -37,6 +38,7 @@ function rowToCase(row: Record<string, unknown>): CaseRecord {
     templateId: row["template_id"] as string,
     status: row["status"] as string,
     name: (row["name"] as string | null | undefined) ?? null,
+    contentTitle: (row["content_title"] as string | null | undefined) ?? null,
     formData:
       typeof formData === "string"
         ? (JSON.parse(formData) as Record<string, string>)
@@ -259,6 +261,32 @@ export class CasesRepository {
         ${CASE_JOIN}
       `,
       [name, id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToCase(result.rows[0]);
+  }
+
+  async updateContentTitle(
+    id: string,
+    contentTitle: string | null,
+  ): Promise<CaseRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        WITH updated AS (
+          UPDATE casos
+          SET content_title = $1, updated_at = now()
+          WHERE id = $2
+          RETURNING *
+        )
+        SELECT ${CASE_SELECT}
+        FROM updated c
+        ${CASE_JOIN}
+      `,
+      [contentTitle, id],
     );
 
     if (result.rowCount === 0 || result.rows.length === 0) {
