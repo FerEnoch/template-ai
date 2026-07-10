@@ -734,4 +734,125 @@ describe("CasesService", () => {
       }
     });
   });
+
+  describe("updateContentTitle", () => {
+    it("should update content title and return effectiveTitle", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Display Name",
+        contentTitle: null,
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Display Name",
+        contentTitle: "Document Title",
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateContentTitle(0, "case-uuid-1", "Document Title");
+
+      expect(result.contentTitle).toBe("Document Title");
+      expect(result.effectiveTitle).toBe("Document Title");
+    });
+
+    it("should fall back to name when contentTitle is null", async () => {
+      const existing = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Display Name",
+        contentTitle: "Old Title",
+        status: "borrador",
+      });
+      const updated = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Display Name",
+        contentTitle: null,
+        status: "borrador",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: existing,
+        updateRecord: updated,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateContentTitle(0, "case-uuid-1", null);
+
+      expect(result.contentTitle).toBeNull();
+      expect(result.effectiveTitle).toBe("Display Name");
+    });
+
+    it("should throw NotFoundException when case does not exist", async () => {
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: null,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      await expect(
+        service.updateContentTitle(0, "non-existent", "New Title"),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("mapToResponse — effectiveTitle chain", () => {
+    it("should use contentTitle when set", async () => {
+      const record = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Display Name",
+        contentTitle: "Content Title",
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: record,
+        updateRecord: record,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", "Display Name");
+
+      expect(result.effectiveTitle).toBe("Content Title");
+    });
+
+    it("should fall back to name when contentTitle is null", async () => {
+      const record = makeCaseRecord({
+        id: "case-uuid-1",
+        name: "Display Name",
+        contentTitle: null,
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: record,
+        updateRecord: record,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", "Display Name");
+
+      expect(result.effectiveTitle).toBe("Display Name");
+    });
+
+    it("should fall back to template name when both contentTitle and name are null", async () => {
+      const record = makeCaseRecord({
+        id: "case-uuid-1",
+        name: null,
+        contentTitle: null,
+      });
+
+      const { mockPostgres } = createMockPostgresService({
+        findByIdRecord: record,
+        updateRecord: record,
+      });
+      const service = new CasesService(mockPostgres, mockGenerationService);
+
+      const result = await service.updateName(0, "case-uuid-1", null);
+
+      expect(result.effectiveTitle).toBe("Test Template");
+    });
+  });
 });
