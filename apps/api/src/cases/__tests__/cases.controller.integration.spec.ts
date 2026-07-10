@@ -489,6 +489,74 @@ describe("CasesController integration", () => {
       );
     });
 
+    // @requires backend RUN_INTEGRATION=1
+    it("should update contentTitle independently from name", async () => {
+      if (!app || !pool) return;
+
+      const user = await createUserAs(0, {
+        email: "cases-content-title@example.com",
+        displayName: "Cases ContentTitle",
+        externalSubject: "subj_cases_content_title",
+      });
+      const { templateId } = await insertDocumentAndTemplate(user.id);
+
+      const createRes = await new Promise<{ status: number; body: unknown }>(
+        (resolve) => {
+          const req = http().request(
+            "POST",
+            "/api/cases",
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: JSON.parse(data),
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({ templateId }));
+          req.end();
+        },
+      );
+
+      expect(createRes.status).toBe(201);
+      const caseId = (createRes.body as Record<string, unknown>).id as string;
+
+      const patchRes = await new Promise<{ status: number; body: unknown }>(
+        (resolve) => {
+          const req = http().request(
+            "PATCH",
+            `/api/cases/${caseId}`,
+            (res: IncomingMessage) => {
+              let data = "";
+              res.on("data", (chunk: string) => (data += chunk));
+              res.on("end", () =>
+                resolve({
+                  status: res.statusCode ?? 0,
+                  body: data ? JSON.parse(data) : {},
+                }),
+              );
+            },
+          );
+          req.setHeader("Content-Type", "application/json");
+          req.write(JSON.stringify({
+            name: "Card Display Name",
+            contentTitle: "Document Internal Title",
+          }));
+          req.end();
+        },
+      );
+
+      expect(patchRes.status).toBe(200);
+      const body = patchRes.body as Record<string, unknown>;
+      expect(body.name).toBe("Card Display Name");
+      expect(body.contentTitle).toBe("Document Internal Title");
+      expect(body.effectiveTitle).toBe("Document Internal Title");
+    });
+
     it("should return 404 when renaming a case owned by another user", async () => {
       if (!app || !pool) return;
 
