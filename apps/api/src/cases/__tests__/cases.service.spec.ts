@@ -56,6 +56,7 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
     templateId: "tmpl-uuid-1",
     status: "borrador",
     name: null,
+    contentTitle: null,
     formData: {},
     generatedText: null,
     createdAt: new Date("2025-06-01T10:00:00Z"),

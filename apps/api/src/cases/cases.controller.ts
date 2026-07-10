@@ -127,6 +127,15 @@ export class CasesController {
       result = await this.casesService.updateName(0, id, parsed.data.name);
     }
 
+    // Update the content title independently of the display name.
+    if (parsed.data.contentTitle !== undefined) {
+      result = await this.casesService.updateContentTitle(
+        0,
+        id,
+        parsed.data.contentTitle,
+      );
+    }
+
     // If only status is provided and it's 'archivado', archive the case
     if (parsed.data.status === "archivado" && !parsed.data.formData) {
       result = await this.casesService.archive(0, id);

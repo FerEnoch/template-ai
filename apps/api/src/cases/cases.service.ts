@@ -23,6 +23,8 @@ export interface CaseResponse {
   templateId: string;
   status: string;
   name: string | null;
+  contentTitle: string | null;
+  effectiveTitle: string;
   formData: Record<string, string>;
   generatedText: string | null;
   createdAt: string;
@@ -39,6 +41,7 @@ export interface UpdateCaseData {
   status?: string;
   name?: string | null;
   generatedText?: string;
+  contentTitle?: string | null;
 }
 
 /**
@@ -257,6 +260,33 @@ export class CasesService {
   }
 
   /**
+   * Update the content title of a case. This title is used for the exported
+   * document heading and filename, independently of the display name.
+   */
+  async updateContentTitle(
+    userId: number,
+    id: string,
+    contentTitle: string | null,
+  ): Promise<CaseResponse> {
+    return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
+      const repo = new CasesRepository(client);
+      const existing = await repo.findById(id);
+
+      if (!existing) {
+        throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      const updated = await repo.updateContentTitle(id, contentTitle);
+
+      if (!updated) {
+        throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      return this.mapToResponse(updated);
+    });
+  }
+
+  /**
    * Archive a case by setting status to 'archivado'.
    */
   async archive(userId: number, id: string): Promise<CaseResponse> {
@@ -416,12 +446,17 @@ export class CasesService {
       throw new NotFoundException(`Template for case "${record.id}" not found`);
     }
 
+    const contentTitle = record.contentTitle ?? null;
+    const name = record.name ?? null;
+
     return {
       id: record.id,
       userId: record.userId,
       templateId: record.templateId,
       status: record.status,
-      name: record.name ?? null,
+      name,
+      contentTitle,
+      effectiveTitle: contentTitle ?? name ?? record.template.name,
       formData: record.formData,
       generatedText: record.generatedText,
       createdAt: record.createdAt.toISOString(),
