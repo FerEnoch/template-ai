@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 export class PromptTemplateNotFoundError extends Error {
   constructor(public readonly name: string) {
@@ -29,9 +28,7 @@ export class PromptEngine {
   private readonly promptsDir: string;
 
   constructor(promptsDir?: string) {
-    this.promptsDir =
-      promptsDir ??
-      resolve(dirname(fileURLToPath(import.meta.url)), "prompts");
+    this.promptsDir = promptsDir ?? resolve(__dirname, "prompts");
   }
 
   private resolvePath(name: string): string {
