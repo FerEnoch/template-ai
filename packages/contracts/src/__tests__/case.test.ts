@@ -105,6 +105,36 @@ describe("CaseSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts contentTitle as a string", () => {
+    const result = CaseSchema.safeParse({
+      ...validCase,
+      contentTitle: "Compraventa",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBe("Compraventa");
+    }
+  });
+
+  it("accepts contentTitle as null", () => {
+    const result = CaseSchema.safeParse({
+      ...validCase,
+      contentTitle: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBeNull();
+    }
+  });
+
+  it("accepts missing contentTitle", () => {
+    const result = CaseSchema.safeParse(validCase);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBeUndefined();
+    }
+  });
 });
 
 describe("CreateCaseRequestSchema", () => {
@@ -184,6 +214,36 @@ describe("UpdateCaseFormDataSchema", () => {
       name: "a".repeat(201),
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts optional contentTitle for renaming", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      contentTitle: "Compraventa",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBe("Compraventa");
+    }
+  });
+
+  it("accepts contentTitle as null", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      contentTitle: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBeNull();
+    }
+  });
+
+  it("accepts PATCH with contentTitle", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      contentTitle: "X",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBe("X");
+    }
   });
 });
 
