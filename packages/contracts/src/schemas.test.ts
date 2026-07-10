@@ -8,6 +8,10 @@ import {
   MANUAL_ENTITY_LIMIT,
   UpdateTemplateNameSchema,
   CaseSchema,
+  TemplateSchema,
+  SEED_GROUPS,
+  GENERAL,
+  OTROS,
 } from "./schemas.js";
 
 describe("EntitySchema", () => {
@@ -187,6 +191,151 @@ describe("MANUAL_ENTITY_LIMIT", () => {
   });
 });
 
+describe("EntitySchema group widening", () => {
+  const baseEntity = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    label: "COMPRADOR",
+    value: "María González López",
+    confidence: "ALTA" as const,
+    reviewed: false,
+  };
+
+  it("accepts seed group PARTES", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, group: "PARTES" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts GENERAL group", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, group: "GENERAL" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts OTROS group", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, group: "OTROS" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts dynamic group", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, group: "JORNADA" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.group).toBe("JORNADA");
+    }
+  });
+
+  it("rejects empty group", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, group: "" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects whitespace-only group", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, group: "   " });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("EntitySchema reviewedAt", () => {
+  const baseEntity = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    label: "COMPRADOR",
+    value: "María González López",
+    group: "PARTES" as const,
+    confidence: "ALTA" as const,
+    reviewed: true,
+  };
+
+  it("accepts reviewedAt ISO datetime", () => {
+    const result = EntitySchema.safeParse({
+      ...baseEntity,
+      reviewedAt: "2026-01-15T10:30:00Z",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reviewedAt).toBe("2026-01-15T10:30:00Z");
+    }
+  });
+
+  it("accepts reviewedAt as null", () => {
+    const result = EntitySchema.safeParse({ ...baseEntity, reviewedAt: null });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reviewedAt).toBeNull();
+    }
+  });
+
+  it("accepts entity without reviewedAt for backward compat", () => {
+    const result = EntitySchema.safeParse(baseEntity);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reviewedAt).toBeUndefined();
+    }
+  });
+});
+
+describe("TemplateSchema suggestedGroupsStatus", () => {
+  const baseTemplate = {
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    name: "Contrato",
+    description: "",
+    documentId: "660e8400-e29b-41d4-a716-446655440001",
+    entities: [],
+    category: "legal",
+    createdAt: "2025-01-01T00:00:00.000Z",
+    status: "draft" as const,
+  };
+
+  it("accepts suggestedGroupsStatus with pending group", () => {
+    const result = TemplateSchema.safeParse({
+      ...baseTemplate,
+      suggestedGroupsStatus: { JORNADA: "pending" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.suggestedGroupsStatus).toEqual({ JORNADA: "pending" });
+    }
+  });
+
+  it("accepts suggestedGroupsStatus with approved and rejected groups", () => {
+    const result = TemplateSchema.safeParse({
+      ...baseTemplate,
+      suggestedGroupsStatus: { JORNADA: "approved", FALTAS: "rejected" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts template without suggestedGroupsStatus for backward compat", () => {
+    const result = TemplateSchema.safeParse(baseTemplate);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.suggestedGroupsStatus).toBeUndefined();
+    }
+  });
+
+  it("rejects invalid suggestedGroupsStatus value", () => {
+    const result = TemplateSchema.safeParse({
+      ...baseTemplate,
+      suggestedGroupsStatus: { JORNADA: "unknown" },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("SEED_GROUPS constants", () => {
+  it("exports seed groups including GENERAL and OTROS", () => {
+    expect(SEED_GROUPS).toContain("PARTES");
+    expect(SEED_GROUPS).toContain("INMUEBLE");
+    expect(SEED_GROUPS).toContain("FECHAS");
+    expect(SEED_GROUPS).toContain("ANEXOS");
+    expect(SEED_GROUPS).toContain("GENERAL");
+    expect(SEED_GROUPS).toContain("OTROS");
+  });
+
+  it("exports GENERAL and OTROS constants", () => {
+    expect(GENERAL).toBe("GENERAL");
+    expect(OTROS).toBe("OTROS");
+  });
+});
+
 describe("ClassifySpanRequestSchema", () => {
   it("parses a valid request", () => {
     const result = ClassifySpanRequestSchema.safeParse({
@@ -345,16 +494,25 @@ describe("ClassifySpanResponseSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects invalid group", () => {
+  it("rejects empty group", () => {
     const result = ClassifySpanResponseSchema.safeParse({
       label: "COMPRADOR",
-      group: "INVALID",
+      group: "",
       value: "Juan Pérez",
     });
     expect(result.success).toBe(false);
   });
 
-  it("accepts all valid groups", () => {
+  it("rejects whitespace-only group", () => {
+    const result = ClassifySpanResponseSchema.safeParse({
+      label: "COMPRADOR",
+      group: "   ",
+      value: "Juan Pérez",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts all seed groups", () => {
     for (const group of ["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]) {
       const result = ClassifySpanResponseSchema.safeParse({
         label: "FIELD",
@@ -363,5 +521,23 @@ describe("ClassifySpanResponseSchema", () => {
       });
       expect(result.success).toBe(true);
     }
+  });
+
+  it("accepts GENERAL group", () => {
+    const result = ClassifySpanResponseSchema.safeParse({
+      label: "Lugar",
+      group: "GENERAL",
+      value: "Av. Central 123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts dynamic group", () => {
+    const result = ClassifySpanResponseSchema.safeParse({
+      label: "Jornada",
+      group: "JORNADA",
+      value: "8 horas",
+    });
+    expect(result.success).toBe(true);
   });
 });

@@ -1,5 +1,22 @@
 import { z } from "zod";
 
+// Seed groups used across the app for entity classification.
+export const PARTES = "PARTES" as const;
+export const INMUEBLE = "INMUEBLE" as const;
+export const FECHAS = "FECHAS" as const;
+export const ANEXOS = "ANEXOS" as const;
+export const GENERAL = "GENERAL" as const;
+export const OTROS = "OTROS" as const;
+
+export const SEED_GROUPS = [
+  PARTES,
+  INMUEBLE,
+  FECHAS,
+  ANEXOS,
+  GENERAL,
+  OTROS,
+] as const;
+
 // Document schema: represents an uploaded file awaiting analysis
 export const DocumentSchema = z.object({
   id: z.string().uuid(),
@@ -20,7 +37,9 @@ export const EntitySchema = z.object({
   id: z.string().uuid(),
   label: z.string(),
   value: z.string(),
-  group: z.enum(["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]),
+  group: z.string().min(1).refine((v) => v.trim().length > 0, {
+    message: "Group cannot be whitespace-only",
+  }),
   confidence: z.enum(["ALTA", "MEDIA", "BAJA"]),
   sourceSpan: z
     .object({
@@ -29,6 +48,7 @@ export const EntitySchema = z.object({
     })
     .optional(),
   reviewed: z.boolean().default(false),
+  reviewedAt: z.string().datetime().nullable().optional(),
   excluded: z.boolean().default(false),
   userCreated: z.boolean().default(false),
 });
@@ -49,7 +69,9 @@ export const ClassifySpanRequestSchema = z.object({
 // Classify span response: AI-inferred entity fields
 export const ClassifySpanResponseSchema = z.object({
   label: z.string().min(1),
-  group: z.enum(["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]),
+  group: z.string().min(1).refine((v) => v.trim().length > 0, {
+    message: "Group cannot be whitespace-only",
+  }),
   value: z.string(),
 });
 
@@ -74,6 +96,9 @@ export const TemplateSchema = z.object({
   category: z.string(),
   createdAt: z.string().datetime(),
   status: z.enum(["draft", "published", "archived"]),
+  suggestedGroupsStatus: z
+    .record(z.enum(["pending", "approved", "rejected"]))
+    .optional(),
 });
 
 // Wizard draft schema: transient form state for the wizard flow
