@@ -8,10 +8,21 @@ import { HttpExceptionFilter } from "./infrastructure/http/exception.filter";
 
 // Timeout configuration for long-running AI generation requests.
 //
-// server.requestTimeout (120s): Maximum time to receive the complete HTTP
-//   request headers + body. The Node.js HTTP server destroys the socket when
-//   this fires — even for in-flight responses, NOT just request reception.
-//   This was the root cause of the original ECONNRESET crash on /generate.
+// Phase 1 (sync /generate): server.requestTimeout is temporarily raised to
+// 300s so the synchronous POST /cases/:id/generate endpoint can survive its
+// worst-case AI retry budget (~150s = 3 attempts × ~48s + backoff). This is a
+// documented band-aid; it will be reverted to 30s in Phase 2 when /generate
+// becomes async (202 Accepted) via the async-document-generation change.
+// See openspec/changes/fix-generation-delay-ui-message/specs/local-operational-infra/spec.md
+//
+// TODO(Phase2): revert REQUEST_TIMEOUT_MS to 30 * 1000 once /generate becomes
+// async (202 Accepted). Remove this comment block update.
+//
+// server.requestTimeout (300s Phase 1 / 30s Phase 2): Maximum time to receive
+//   the complete HTTP request headers + body. The Node.js HTTP server destroys
+//   the socket when this fires — even for in-flight responses, NOT just request
+//   reception. This was the root cause of the original ECONNRESET crash on
+//   /generate.
 //
 // server.timeout (0 = disabled): Socket inactivity timer. DELIBERATELY kept
 //   at 0 because during AI generation (OpenRouter, 30-60s + retries) NO bytes
@@ -30,7 +41,8 @@ import { HttpExceptionFilter } from "./infrastructure/http/exception.filter";
 //
 // Reference: https://nodejs.org/api/http.html#servertimeout
 // server.timeout is deprecated since Node 18; prefer server.requestTimeout.
-const REQUEST_TIMEOUT_MS = 120 * 1000;
+// TODO(Phase2): revert to 30s once /generate becomes async (202 Accepted)
+const REQUEST_TIMEOUT_MS = 300 * 1000;
 const SOCKET_TIMEOUT_MS = 0; // disabled — see explanation above
 const KEEP_ALIVE_TIMEOUT_MS = 75 * 1000;
 const HEADERS_TIMEOUT_MS = 76 * 1000;
