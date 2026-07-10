@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { Logger } from "@nestjs/common";
 
 const originalEnv = { ...process.env };
 
@@ -11,6 +12,7 @@ beforeEach(() => {
   process.env.OPENROUTER_API_KEY = "sk-or-test-key-123";
   process.env.REDIS_HOST = "localhost";
   process.env.REDIS_PORT = "6379";
+  process.env.AI_MODEL = "openai/gpt-4o-mini";
 });
 
 afterEach(() => {
@@ -122,5 +124,83 @@ describe("UPLOAD_DIR", () => {
     const { UPLOAD_DIR } = await import("./ai.js");
 
     expect(UPLOAD_DIR).toBe("/tmp/test-uploads");
+  });
+});
+
+describe("AI_CONFIG.router", () => {
+  it("is null when AI_MODEL_ROUTER_ENABLED is not set", async () => {
+    delete process.env.AI_MODEL_ROUTER_ENABLED;
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.router).toBeNull();
+  });
+
+  it("is null when AI_MODEL_ROUTER_ENABLED is false", async () => {
+    process.env.AI_MODEL_ROUTER_ENABLED = "false";
+    process.env.AI_MODEL_EXTRACTION = "openai/gpt-4o";
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.router).toBeNull();
+  });
+
+  it("exposes per-task models and fallback when router is enabled", async () => {
+    process.env.AI_MODEL_ROUTER_ENABLED = "true";
+    process.env.AI_MODEL_EXTRACTION = "openai/gpt-4o";
+    process.env.AI_MODEL_CLASSIFICATION = "anthropic/claude-3-haiku";
+    process.env.AI_MODEL_GENERATION = "google/gemma-4-31b-it:free";
+    process.env.AI_MODEL_FALLBACK = "openai/gpt-4o-mini";
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.router).toEqual({
+      extraction: "openai/gpt-4o",
+      classification: "anthropic/claude-3-haiku",
+      generation: "google/gemma-4-31b-it:free",
+      fallback: "openai/gpt-4o-mini",
+    });
+  });
+
+  it("leaves per-task values undefined when router enabled but vars unset", async () => {
+    process.env.AI_MODEL_ROUTER_ENABLED = "true";
+    delete process.env.AI_MODEL_EXTRACTION;
+    delete process.env.AI_MODEL_CLASSIFICATION;
+    delete process.env.AI_MODEL_GENERATION;
+    delete process.env.AI_MODEL_FALLBACK;
+
+    const warnSpy = vi
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.router).toEqual({
+      extraction: undefined,
+      classification: undefined,
+      generation: undefined,
+      fallback: undefined,
+    });
+    expect(warnSpy).toHaveBeenCalledTimes(3);
+
+    warnSpy.mockRestore();
+  });
+
+  it("throws at import time when router enabled but AI_MODEL is missing", async () => {
+    process.env.AI_MODEL_ROUTER_ENABLED = "true";
+    delete process.env.AI_MODEL;
+
+    await expect(import("./ai.js")).rejects.toThrow(
+      "AI_MODEL_ROUTER_ENABLED=true requires AI_MODEL to be set",
+    );
+  });
+
+  it("does not read router env vars when router is disabled", async () => {
+    process.env.AI_MODEL_ROUTER_ENABLED = "false";
+    process.env.AI_MODEL_EXTRACTION = "openai/gpt-4o";
+
+    const { AI_CONFIG } = await import("./ai.js");
+
+    expect(AI_CONFIG.router).toBeNull();
   });
 });

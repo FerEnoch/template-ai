@@ -26,9 +26,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: PR#3 — ModelRouter
 
-- [ ] 3.1 RED `model-router.spec.ts`: disabled→AI_MODEL, per-task, fallback dedup, both-unset+WARNING, bootstrap fail, dev ignores vars
-- [ ] 3.2 GREEN `model-router.ts`: `resolveModel`, `resolveModelChain`, `validateRouterConfig`, `AiTask`
-- [ ] 3.3 `config/ai.ts/spec.ts`: router vars + `AI_MODEL_FALLBACK`; bootstrap throws on router+!AI_MODEL
+- [x] 3.1 RED `model-router.spec.ts`: disabled→AI_MODEL, per-task, fallback dedup, both-unset+WARNING, bootstrap fail, dev ignores vars
+- [x] 3.2 GREEN `model-router.ts`: `resolveModel`, `resolveModelChain`, `validateRouterConfig`, `AiTask`
+- [x] 3.3 `config/ai.ts/spec.ts`: router vars + `AI_MODEL_FALLBACK`; bootstrap throws on router+!AI_MODEL
 
 ## Phase 4: PR#4 — FewShotProvider + GroupsService
 
