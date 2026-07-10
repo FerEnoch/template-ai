@@ -43,6 +43,7 @@ function makeEntityRecord(overrides: Partial<EntityRecord> = {}): EntityRecord {
     confidence: "ALTA",
     sourceSpan: { start: 142, end: 163 },
     reviewed: false,
+    reviewedAt: null,
     excluded: false,
     userCreated: false,
     ...overrides,

@@ -23,7 +23,8 @@ const CASE_SELECT = `
   c.id, c.user_id, c.template_id, c.status, c.name, c.form_data, c.generated_text, c.created_at, c.updated_at,
   t.id AS t_id, t.user_id AS t_user_id, t.name AS t_name, t.description AS t_description,
   t.document_id AS t_document_id, t.category AS t_category, t.status AS t_status,
-  t.entities AS t_entities, t.created_at AS t_created_at, t.deleted_at AS t_deleted_at
+  t.entities AS t_entities, t.suggested_groups_status AS t_suggested_groups_status,
+  t.created_at AS t_created_at, t.deleted_at AS t_deleted_at
 `;
 
 const CASE_JOIN = `LEFT JOIN templates t ON c.template_id = t.id`;
@@ -54,6 +55,8 @@ function rowToCase(row: Record<string, unknown>): CaseRecord {
           category: row["t_category"] as string,
           status: row["t_status"] as string,
           entities: row["t_entities"] as unknown[],
+          suggestedGroupsStatus:
+            (row["t_suggested_groups_status"] as Record<string, string> | undefined) ?? {},
           createdAt: row["t_created_at"] as Date,
           deletedAt: (row["t_deleted_at"] as Date | null | undefined) ?? null,
         }

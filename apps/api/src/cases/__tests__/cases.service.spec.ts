@@ -69,6 +69,7 @@ function makeCaseRecord(overrides: Partial<CaseRecord> = {}): CaseRecord {
       category: "general",
       status: "published",
       entities: [],
+      suggestedGroupsStatus: {},
       createdAt: new Date("2025-06-01T10:00:00Z"),
       deletedAt: null,
     },
