@@ -13,8 +13,8 @@ Chain strategy: feature-branch-chain
 
 - [x] 1.1 `ExportPanel.tsx`: rename `templateSlug`→`filenameSlug`; add `displayTitle`; pass as `title` to `generatePdf`/`generateDocx`; `filenameSlug`→`buildFilename`.
 - [x] 1.2 `PreviewPageContent.tsx`: pass `displayTitle={name ?? template.name}` + `filenameSlug={slugify(name ?? template.name)}` to ExportPanel.
-- [ ] 1.3 RED `ExportPanel.test.tsx`: heading=`displayTitle`, filename=`filenameSlug` (mock generators).
-- [ ] 1.4 RED `PreviewPageContent.test.tsx`: props = `name ?? template.name` + `slugify(...)`.
+- [x] 1.3 RED `ExportPanel.test.tsx`: heading=`displayTitle`, filename=`filenameSlug` (mock generators).
+- [x] 1.4 RED `PreviewPageContent.test.tsx`: props = `name ?? template.name` + `slugify(...)`. 
 - [x] 1.5 GREEN `pnpm --filter web test` + `pnpm --filter web typecheck`. Open PR-5 → PR-4 branch.
 
 ## Phase 2 — PR-6 (full stack, base: PR-5 branch)
@@ -31,9 +31,9 @@ Chain strategy: feature-branch-chain
 
 - [ ] 2.10 RED `cases.test.ts`: `fetchCase` returns `effectiveTitle` per chain. **No backend** (mock fetch).
 - [x] 2.11 `DocumentViewer.tsx`: add `contentTitle?`, `onRenameContentTitle?`, `contentTitleFallback?` props. Render 2nd `<EditableTitle>` below h1, label `"Título del documento"`. Editor = raw; fallback muted when null.
-- [ ] 2.12 RED `DocumentViewer.test.tsx`: two EditableTitle; `onRenameContentTitle` on Enter; `onRenameTitle` unaffected; Escape cancels.
+- [x] 2.12 RED `DocumentViewer.test.tsx`: two EditableTitle; `onRenameContentTitle` on Enter; `onRenameTitle` unaffected; Escape cancels.
 - [x] 2.13 `PreviewPageContent.tsx`: `handleRenameContentTitle(v, sig?)` → `updateCase(id, { contentTitle: v }, sig)`. Pass `effectiveTitle`→`displayTitle` to ExportPanel. `contentTitleFallback={name ?? template.name}` to DocumentViewer.
-- [ ] 2.14 RED `PreviewPageContent.test.tsx`: `updateCase` called with `{ contentTitle }`; `displayTitle` = `effectiveTitle`.
+- [x] 2.14 RED `PreviewPageContent.test.tsx`: `updateCase` called with `{ contentTitle }`; `displayTitle` = `effectiveTitle`.
 - [ ] 2.15 RED `cases.service.test.ts`: `mapToResponse` 3-level chain; `updateContentTitle` round-trip. Mock repo. **No backend**.
 - [ ] 2.16 RED `cases.controller.test.ts`: PATCH `{ contentTitle }` routes. **No backend.**
 - [ ] 2.17 If integration tests exist, mark `@requires backend`; gate `RUN_INTEGRATION=1`.

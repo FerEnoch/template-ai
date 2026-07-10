@@ -126,4 +126,114 @@ describe("DocumentViewer", () => {
 
     expect(screen.getByTestId("editable-title-input")).toHaveValue(TITLE);
   });
+
+  it("renders two EditableTitle instances when both rename handlers are provided", () => {
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+        onRenameTitle={vi.fn().mockResolvedValue(undefined)}
+        onRenameContentTitle={vi.fn().mockResolvedValue(undefined)}
+        contentTitleFallback={TITLE}
+      />
+    );
+
+    expect(screen.getAllByTestId("editable-title-wrapper")).toHaveLength(2);
+  });
+
+  it("calls onRenameContentTitle with the new value and a signal on Enter", async () => {
+    const onRenameTitle = vi.fn().mockResolvedValue(undefined);
+    const onRenameContentTitle = vi.fn(
+      async (_value: string, _signal?: AbortSignal) => undefined
+    );
+
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+        onRenameTitle={onRenameTitle}
+        onRenameContentTitle={onRenameContentTitle}
+        contentTitle="Título original"
+        contentTitleFallback={TITLE}
+      />
+    );
+
+    const icons = screen.getAllByTestId("editable-title-icon");
+    fireEvent.click(icons[1]);
+
+    const input = screen.getAllByTestId("editable-title-input").at(-1);
+    expect(input).toBeDefined();
+    fireEvent.change(input!, { target: { value: "Nuevo título" } });
+    fireEvent.keyDown(input!, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => {
+      expect(onRenameContentTitle).toHaveBeenCalledWith(
+        "Nuevo título",
+        expect.any(AbortSignal)
+      );
+    });
+  });
+
+  it("does not call onRenameTitle when editing the content title", async () => {
+    const onRenameTitle = vi.fn().mockResolvedValue(undefined);
+    const onRenameContentTitle = vi.fn(
+      async (_value: string, _signal?: AbortSignal) => undefined
+    );
+
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+        onRenameTitle={onRenameTitle}
+        onRenameContentTitle={onRenameContentTitle}
+        contentTitle="Título original"
+        contentTitleFallback={TITLE}
+      />
+    );
+
+    const icons = screen.getAllByTestId("editable-title-icon");
+    fireEvent.click(icons[1]);
+
+    const input = screen.getAllByTestId("editable-title-input").at(-1);
+    expect(input).toBeDefined();
+    fireEvent.change(input!, { target: { value: "Nuevo título" } });
+    fireEvent.keyDown(input!, { key: "Enter", code: "Enter" });
+
+    await waitFor(() => {
+      expect(onRenameContentTitle).toHaveBeenCalledWith("Nuevo título", expect.any(AbortSignal));
+    });
+
+    expect(onRenameTitle).not.toHaveBeenCalled();
+  });
+
+  it("reverts the content title edit on Escape without calling onRenameContentTitle", () => {
+    const onRenameTitle = vi.fn().mockResolvedValue(undefined);
+    const onRenameContentTitle = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+        onRenameTitle={onRenameTitle}
+        onRenameContentTitle={onRenameContentTitle}
+        contentTitle="Título original"
+        contentTitleFallback={TITLE}
+      />
+    );
+
+    const icons = screen.getAllByTestId("editable-title-icon");
+    fireEvent.click(icons[1]);
+
+    const input = screen.getAllByTestId("editable-title-input").at(-1);
+    expect(input).toBeDefined();
+    fireEvent.change(input!, { target: { value: "Título abortado" } });
+    fireEvent.keyDown(input!, { key: "Escape", code: "Escape" });
+
+    expect(onRenameContentTitle).not.toHaveBeenCalled();
+    expect(screen.getByText("Título original")).toBeInTheDocument();
+  });
 });
