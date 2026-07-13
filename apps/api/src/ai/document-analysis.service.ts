@@ -4,6 +4,8 @@ import { extname } from "node:path";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
 import { CACHE_CONFIG } from "../config/ai.js";
+import { FewShotProvider } from "./few-shot-provider.js";
+import { GroupsService } from "./groups.service.js";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
@@ -17,6 +19,7 @@ export interface AnalyzeResult {
     confidence: string;
     sourceSpan?: { start: number; end: number };
   }>;
+  suggestedGroups?: string[];
   error?: string;
 }
 
@@ -82,6 +85,8 @@ export class DocumentAnalysisService {
   constructor(
     private readonly openRouterService: OpenRouterService,
     @Inject(CACHE_PORT) private readonly cachePort: CachePort,
+    private readonly fewShotProvider: FewShotProvider,
+    private readonly groupsService: GroupsService,
   ) {}
 
   /**
@@ -145,6 +150,8 @@ export class DocumentAnalysisService {
   async analyze(
     filePath: string | null,
     contentHash?: string,
+    userId?: number,
+    templateId?: string,
   ): Promise<AnalyzeResult> {
     if (!filePath) {
       return { success: false, error: "File not found" };
@@ -163,7 +170,11 @@ export class DocumentAnalysisService {
 
     // Call AI with retry on rate limit
     try {
-      const aiResult = await this.callAiWithRetry(fileContent);
+      const aiResult = await this.callAiWithRetry(
+        fileContent,
+        userId ?? 0,
+        templateId,
+      );
       const entities = aiResult.entities.map((e) => ({
         label: e.label,
         value: e.value,
@@ -178,6 +189,7 @@ export class DocumentAnalysisService {
         success: true,
         extractedText: fileContent,
         entities: correctedEntities,
+        suggestedGroups: aiResult.suggestedGroups,
       };
     } catch (error) {
       const message =
@@ -192,7 +204,17 @@ export class DocumentAnalysisService {
    * Primary model → (rate limit?) → fallback model → (rate limit?) → wait → retry.
    * Gives up after exhausting all attempts.
    */
-  private async callAiWithRetry(fileContent: string) {
+  private async callAiWithRetry(
+    fileContent: string,
+    userId: number,
+    templateId?: string,
+  ) {
+    // Build context-aware prompt inputs once.
+    const [fewShot, groups] = await Promise.all([
+      this.fewShotProvider.getExamples(userId),
+      this.groupsService.resolve(templateId),
+    ]);
+
     // Retryable error codes — transient failures worth re-attempting.
     // CONFIG_ERROR (bad API key, model not found) is NOT retried.
     const retryableCodes = ["RATE_LIMIT", "NETWORK_ERROR", "INVALID_RESPONSE"];
@@ -209,7 +231,12 @@ export class DocumentAnalysisService {
           );
           await sleep(delay);
         }
-        return await this.openRouterService.extractEntities(fileContent);
+        return await this.openRouterService.extractEntities({
+          documentText: fileContent,
+          userId,
+          groups,
+          fewShot,
+        });
       } catch (error) {
         lastError = error;
         if (

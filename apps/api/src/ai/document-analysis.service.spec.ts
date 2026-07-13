@@ -26,18 +26,34 @@ import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
 import type { AnalyzeResult } from "./document-analysis.service.js";
 import type { AiEntity } from "./open-router.service.js";
 import type { CachePort } from "../infrastructure/redis/index.js";
+import { FewShotProvider } from "./few-shot-provider.js";
+import { GroupsService } from "./groups.service.js";
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
 
 const mockExtractEntities = vi.fn();
+const mockGetExamples = vi.fn();
+const mockResolveGroups = vi.fn();
 
 // Create a mock OpenRouterService that delegates to our mock function
 function createMockOpenRouterService(): OpenRouterService {
   return {
     extractEntities: mockExtractEntities,
   } as unknown as OpenRouterService;
+}
+
+function createMockFewShotProvider(): FewShotProvider {
+  return {
+    getExamples: mockGetExamples,
+  } as unknown as FewShotProvider;
+}
+
+function createMockGroupsService(): GroupsService {
+  return {
+    resolve: mockResolveGroups,
+  } as unknown as GroupsService;
 }
 
 function createMockCachePort(): CachePort {
@@ -75,13 +91,22 @@ vi.mock("mammoth", () => ({
 describe("DocumentAnalysisService", () => {
   let service: DocumentAnalysisService;
   let mockOpenRouter: OpenRouterService;
+  let mockFewShotProvider: FewShotProvider;
+  let mockGroupsService: GroupsService;
   let mockCachePort: CachePort;
 
   beforeEach(() => {
     vi.resetAllMocks();
     mockOpenRouter = createMockOpenRouterService();
+    mockFewShotProvider = createMockFewShotProvider();
+    mockGroupsService = createMockGroupsService();
     mockCachePort = createMockCachePort();
-    service = new DocumentAnalysisService(mockOpenRouter, mockCachePort);
+    service = new DocumentAnalysisService(
+      mockOpenRouter,
+      mockCachePort,
+      mockFewShotProvider,
+      mockGroupsService,
+    );
   });
 
   describe("analyze", () => {
@@ -92,6 +117,8 @@ describe("DocumentAnalysisService", () => {
       ];
 
       mockExtractEntities.mockResolvedValue({ entities, rawResponse: "[]" });
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES", "INMUEBLE"]);
 
       const pdfParse = (await import("pdf-parse")).default;
       (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -99,14 +126,71 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const result: AnalyzeResult = await service.analyze("/uploads/test.pdf");
+      const result: AnalyzeResult = await service.analyze("/uploads/test.pdf", undefined, 1);
 
       expect(result.success).toBe(true);
       expect(result.extractedText).toBe("Contrato de compra...");
       expect(result.entities).toHaveLength(2);
       expect(result.entities![0].label).toBe("COMPRADOR");
       expect(result.entities![1].label).toBe("PRECIO_TOTAL");
-      expect(mockExtractEntities).toHaveBeenCalledWith("Contrato de compra...");
+      expect(mockExtractEntities).toHaveBeenCalledWith({
+        documentText: "Contrato de compra...",
+        userId: 1,
+        groups: ["PARTES", "INMUEBLE"],
+        fewShot: "",
+      });
+      expect(mockGetExamples).toHaveBeenCalledWith(1);
+      expect(mockResolveGroups).toHaveBeenCalledWith(undefined);
+    });
+
+    it("should pass userId and templateId to few-shot and group resolution", async () => {
+      const entities: AiEntity[] = [
+        { label: "COMPRADOR", value: "Juan Pérez", group: "PARTES", confidence: "ALTA" },
+      ];
+
+      mockExtractEntities.mockResolvedValue({ entities, rawResponse: "[]" });
+      mockGetExamples.mockResolvedValue("few-shot-examples");
+      mockResolveGroups.mockResolvedValue(["PARTES", "CUSTOM"]);
+
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "Contrato...",
+        numpages: 1,
+      });
+
+      await service.analyze("/uploads/test.pdf", undefined, 42, "template-1");
+
+      expect(mockGetExamples).toHaveBeenCalledWith(42);
+      expect(mockResolveGroups).toHaveBeenCalledWith("template-1");
+      expect(mockExtractEntities).toHaveBeenCalledWith({
+        documentText: "Contrato...",
+        userId: 42,
+        groups: ["PARTES", "CUSTOM"],
+        fewShot: "few-shot-examples",
+      });
+    });
+
+    it("should include suggestedGroups in the result", async () => {
+      const entities: AiEntity[] = [];
+
+      mockExtractEntities.mockResolvedValue({
+        entities,
+        rawResponse: "[]",
+        suggestedGroups: ["GARANTES", "OBLIGACIONES"],
+      });
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
+
+      const pdfParse = (await import("pdf-parse")).default;
+      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
+        text: "Contrato...",
+        numpages: 1,
+      });
+
+      const result: AnalyzeResult = await service.analyze("/uploads/test.pdf", undefined, 1);
+
+      expect(result.success).toBe(true);
+      expect(result.suggestedGroups).toEqual(["GARANTES", "OBLIGACIONES"]);
     });
 
     it("should extract entities from a valid DOCX file", async () => {
@@ -115,6 +199,8 @@ describe("DocumentAnalysisService", () => {
       ];
 
       mockExtractEntities.mockResolvedValue({ entities, rawResponse: "[]" });
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES", "INMUEBLE"]);
 
       const mammothModule = await import("mammoth");
       (mammothModule.default.extractRawText as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -127,7 +213,12 @@ describe("DocumentAnalysisService", () => {
       expect(result.extractedText).toBe("Contrato de María López...");
       expect(result.entities).toHaveLength(1);
       expect(result.entities![0].label).toBe("COMPRADOR");
-      expect(mockExtractEntities).toHaveBeenCalledWith("Contrato de María López...");
+      expect(mockExtractEntities).toHaveBeenCalledWith({
+        documentText: "Contrato de María López...",
+        userId: 0,
+        groups: ["PARTES", "INMUEBLE"],
+        fewShot: "",
+      });
     });
 
     it("should return file not found error when filePath is null", async () => {
@@ -180,6 +271,8 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities.mockRejectedValue(new Error("Rate limit exceeded"));
 
       const result = await service.analyze("/uploads/test.pdf");
@@ -199,6 +292,8 @@ describe("DocumentAnalysisService", () => {
     });
 
     it("should retry on RATE_LIMIT errors up to 3 attempts", async () => {
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities
         .mockRejectedValueOnce(new OpenRouterError("rate limited", "RATE_LIMIT"))
         .mockRejectedValueOnce(new OpenRouterError("rate limited again", "RATE_LIMIT"))
@@ -211,7 +306,7 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const analyzePromise = service.analyze("/uploads/test.pdf");
+      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
 
       // Advance timers to skip backoff delays
       await vi.runAllTimersAsync();
@@ -222,6 +317,8 @@ describe("DocumentAnalysisService", () => {
     });
 
     it("should retry on NETWORK_ERROR", async () => {
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities
         .mockRejectedValueOnce(new OpenRouterError("unreachable", "NETWORK_ERROR"))
         .mockResolvedValue({ entities: [], rawResponse: "[]" });
@@ -232,7 +329,7 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const analyzePromise = service.analyze("/uploads/test.pdf");
+      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
       await vi.runAllTimersAsync();
       const result = await analyzePromise;
 
@@ -241,6 +338,8 @@ describe("DocumentAnalysisService", () => {
     });
 
     it("should retry on INVALID_RESPONSE", async () => {
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities
         .mockRejectedValueOnce(new OpenRouterError("bad json", "INVALID_RESPONSE"))
         .mockResolvedValue({ entities: [], rawResponse: "[]" });
@@ -251,7 +350,7 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const analyzePromise = service.analyze("/uploads/test.pdf");
+      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
       await vi.runAllTimersAsync();
       const result = await analyzePromise;
 
@@ -260,6 +359,8 @@ describe("DocumentAnalysisService", () => {
     });
 
     it("should NOT retry on CONFIG_ERROR (AUTH_ERROR)", async () => {
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities.mockRejectedValue(
         new OpenRouterError("bad key", "AUTH_ERROR"),
       );
@@ -270,17 +371,19 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const result = await service.analyze("/uploads/test.pdf");
+      const result = await service.analyze("/uploads/test.pdf", undefined, 1);
 
       expect(result.success).toBe(false);
       expect(mockExtractEntities).toHaveBeenCalledTimes(1);
     });
 
     it("should fail permanently after 3 attempts", async () => {
+      mockGetExamples.mockResolvedValue("");
+      mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities
-        .mockRejectedValue(new OpenRouterError("e1", "INVALID_RESPONSE"))
-        .mockRejectedValue(new OpenRouterError("e2", "INVALID_RESPONSE"))
-        .mockRejectedValue(new OpenRouterError("e3", "INVALID_RESPONSE"));
+        .mockRejectedValueOnce(new OpenRouterError("e1", "INVALID_RESPONSE"))
+        .mockRejectedValueOnce(new OpenRouterError("e2", "INVALID_RESPONSE"))
+        .mockRejectedValueOnce(new OpenRouterError("e3", "INVALID_RESPONSE"));
 
       const pdfParse = (await import("pdf-parse")).default;
       (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -288,7 +391,7 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const analyzePromise = service.analyze("/uploads/test.pdf");
+      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
       await vi.runAllTimersAsync();
       const result = await analyzePromise;
 
