@@ -39,6 +39,8 @@ import { AnalysisProcessor } from "./analysis.processor";
 import type { AnalysisJobPayload } from "./analysis.queue";
 import { DocumentAnalysisService } from "../ai/document-analysis.service.js";
 import { OpenRouterService } from "../ai/open-router.service.js";
+import { FewShotProvider } from "../ai/few-shot-provider.js";
+import { GroupsService } from "../ai/groups.service.js";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import type { CachePort } from "../infrastructure/redis/index.js";
 
@@ -153,7 +155,7 @@ describe("AnalysisProcessor — cache integration", () => {
     vi.clearAllMocks();
 
     cachePort = createInMemoryCachePort();
-    mockExtractEntities = vi.fn(async (text: string) => ({
+    mockExtractEntities = vi.fn(async (_input: { documentText: string }) => ({
       entities: [
         { label: "COMPRADOR", value: "Juan", group: "PARTES", confidence: "ALTA" },
       ],
@@ -164,9 +166,19 @@ describe("AnalysisProcessor — cache integration", () => {
       extractEntities: mockExtractEntities,
     } as unknown as OpenRouterService;
 
+    const mockFewShotProvider = {
+      getExamples: vi.fn(async () => ""),
+    } as unknown as FewShotProvider;
+
+    const mockGroupsService = {
+      resolve: vi.fn(async () => ["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"]),
+    } as unknown as GroupsService;
+
     const documentAnalysisService = new DocumentAnalysisService(
       mockOpenRouter,
       cachePort,
+      mockFewShotProvider,
+      mockGroupsService,
     );
 
     const postgres = createMockPostgres("/uploads/test.pdf");

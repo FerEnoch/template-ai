@@ -25,46 +25,41 @@ export interface GenerateResult {
 }
 
 // ---------------------------------------------------------------------------
-// Prompt construction
+// Prompt variable construction
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `Eres un asistente especializado en generación de documentos legales mexicanos.
-Genera un documento legal completo basado en las entidades proporcionadas y los datos del formulario.
-
-Reglas:
-- Preserva la estructura del documento base si está disponible.
-- Sustituye solo los valores proporcionados por el usuario.
-- Usa [COMPLETAR: <nombre del campo>] para campos críticos sin valor.
-- Responde EXCLUSIVAMENTE con un JSON object: { "generatedText": "..." }
-- No incluyas texto adicional fuera del JSON.`;
-
-const SYSTEM_PROMPT_NO_BASE = `Eres un asistente especializado en generación de documentos legales mexicanos.
-Genera un documento legal completo basado en las entidades y datos del formulario proporcionados.
-No dispones de un documento base — genera el documento desde cero usando los datos disponibles.
-
-Reglas:
-- Usa [COMPLETAR: <nombre del campo>] para campos críticos sin valor.
-- Responde EXCLUSIVAMENTE con un JSON object: { "generatedText": "..." }
-- No incluyas texto adicional fuera del JSON.`;
-
-function buildUserPrompt(input: GenerateInput): string {
+function formatEntities(input: GenerateInput): string {
   const lines: string[] = [];
 
-  // Entities with user-provided values
-  lines.push("## Entidades del documento");
   for (const entity of input.entities) {
     const value = input.formData[entity.id] ?? entity.value ?? "";
     lines.push(`- ${entity.label} (${entity.group}): ${value || "[sin valor]"}`);
   }
 
-  // Base text (if available)
-  if (input.baseText) {
-    lines.push("");
-    lines.push("## Documento base");
-    lines.push(input.baseText);
+  return lines.join("\n");
+}
+
+function formatFormData(input: GenerateInput): string {
+  const lines: string[] = [];
+
+  for (const [key, value] of Object.entries(input.formData)) {
+    lines.push(`- ${key}: ${value || "[sin valor]"}`);
   }
 
   return lines.join("\n");
+}
+
+function buildGenerationVars(input: GenerateInput): Record<string, string> {
+  const vars: Record<string, string> = {
+    entities: formatEntities(input),
+    formData: formatFormData(input),
+  };
+
+  if (input.baseText) {
+    vars.baseText = input.baseText;
+  }
+
+  return vars;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,13 +79,11 @@ export class DocumentGenerationService {
    * base text. Retries up to 3 attempts on transient errors.
    */
   async generate(input: GenerateInput): Promise<GenerateResult> {
-    const systemPrompt = input.baseText
-      ? SYSTEM_PROMPT
-      : SYSTEM_PROMPT_NO_BASE;
-    const userPrompt = buildUserPrompt(input);
+    const task = input.baseText ? "generation" : "generation-no-base";
+    const vars = buildGenerationVars(input);
 
     try {
-      const result = await this.callWithRetry(systemPrompt, userPrompt);
+      const result = await this.callWithRetry(task, vars);
       return {
         success: true,
         generatedText: result.generatedText,
@@ -120,8 +113,8 @@ export class DocumentGenerationService {
    * 3 attempts total with 1s, 3s backoff.
    */
   private async callWithRetry(
-    systemPrompt: string,
-    userPrompt: string,
+    task: "generation" | "generation-no-base",
+    vars: Record<string, string>,
   ): Promise<{ generatedText: string }> {
     const retryableCodes = ["RATE_LIMIT", "NETWORK_ERROR", "INVALID_RESPONSE"];
     const delays = [1_000, 3_000];
@@ -136,10 +129,7 @@ export class DocumentGenerationService {
           );
           await sleep(delay);
         }
-        return await this.openRouterService.generateDocument(
-          systemPrompt,
-          userPrompt,
-        );
+        return await this.openRouterService.generateDocument(task, vars);
       } catch (error) {
         lastError = error;
         if (

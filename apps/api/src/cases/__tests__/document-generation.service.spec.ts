@@ -82,6 +82,14 @@ describe("DocumentGenerationService", () => {
       expect(result.success).toBe(true);
       expect(result.generatedText).toBe(generatedText);
       expect(mockGenerateDocument).toHaveBeenCalledOnce();
+      expect(mockGenerateDocument).toHaveBeenCalledWith(
+        "generation",
+        expect.objectContaining({
+          entities: expect.stringContaining("COMPRADOR"),
+          formData: expect.stringContaining("Juan Pérez"),
+          baseText: sampleBaseText,
+        }),
+      );
     });
 
     it("should succeed with NULL base text (graceful degradation)", async () => {
@@ -97,6 +105,17 @@ describe("DocumentGenerationService", () => {
       expect(result.success).toBe(true);
       expect(result.generatedText).toBe(generatedText);
       expect(result.baseTextMissing).toBe(true);
+      expect(mockGenerateDocument).toHaveBeenCalledWith(
+        "generation-no-base",
+        expect.objectContaining({
+          entities: expect.any(String),
+          formData: expect.any(String),
+        }),
+      );
+      expect(mockGenerateDocument).not.toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ baseText: expect.any(String) }),
+      );
     });
 
     it("should retry on RATE_LIMIT up to 3 attempts", async () => {
@@ -142,6 +161,7 @@ describe("DocumentGenerationService", () => {
       const result = await generatePromise;
 
       expect(result.success).toBe(true);
+      expect(result.generatedText).toBe(generatedText);
       expect(mockGenerateDocument).toHaveBeenCalledTimes(2);
 
       vi.useRealTimers();
@@ -151,9 +171,9 @@ describe("DocumentGenerationService", () => {
       vi.useFakeTimers();
 
       mockGenerateDocument
-        .mockRejectedValue(new OpenRouterError("e1", "INVALID_RESPONSE"))
-        .mockRejectedValue(new OpenRouterError("e2", "INVALID_RESPONSE"))
-        .mockRejectedValue(new OpenRouterError("e3", "INVALID_RESPONSE"));
+        .mockRejectedValueOnce(new OpenRouterError("e1", "INVALID_RESPONSE"))
+        .mockRejectedValueOnce(new OpenRouterError("e2", "INVALID_RESPONSE"))
+        .mockRejectedValueOnce(new OpenRouterError("e3", "INVALID_RESPONSE"));
 
       const generatePromise = service.generate({
         entities: sampleEntities,
@@ -175,9 +195,9 @@ describe("DocumentGenerationService", () => {
       vi.useFakeTimers();
 
       mockGenerateDocument
-        .mockRejectedValue(new OpenRouterError("net1", "NETWORK_ERROR"))
-        .mockRejectedValue(new OpenRouterError("net2", "NETWORK_ERROR"))
-        .mockRejectedValue(new OpenRouterError("net3", "NETWORK_ERROR"));
+        .mockRejectedValueOnce(new OpenRouterError("net1", "NETWORK_ERROR"))
+        .mockRejectedValueOnce(new OpenRouterError("net2", "NETWORK_ERROR"))
+        .mockRejectedValueOnce(new OpenRouterError("net3", "NETWORK_ERROR"));
 
       const generatePromise = service.generate({
         entities: sampleEntities,

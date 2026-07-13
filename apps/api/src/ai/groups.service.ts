@@ -43,7 +43,7 @@ export class GroupsService {
    * Invalid or non-approved statuses are ignored.
    */
   async resolve(templateId?: string): Promise<string[]> {
-    const groups = [...SEED_GROUPS];
+    const groups: string[] = [...SEED_GROUPS];
 
     if (!templateId) {
       return groups;

@@ -42,6 +42,8 @@ export class AnalysisProcessor extends WorkerHost {
     const analysisResult = await this.documentAnalysisService.analyze(
       document?.filePath ?? filePath ?? null,
       contentHash,
+      ownerId,
+      undefined,
     );
 
     if (!analysisResult.success) {
