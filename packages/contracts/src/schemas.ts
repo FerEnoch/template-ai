@@ -181,6 +181,14 @@ export const UpdateTemplateNameSchema = z.object({
 // Generate document response: AI-generated text (must be non-empty)
 export const GenerateDocumentResponseSchema = z.object({
   generatedText: z.string().min(1),
+  verification: z
+    .object({
+      passed: z.boolean(),
+      completarCount: z.number().int().min(0),
+      warnings: z.array(z.string()),
+      degraded: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 // Export request: output format selection

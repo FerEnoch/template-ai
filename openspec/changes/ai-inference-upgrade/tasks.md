@@ -47,10 +47,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 6: PR#6 — VerificationService + DocumentGenerationService
 
-- [ ] 6.1 RED `verification.service.spec.ts`: `[COMPLETAR]` detected, clean→passed, degraded on model fail
-- [ ] 6.2 GREEN `verification.service.ts` `verify()`: `AI_MODEL_FALLBACK ?? AI_MODEL`, max_tokens 2048, temp 0; never blocks
-- [ ] 6.3 `schemas.ts`: `GenerateDocumentResponseSchema` add `verification:{passed,completarCount,warnings,degraded}` + tests
-- [ ] 6.4 RED+GREEN rewrite `document-generation.service.ts/spec.ts`: consume PromptEngine, call verify, return `verification`; register
+- [x] 6.1 RED `verification.service.spec.ts`: `[COMPLETAR]` detected, clean→passed, degraded on model fail
+- [x] 6.2 GREEN `verification.service.ts` `verify()`: `AI_MODEL_FALLBACK ?? AI_MODEL`, max_tokens 2048, temp 0; never blocks
+- [x] 6.3 `schemas.ts`: `GenerateDocumentResponseSchema` add `verification:{passed,completarCount,warnings,degraded}` + tests
+- [x] 6.4 RED+GREEN rewrite `document-generation.service.ts/spec.ts`: consume PromptEngine, call verify, return `verification`; register
 
 ## Phase 7: PR#7 — ReviewService fallback
 

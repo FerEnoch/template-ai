@@ -9,6 +9,7 @@ import { DocumentGenerationService } from "./document-generation.service.js";
 import { PromptEngine } from "./prompt-engine.js";
 import { FewShotProvider } from "./few-shot-provider.js";
 import { GroupsService } from "./groups.service.js";
+import { VerificationService } from "./verification.service.js";
 
 const fewShotProvider = {
   provide: FewShotProvider,
@@ -35,6 +36,7 @@ const fewShotProvider = {
     OpenRouterService,
     DocumentAnalysisService,
     DocumentGenerationService,
+    VerificationService,
   ],
   exports: [
     PromptEngine,
@@ -43,6 +45,7 @@ const fewShotProvider = {
     DocumentAnalysisService,
     DocumentGenerationService,
     OpenRouterService,
+    VerificationService,
   ],
 })
 export class AiModule {}

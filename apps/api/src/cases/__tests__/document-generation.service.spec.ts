@@ -24,6 +24,7 @@ vi.mock("../../config/ai.js", () => ({
 
 import { DocumentGenerationService } from "../../ai/document-generation.service";
 import { OpenRouterService, OpenRouterError } from "../../ai/open-router.service";
+import { VerificationService } from "../../ai/verification.service.js";
 import type { CachePort } from "../../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
@@ -31,11 +32,18 @@ import type { CachePort } from "../../infrastructure/redis/index.js";
 // ---------------------------------------------------------------------------
 
 const mockGenerateDocument = vi.fn();
+const mockVerify = vi.fn();
 
 function createMockOpenRouterService(): OpenRouterService {
   return {
     generateDocument: mockGenerateDocument,
   } as unknown as OpenRouterService;
+}
+
+function createMockVerificationService(): VerificationService {
+  return {
+    verify: mockVerify,
+  } as unknown as VerificationService;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,11 +69,18 @@ const sampleBaseText = "Contrato de compraventa que celebran las partes...";
 describe("DocumentGenerationService", () => {
   let service: DocumentGenerationService;
   let mockOpenRouter: OpenRouterService;
+  let mockVerification: VerificationService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     mockOpenRouter = createMockOpenRouterService();
-    service = new DocumentGenerationService(mockOpenRouter);
+    mockVerification = createMockVerificationService();
+    mockVerify.mockResolvedValue({
+      passed: true,
+      completarCount: 0,
+      warnings: [],
+    });
+    service = new DocumentGenerationService(mockOpenRouter, mockVerification);
   });
 
   describe("generate", () => {
@@ -227,6 +242,69 @@ describe("DocumentGenerationService", () => {
 
       expect(result.success).toBe(false);
       expect(mockGenerateDocument).toHaveBeenCalledTimes(1);
+    });
+
+    it("should include verification data in a successful result", async () => {
+      const generatedText = "Contrato de compraventa entre Juan Pérez.";
+      const verification = {
+        passed: true,
+        completarCount: 0,
+        warnings: [],
+      };
+      mockGenerateDocument.mockResolvedValue({ generatedText });
+      mockVerify.mockResolvedValue(verification);
+
+      const result = await service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.verification).toEqual(verification);
+      expect(mockVerify).toHaveBeenCalledTimes(1);
+      expect(mockVerify).toHaveBeenCalledWith(generatedText);
+    });
+
+    it("should NOT block generation when verification finds [COMPLETAR]", async () => {
+      const generatedText = "El Sr. [COMPLETAR] domiciliado en.";
+      const verification = {
+        passed: false,
+        completarCount: 1,
+        warnings: ["Falta nombre del arrendador"],
+      };
+      mockGenerateDocument.mockResolvedValue({ generatedText });
+      mockVerify.mockResolvedValue(verification);
+
+      const result = await service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.verification).toEqual(verification);
+    });
+
+    it("should NOT block generation when verification is degraded", async () => {
+      const generatedText = "Documento.";
+      const verification = {
+        passed: true,
+        completarCount: 0,
+        warnings: ["Verification model failed: timeout"],
+        degraded: true,
+      };
+      mockGenerateDocument.mockResolvedValue({ generatedText });
+      mockVerify.mockResolvedValue(verification);
+
+      const result = await service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.verification).toEqual(verification);
     });
   });
 

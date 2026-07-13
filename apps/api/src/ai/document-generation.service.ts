@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
+import { VerificationService, type VerificationResult } from "./verification.service.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +23,7 @@ export interface GenerateResult {
   baseTextMissing?: boolean;
   error?: string;
   errorType?: string;
+  verification?: VerificationResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +74,10 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export class DocumentGenerationService {
   private readonly logger = new Logger(DocumentGenerationService.name);
 
-  constructor(private readonly openRouterService: OpenRouterService) {}
+  constructor(
+    private readonly openRouterService: OpenRouterService,
+    private readonly verificationService: VerificationService,
+  ) {}
 
   /**
    * Generate a legal document from template entities, form data, and optional
@@ -84,10 +89,14 @@ export class DocumentGenerationService {
 
     try {
       const result = await this.callWithRetry(task, vars);
+      const verification = await this.verificationService.verify(
+        result.generatedText,
+      );
       return {
         success: true,
         generatedText: result.generatedText,
         baseTextMissing: input.baseText === null ? true : undefined,
+        verification,
       };
     } catch (error) {
       const message =
