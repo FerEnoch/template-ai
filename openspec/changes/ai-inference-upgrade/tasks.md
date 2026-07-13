@@ -54,9 +54,9 @@ Chain strategy: feature-branch-chain
 
 ## Phase 7: PR#7 — ReviewService fallback
 
-- [ ] 7.1 RED `review.service.spec.ts`: unknown group→GENERAL; malformed JSON→`{label:"",group:"GENERAL",value:inputText}`
-- [ ] 7.2 GREEN `review.service.ts`: pass `groups` to `classifySpan`; unknown→`GENERAL`; malformed→fallback entity
-- [ ] 7.3 RED+GREEN `open-router.service.ts` `classifySpan`: accept `groups`, render via PromptEngine
+- [x] 7.1 RED `review.service.spec.ts`: unknown group→GENERAL; malformed JSON→`{label:"",group:"GENERAL",value:inputText}`
+- [x] 7.2 GREEN `review.service.ts`: pass `groups` to `classifySpan`; unknown→`GENERAL`; malformed→fallback entity
+- [x] 7.3 RED+GREEN `open-router.service.ts` `classifySpan`: accept `groups`, render via PromptEngine
 
 ## Phase 8: PR#8 — Frontend
 
