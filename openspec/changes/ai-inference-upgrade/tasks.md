@@ -40,10 +40,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 5: PR#5 — OpenRouterService + DocumentAnalysisService
 
-- [ ] 5.1 RED rewrite `open-router.service.spec.ts`: prompt assertion; `suggestedGroups` parse+validate; cache key has userId+groups
-- [ ] 5.2 GREEN `open-router.service.ts`: drop hardcoded prompts; inject `PromptEngine`+`ModelRouter`; widen `group`→string; add `suggestedGroups`; new `extractEntities(input)`
-- [ ] 5.3 GREEN `callWithRetryChain`: 3 attempts primary + 1 per fallback; `CONFIG_ERROR` aborts
-- [ ] 5.4 RED+GREEN rewrite `document-analysis.service.ts/spec.ts`: `analyze(file, userId, templateId?)` threads few-shot+groups via PromptEngine
+- [x] 5.1 RED rewrite `open-router.service.spec.ts`: prompt assertion; `suggestedGroups` parse+validate; cache key has userId+groups
+- [x] 5.2 GREEN `open-router.service.ts`: drop hardcoded prompts; inject `PromptEngine`+`ModelRouter`; widen `group`→string; add `suggestedGroups`; new `extractEntities(input)`
+- [x] 5.3 GREEN `callWithRetryChain`: 3 attempts primary + 1 per fallback; `CONFIG_ERROR` aborts
+- [x] 5.4 RED+GREEN rewrite `document-analysis.service.ts/spec.ts`: `analyze(file, userId, templateId?)` threads few-shot+groups via PromptEngine
 
 ## Phase 6: PR#6 — VerificationService + DocumentGenerationService
 
@@ -60,13 +60,13 @@ Chain strategy: feature-branch-chain
 
 ## Phase 8: PR#8 — Frontend
 
-- [ ] 8.1 `apps/web/src/lib/case/groupEntities.ts`: add GENERAL/OTROS to GROUP_ORDER
-- [ ] 8.2 `CaseFormSection.tsx`: generic group lookup; `+ AGREGAR CAMPO` in all headers
-- [ ] 8.3 create approval-chip component for `suggestedGroupsStatus` (✓ Aprobar / ✗ Rechazar)
-- [ ] 8.4 `EntityEditModal`/`EntityCreateModal`: dropdown includes seed + dynamic; pre-fill GENERAL on fallback
-- [ ] 8.5 component tests: dynamic group rendering, approval chip, dropdown
+- [x] 8.1 `apps/web/src/lib/case/groupEntities.ts`: add GENERAL/OTROS to GROUP_ORDER
+- [x] 8.2 `CaseFormSection.tsx`: generic group lookup; `+ AGREGAR CAMPO` in all headers
+- [x] 8.3 create approval-chip component for `suggestedGroupsStatus` (✓ Aprobar / ✗ Rechazar)
+- [x] 8.4 `EntityEditModal`/`EntityCreateModal`: dropdown includes seed + dynamic; pre-fill GENERAL on fallback
+- [x] 8.5 component tests: dynamic group rendering, approval chip, dropdown
 
 ## Phase 9: Verification
 
-- [ ] 9.1 test suites green; migrations apply; prompts in dist
+- [x] 9.1 test suites green; migrations apply; prompts in dist
 - [ ] 9.2 merge tracker after 8 PRs reviewed
