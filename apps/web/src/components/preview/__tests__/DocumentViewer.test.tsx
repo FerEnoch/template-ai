@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
 import {
   render,
   screen,
@@ -8,9 +8,17 @@ import {
   cleanup,
 } from "@testing-library/react";
 import { DocumentViewer } from "../DocumentViewer";
+import { updateCase } from "@/lib/api/cases";
+
+vi.mock("@/lib/api/cases", () => ({
+  updateCase: vi.fn(),
+}));
+
+const mockedUpdateCase = vi.mocked(updateCase);
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
 const CASE_ID = "case-123e4567-e89b-12d3-a456-426614174000";
@@ -19,111 +27,115 @@ const GENERATED_TEXT =
   "Entre el COMPRADOR y la VENDEDORA se celebra el presente contrato.\n\nPrimera — Objeto.";
 
 describe("DocumentViewer", () => {
-  it("renders a static h1 when onRenameTitle is not provided", () => {
-    render(
-      <DocumentViewer
-        caseId={CASE_ID}
-        title={TITLE}
-        generatedText={GENERATED_TEXT}
-      />
-    );
-
-    const heading = screen.getByRole("heading", { level: 1 });
-    expect(heading).toHaveTextContent(TITLE);
-    expect(
-      screen.queryByTestId("editable-title-icon")
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows the edit icon when hovering the title", () => {
-    const onRenameTitle = vi.fn().mockResolvedValue(undefined);
-
-    render(
-      <DocumentViewer
-        caseId={CASE_ID}
-        title={TITLE}
-        generatedText={GENERATED_TEXT}
-        onRenameTitle={onRenameTitle}
-      />
-    );
-
-    const wrapper = screen.getByTestId("editable-title-wrapper");
-    expect(screen.getByTestId("editable-title-icon")).toHaveClass("opacity-0");
-
-    fireEvent.mouseEnter(wrapper);
-    expect(screen.getByTestId("editable-title-icon")).toHaveClass(
-      "group-hover:opacity-100"
-    );
-  });
-
-  it("enters edit mode with a pre-filled input when the icon is clicked", () => {
-    const onRenameTitle = vi.fn().mockResolvedValue(undefined);
-
-    render(
-      <DocumentViewer
-        caseId={CASE_ID}
-        title={TITLE}
-        generatedText={GENERATED_TEXT}
-        onRenameTitle={onRenameTitle}
-      />
-    );
-
-    fireEvent.click(screen.getByTestId("editable-title-icon"));
-
-    const input = screen.getByTestId("editable-title-input");
-    expect(input).toBeInTheDocument();
-    expect(input).toHaveValue(TITLE);
-    expect(input).toHaveFocus();
-  });
-
-  it("calls onRenameTitle with the new name and an AbortSignal on Enter", async () => {
-    const onRenameTitle = vi.fn(
-      async (_name: string, _signal?: AbortSignal) => undefined
-    );
-
-    render(
-      <DocumentViewer
-        caseId={CASE_ID}
-        title={TITLE}
-        generatedText={GENERATED_TEXT}
-        onRenameTitle={onRenameTitle}
-      />
-    );
-
-    fireEvent.click(screen.getByTestId("editable-title-icon"));
-    const input = screen.getByTestId("editable-title-input");
-    fireEvent.change(input, { target: { value: "Contrato Modificado" } });
-    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
-
-    await waitFor(() => {
-      expect(onRenameTitle).toHaveBeenCalledWith(
-        "Contrato Modificado",
-        expect.any(AbortSignal)
-      );
+  beforeEach(() => {
+    mockedUpdateCase.mockResolvedValue({
+      id: CASE_ID,
+      name: TITLE,
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      templateId: "template-1",
+      userId: "user-1",
+      formData: { generatedText: GENERATED_TEXT },
     });
   });
 
-  it("reverts to the original title and shows an inline error when onRenameTitle rejects", async () => {
-    const onRenameTitle = vi.fn().mockRejectedValue(new Error("Save failed"));
+  it("renders the filename as read-only text", () => {
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+      />
+    );
+
+    const label = screen.getByTestId("filename-label");
+    expect(label).toHaveTextContent(`Documento: ${TITLE}`);
+    expect(label).not.toHaveAttribute("contenteditable");
+  });
+
+  it("does not render an editable title control", () => {
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+      />
+    );
+
+    expect(
+      screen.queryByTestId("editable-title-icon")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("editable-title-input")
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders editable paragraphs for the generated text", () => {
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+      />
+    );
+
+    expect(
+      screen.getByText("Entre el COMPRADOR y la VENDEDORA se celebra el presente contrato.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Primera — Objeto.")).toBeInTheDocument();
+  });
+
+  it("calls onUpdate with the full text after saving a paragraph", async () => {
+    const onUpdate = vi.fn();
 
     render(
       <DocumentViewer
         caseId={CASE_ID}
         title={TITLE}
         generatedText={GENERATED_TEXT}
-        onRenameTitle={onRenameTitle}
+        onUpdate={onUpdate}
       />
     );
 
-    fireEvent.click(screen.getByTestId("editable-title-icon"));
-    const input = screen.getByTestId("editable-title-input");
-    fireEvent.change(input, { target: { value: "Contrato Modificado" } });
-    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    fireEvent.click(screen.getAllByLabelText("Editar párrafo")[0]);
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, {
+      target: { value: "Texto modificado del primer párrafo." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateCase).toHaveBeenCalledWith(CASE_ID, {
+        formData: {
+          generatedText: "Texto modificado del primer párrafo.\n\nPrimera — Objeto.",
+        },
+      });
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      "Texto modificado del primer párrafo.\n\nPrimera — Objeto."
+    );
+  });
+
+  it("displays an error message when saving a paragraph fails", async () => {
+    mockedUpdateCase.mockRejectedValue(new Error("Save failed"));
+
+    render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={GENERATED_TEXT}
+      />
+    );
+
+    fireEvent.click(screen.getAllByLabelText("Editar párrafo")[0]);
+    const textarea = screen.getByRole("textbox");
+    fireEvent.change(textarea, { target: { value: "Otro cambio." } });
+    fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
       expect(screen.getByText("Save failed")).toBeInTheDocument();
     });
-
-    expect(screen.getByTestId("editable-title-input")).toHaveValue(TITLE);
   });
 });

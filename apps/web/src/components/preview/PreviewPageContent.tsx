@@ -93,19 +93,6 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     router.push(`/nuevo/${caseItem.template.id}`);
   }, [caseItem, router]);
 
-  const handleRenameTitle = useCallback(
-    async (name: string, signal?: AbortSignal) => {
-      const updated = await updateCase(caseId, { name }, signal);
-      setCaseItem(
-        (current) =>
-          current
-            ? ({ ...current, name: updated.name, updatedAt: updated.updatedAt } as CaseWithTemplate)
-            : current
-      );
-    },
-    [caseId]
-  );
-
   if (loading) {
     return (
       <AppShell activeSidebarItem="Biblioteca">
@@ -199,7 +186,6 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
                 current ? { ...current, generatedText: text } : current
               )
             }
-            onRenameTitle={handleRenameTitle}
           />
         </div>
 
