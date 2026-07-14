@@ -2,19 +2,19 @@
 
 import { useCallback, useState } from "react";
 import {
-  Users,
-  Building2,
-  Calendar,
-  Paperclip,
   ChevronDown,
   ChevronUp,
   AlertCircle,
   Ban,
   Plus,
+  Sparkles,
 } from "lucide-react";
 import type { Entity } from "@template-ai/contracts";
-import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
+import { MANUAL_ENTITY_LIMIT, SEED_GROUPS } from "@template-ai/contracts";
+import { groupEntities } from "@/lib/case/groupEntities";
+import { getGroupConfig } from "@/lib/case/groupConfig";
 import { EntityEditModal } from "./EntityEditModal";
+import { SuggestedGroupChips } from "./SuggestedGroupChips";
 
 type Confidence = "ALTA" | "MEDIA" | "BAJA";
 
@@ -25,17 +25,10 @@ interface EntityInspectorProps {
   manualEntityCount?: number;
   manualEntityLimit?: number;
   onEntityHover?: (entityId: string | null) => void;
+  suggestedGroupsStatus?: Record<string, "pending" | "approved" | "rejected">;
+  onApproveGroup?: (group: string) => void | Promise<void>;
+  onRejectGroup?: (group: string) => void | Promise<void>;
 }
-
-const GROUP_CONFIG: Record<
-  string,
-  { label: string; icon: typeof Users; color: string }
-> = {
-  PARTES: { label: "Partes", icon: Users, color: "text-accent" },
-  INMUEBLE: { label: "Inmueble", icon: Building2, color: "text-accent" },
-  FECHAS: { label: "Fechas", icon: Calendar, color: "text-accent" },
-  ANEXOS: { label: "Anexos", icon: Paperclip, color: "text-accent" },
-};
 
 const CONFIDENCE_STYLES: Record<
   Confidence,
@@ -61,7 +54,9 @@ const CONFIDENCE_STYLES: Record<
   },
 };
 
-type Group = "PARTES" | "INMUEBLE" | "FECHAS" | "ANEXOS";
+function isSeedGroup(group: string): boolean {
+  return (SEED_GROUPS as readonly string[]).includes(group);
+}
 
 export function EntityInspector({
   entities,
@@ -70,8 +65,11 @@ export function EntityInspector({
   manualEntityCount = 0,
   manualEntityLimit = MANUAL_ENTITY_LIMIT,
   onEntityHover,
+  suggestedGroupsStatus,
+  onApproveGroup,
+  onRejectGroup,
 }: EntityInspectorProps) {
-  const [expandedGroups, setExpandedGroups] = useState<Set<Group>>(
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["PARTES"])
   );
   const [priorityReviewed, setPriorityReviewed] = useState<Set<string>>(new Set());
@@ -81,7 +79,7 @@ export function EntityInspector({
 
   const isLimitReached = manualEntityCount >= manualEntityLimit;
 
-  const toggleGroup = (group: Group) => {
+  const toggleGroup = (group: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(group)) {
@@ -99,20 +97,16 @@ export function EntityInspector({
     return (order[a.confidence] ?? 3) - (order[b.confidence] ?? 3);
   });
 
-  const groupedEntities = sortedEntities.reduce<Record<Group, Entity[]>>(
-    (acc, entity) => {
-      const group = entity.group as Group;
-      if (!acc[group]) acc[group] = [];
-      acc[group].push(entity);
-      return acc;
-    },
-    { PARTES: [], INMUEBLE: [], FECHAS: [], ANEXOS: [] }
-  );
+  const grouped = groupEntities(sortedEntities);
 
   // Priority items (BAJA confidence that haven't been reviewed)
   const priorityItems = entities.filter(
     (e) => e.confidence === "BAJA" && !e.reviewed
   );
+
+  const pendingSuggestedGroups = Object.entries(suggestedGroupsStatus ?? {})
+    .filter(([_, status]) => status === "pending")
+    .map(([group]) => group);
 
   const handleMarkReviewed = (entityId: string) => {
     setPriorityReviewed((prev) => {
@@ -208,19 +202,67 @@ export function EntityInspector({
         </section>
       )}
 
+      {/* Suggested group approval chips */}
+      {pendingSuggestedGroups.length > 0 && (
+        <SuggestedGroupChips
+          groups={pendingSuggestedGroups}
+          onApprove={onApproveGroup}
+          onReject={onRejectGroup}
+        />
+      )}
+
       {/* Detected Groups */}
       <section className="space-y-3">
         <h4 className="ml-1 font-label text-[10px] font-bold uppercase tracking-widest text-text-secondary">
           Grupos detectados
         </h4>
 
-        {(Object.keys(groupedEntities) as Group[]).map((group) => {
-          const groupEntities = groupedEntities[group];
-          if (groupEntities.length === 0) return null;
-
-          const config = GROUP_CONFIG[group];
+        {grouped.map(([group, groupEntities]) => {
+          const isEmpty = groupEntities.length === 0;
+          const config = getGroupConfig(group);
           const isExpanded = expandedGroups.has(group);
           const GroupIcon = config.icon;
+
+          if (isEmpty && !isSeedGroup(group)) {
+            return null;
+          }
+
+          if (isEmpty) {
+            return (
+              <div
+                key={group}
+                className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-surface/50 p-6"
+              >
+                <GroupIcon className="text-3xl text-text-disabled opacity-40" />
+                <p className="text-[11px] font-medium text-text-secondary">
+                  No se han detectado {config.label.toLowerCase()}
+                </p>
+                {onAddEntity && (
+                  <button
+                    onClick={() => {
+                      if (!isLimitReached) {
+                        onAddEntity();
+                      }
+                    }}
+                    disabled={isLimitReached}
+                    title={
+                      isLimitReached
+                        ? `Límite de ${manualEntityLimit} campos manuales alcanzado`
+                        : undefined
+                    }
+                    className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-bold transition-colors ${
+                      isLimitReached
+                        ? "cursor-not-allowed border-border text-text-disabled"
+                        : "border-accent text-accent hover:bg-accent/5"
+                    }`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    AGREGAR CAMPO
+                  </button>
+                )}
+              </div>
+            );
+          }
 
           return (
             <div
@@ -232,10 +274,16 @@ export function EntityInspector({
                 className="flex w-full cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-background"
               >
                 <div className="flex items-center gap-2">
-                  <GroupIcon className={`text-xl ${config.color}`} />
+                  <GroupIcon className={`text-xl ${config.isSeed ? "text-accent" : "text-warning"}`} />
                   <span className="text-sm font-bold text-text-primary">
                     {config.label}
                   </span>
+                  {!config.isSeed && (
+                    <span className="flex items-center gap-1 rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-bold text-accent">
+                      <Sparkles className="h-3 w-3" />
+                      Sugerido por IA
+                    </span>
+                  )}
                   <span className="ml-1 rounded bg-background px-1.5 py-0.5 text-[10px] font-bold text-text-secondary">
                     {groupEntities.length}
                   </span>
@@ -323,50 +371,6 @@ export function EntityInspector({
                       );
                     })}
                 </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Empty group states */}
-        {(Object.keys(groupedEntities) as Group[]).map((group) => {
-          const groupEntities = groupedEntities[group];
-          if (groupEntities.length > 0) return null;
-
-          const config = GROUP_CONFIG[group];
-          const GroupIcon = config.icon;
-
-          return (
-            <div
-              key={group}
-              className="flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-border bg-surface/50 p-6"
-            >
-              <GroupIcon className="text-3xl text-text-disabled opacity-40" />
-              <p className="text-[11px] font-medium text-text-secondary">
-                No se han detectado {config.label.toLowerCase()}
-              </p>
-              {onAddEntity && (
-                <button
-                  onClick={() => {
-                    if (!isLimitReached) {
-                      onAddEntity();
-                    }
-                  }}
-                  disabled={isLimitReached}
-                  title={
-                    isLimitReached
-                      ? `Límite de ${manualEntityLimit} campos manuales alcanzado`
-                      : undefined
-                  }
-                  className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-bold transition-colors ${
-                    isLimitReached
-                      ? "cursor-not-allowed border-border text-text-disabled"
-                      : "border-accent text-accent hover:bg-accent/5"
-                  }`}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  AGREGAR CAMPO
-                </button>
               )}
             </div>
           );

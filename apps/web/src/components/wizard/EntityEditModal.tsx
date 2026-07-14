@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { X, AlertTriangle, RotateCcw } from "lucide-react";
 import type { Entity } from "@template-ai/contracts";
+import { SEED_GROUPS } from "@template-ai/contracts";
+import { getGroupConfig } from "@/lib/case/groupConfig";
 
 type Confidence = "ALTA" | "BAJA";
 
@@ -12,6 +14,7 @@ interface EntityEditModalProps {
   mode?: "edit" | "create";
   onSave: (entity: Entity) => Promise<void> | void;
   onClose: () => void;
+  availableGroups?: string[];
 }
 
 const CONFIDENCE_OPTIONS: { value: Confidence; label: string; activeClass: string }[] = [
@@ -33,6 +36,7 @@ export function EntityEditModal({
   mode = "edit",
   onSave,
   onClose,
+  availableGroups = SEED_GROUPS as unknown as string[],
 }: EntityEditModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [value, setValue] = useState("");
@@ -200,10 +204,11 @@ export function EntityEditModal({
               }}
               className="w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm font-bold text-text-primary transition-colors focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             >
-              <option value="PARTES">Partes</option>
-              <option value="INMUEBLE">Inmueble</option>
-              <option value="FECHAS">Fechas</option>
-              <option value="ANEXOS">Anexos</option>
+              {availableGroups.map((g) => (
+                <option key={g} value={g}>
+                  {getGroupConfig(g).label}
+                </option>
+              ))}
             </select>
           </div>
         )}

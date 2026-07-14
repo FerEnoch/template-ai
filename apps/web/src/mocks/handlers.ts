@@ -406,6 +406,65 @@ export const handlers = [
     const manualCount = storedEntities.filter((e) => e.userCreated).length;
     return HttpResponse.json({ count: manualCount }, { status: 200 });
   }),
+
+  /**
+   * GET /api/review/:documentId/suggested-groups
+   * Returns the suggested-groups status map for the associated template.
+   */
+  http.get("/api/review/:documentId/suggested-groups", ({ params }) => {
+    const { documentId } = params;
+    const template = storedTemplates.find((t) => t.documentId === documentId);
+    return HttpResponse.json(
+      { suggestedGroupsStatus: template?.suggestedGroupsStatus ?? {} },
+      { status: 200 }
+    );
+  }),
+
+  /**
+   * POST /api/review/:documentId/groups/:group/approve
+   * Approves a suggested dynamic group for the associated template.
+   */
+  http.post(
+    "/api/review/:documentId/groups/:group/approve",
+    ({ params }) => {
+      const { documentId, group } = params;
+      const template = storedTemplates.find((t) => t.documentId === documentId);
+      if (!template) {
+        return HttpResponse.json(
+          { error: "No template found for document" },
+          { status: 404 }
+        );
+      }
+      template.suggestedGroupsStatus = {
+        ...template.suggestedGroupsStatus,
+        [group as string]: "approved",
+      };
+      return new HttpResponse(null, { status: 204 });
+    }
+  ),
+
+  /**
+   * POST /api/review/:documentId/groups/:group/reject
+   * Rejects a suggested dynamic group for the associated template.
+   */
+  http.post(
+    "/api/review/:documentId/groups/:group/reject",
+    ({ params }) => {
+      const { documentId, group } = params;
+      const template = storedTemplates.find((t) => t.documentId === documentId);
+      if (!template) {
+        return HttpResponse.json(
+          { error: "No template found for document" },
+          { status: 404 }
+        );
+      }
+      template.suggestedGroupsStatus = {
+        ...template.suggestedGroupsStatus,
+        [group as string]: "rejected",
+      };
+      return new HttpResponse(null, { status: 204 });
+    }
+  ),
 ];
 
 // Helper functions for mock classification

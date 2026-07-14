@@ -106,6 +106,25 @@ export class TemplatesRepository {
   /**
    * Find a template by name and userId — used for 409 uniqueness check.
    */
+  async findByDocumentId(documentId: string): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
+        FROM templates
+        WHERE document_id = $1 AND status != 'archived'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [documentId],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
   async findByNameAndUserId(name: string, userId: number): Promise<TemplateRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `

@@ -8,6 +8,8 @@ import { PromptEngine } from "./prompt-engine.js";
 import { resolveModelChain, type AiTask } from "./model-router.js";
 import { SEED_GROUPS } from "./groups.service.js";
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // ---------------------------------------------------------------------------
 // Schema for validating AI response entities
 // ---------------------------------------------------------------------------
@@ -236,6 +238,7 @@ export class OpenRouterService {
     const retryableCodes = ["RATE_LIMIT", "NETWORK_ERROR", "INVALID_RESPONSE"];
     const fallbackTriggerCodes = ["MODEL_NOT_FOUND"];
     const fatalCodes = ["AUTH_ERROR", "API_ERROR"];
+    const delays = [1_000, 3_000];
     let lastError: OpenRouterError | undefined;
 
     for (let modelIndex = 0; modelIndex < chain.length; modelIndex++) {
@@ -269,9 +272,11 @@ export class OpenRouterService {
           }
 
           if (isPrimary && attempt < maxAttempts - 1) {
+            const delay = delays[attempt] ?? delays[delays.length - 1];
             this.logger.warn(
-              `${task} call failed with ${error.code} on "${model}" (attempt ${attempt + 1}/${maxAttempts}) — retrying`,
+              `${task} call failed with ${error.code} on "${model}" (attempt ${attempt + 1}/${maxAttempts}) — retrying in ${delay}ms`,
             );
+            await sleep(delay);
           }
         }
       }

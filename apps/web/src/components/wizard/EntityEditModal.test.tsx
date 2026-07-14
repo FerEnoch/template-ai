@@ -225,11 +225,27 @@ describe("EntityEditModal", () => {
       const groupSelect = screen.getByRole("combobox");
       expect(groupSelect).toBeInTheDocument();
 
-      // All group options should be available
+      // All seed group options should be available
       expect(screen.getByText("Partes")).toBeInTheDocument();
       expect(screen.getByText("Inmueble")).toBeInTheDocument();
       expect(screen.getByText("Fechas")).toBeInTheDocument();
       expect(screen.getByText("Anexos")).toBeInTheDocument();
+      expect(screen.getByText("General")).toBeInTheDocument();
+      expect(screen.getByText("Otros")).toBeInTheDocument();
+    });
+
+    it("renders dynamic group options when availableGroups is provided", () => {
+      render(
+        <EntityEditModal
+          {...createProps}
+          availableGroups={["PARTES", "JORNADA", "GARANTES"]}
+        />
+      );
+
+      expect(screen.getByText("Partes")).toBeInTheDocument();
+      expect(screen.getByText("Jornada")).toBeInTheDocument();
+      expect(screen.getByText("Garantes")).toBeInTheDocument();
+      expect(screen.queryByText("Inmueble")).not.toBeInTheDocument();
     });
 
     it("locks confidence to ALTA in create mode (disabled toggle)", () => {

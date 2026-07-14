@@ -22,7 +22,8 @@ import { useCreateEntityHandler } from "@/lib/wizard/useCreateEntityHandler";
 import { useUpdateEntityHandler } from "@/lib/wizard/useUpdateEntityHandler";
 import { WizardStep } from "@/lib/wizard";
 import type { Entity, ClassifySpanResponse } from "@template-ai/contracts";
-import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
+import { MANUAL_ENTITY_LIMIT, SEED_GROUPS } from "@template-ai/contracts";
+import { useSuggestedGroups } from "@/lib/wizard/useSuggestedGroups";
 
 export default function ReviewPage() {
   return (
@@ -46,6 +47,21 @@ function ReviewInner() {
   const [pendingBajaCount, setPendingBajaCount] = useState(0);
   const [isConfirmEnabled, setIsConfirmEnabled] = useState(false);
   const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
+
+  // Suggested dynamic groups for the current document/template
+  const {
+    suggestedGroupsStatus,
+    updateStatus: updateSuggestedGroupStatus,
+  } = useSuggestedGroups(state.analysisResultId);
+
+  const approvedDynamicGroups = Object.entries(suggestedGroupsStatus)
+    .filter(([, status]) => status === "approved")
+    .map(([group]) => group);
+
+  const availableGroups = [
+    ...SEED_GROUPS,
+    ...approvedDynamicGroups,
+  ] as string[];
 
   // Manual entity creation state
   const [isClassifying, setIsClassifying] = useState(false);
@@ -191,6 +207,76 @@ function ReviewInner() {
     cancelSelection();
   }, [cancelSelection]);
 
+  const handleApproveGroup = useCallback(
+    async (group: string) => {
+      if (!state.analysisResultId) return;
+
+      const previousStatus = suggestedGroupsStatus[group];
+      updateSuggestedGroupStatus(group, "approved");
+
+      try {
+        const response = await fetch(
+          `/api/review/${state.analysisResultId}/groups/${group}/approve`,
+          { method: "POST" }
+        );
+        if (!response.ok) {
+          throw new Error("Error al aprobar el grupo");
+        }
+      } catch (err) {
+        // Rollback optimistic update on failure
+        if (previousStatus) {
+          updateSuggestedGroupStatus(group, previousStatus);
+        }
+        setClassificationError(
+          err instanceof Error ? err.message : "Error al aprobar el grupo"
+        );
+      }
+    },
+    [state.analysisResultId, suggestedGroupsStatus, updateSuggestedGroupStatus]
+  );
+
+  const handleRejectGroup = useCallback(
+    async (group: string) => {
+      if (!state.analysisResultId) return;
+
+      const previousStatus = suggestedGroupsStatus[group];
+      updateSuggestedGroupStatus(group, "rejected");
+
+      // Optimistically reassign entities in this group to GENERAL
+      const reassigned: Entity[] = [];
+      state.entities.forEach((entity) => {
+        if (entity.group === group) {
+          const next = { ...entity, group: "GENERAL" as const };
+          reassigned.push(next);
+          updateEntity(next);
+        }
+      });
+
+      try {
+        const response = await fetch(
+          `/api/review/${state.analysisResultId}/groups/${group}/reject`,
+          { method: "POST" }
+        );
+        if (!response.ok) {
+          throw new Error("Error al rechazar el grupo");
+        }
+      } catch (err) {
+        // Rollback optimistic update on failure
+        if (previousStatus) {
+          updateSuggestedGroupStatus(group, previousStatus);
+        }
+        reassigned.forEach((entity) => {
+          const original = state.entities.find((e) => e.id === entity.id);
+          if (original) updateEntity({ ...original, group });
+        });
+        setClassificationError(
+          err instanceof Error ? err.message : "Error al rechazar el grupo"
+        );
+      }
+    },
+    [state.analysisResultId, suggestedGroupsStatus, state.entities, updateEntity, updateSuggestedGroupStatus]
+  );
+
   return (
     <AppShell sidebar={false}>
       <WizardLayout>
@@ -292,7 +378,7 @@ function ReviewInner() {
                         id: crypto.randomUUID(),
                         label: "",
                         value: selection?.text ?? "",
-                        group: "PARTES",
+                        group: "GENERAL",
                         confidence: "ALTA",
                         sourceSpan: selection?.sourceSpan ?? { start: 0, end: 0 },
                         reviewed: false,
@@ -354,6 +440,9 @@ function ReviewInner() {
                 onAddEntity={handleAddEntity}
                 manualEntityCount={manualEntityCount}
                 onEntityHover={setHoveredEntityId}
+                suggestedGroupsStatus={suggestedGroupsStatus}
+                onApproveGroup={handleApproveGroup}
+                onRejectGroup={handleRejectGroup}
               />
             </div>
           </section>
@@ -366,6 +455,7 @@ function ReviewInner() {
           mode="create"
           onSave={handleCreateModalSave}
           onClose={handleCreateModalClose}
+          availableGroups={availableGroups}
         />
 
         {/* Sticky bottom action bar */}

@@ -5,6 +5,7 @@ import { GroupsService } from "../ai/groups.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
 import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
+import { TemplatesRepository } from "../infrastructure/postgres/repositories/templates.repository";
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -215,6 +216,64 @@ export class ReviewService {
         canAddMore: count < MANUAL_ENTITY_LIMIT,
       };
     });
+  }
+
+  /**
+   * Find the template associated with a document and return its suggested
+   * groups status map. Returns an empty object when no template exists.
+   */
+  async getSuggestedGroupsStatus(
+    documentId: string,
+  ): Promise<Record<string, string>> {
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const templatesRepo = new TemplatesRepository(client);
+      const template = await templatesRepo.findByDocumentId(documentId);
+      return template?.suggestedGroupsStatus ?? {};
+    });
+  }
+
+  /**
+   * Approve a suggested dynamic group for the template associated with the
+   * given document. Throws NotFoundException if no template exists.
+   */
+  async approveGroup(documentId: string, group: string): Promise<void> {
+    const template = await this.postgres.withOwnerTransaction(
+      0,
+      async ({ client }) => {
+        const templatesRepo = new TemplatesRepository(client);
+        return templatesRepo.findByDocumentId(documentId);
+      },
+    );
+
+    if (!template) {
+      throw new NotFoundException(
+        `No template found for document "${documentId}"`,
+      );
+    }
+
+    await this.groupsService.approve(template.id, group);
+  }
+
+  /**
+   * Reject a suggested dynamic group for the template associated with the
+   * given document. Throws NotFoundException if no template exists.
+   */
+  async rejectGroup(documentId: string, group: string): Promise<void> {
+    const template = await this.postgres.withOwnerTransaction(
+      0,
+      async ({ client }) => {
+        const templatesRepo = new TemplatesRepository(client);
+        return templatesRepo.findByDocumentId(documentId);
+      },
+    );
+
+    if (!template) {
+      throw new NotFoundException(
+        `No template found for document "${documentId}"`,
+      );
+    }
+
+    await this.groupsService.reject(template.id, group);
   }
 
   /**
