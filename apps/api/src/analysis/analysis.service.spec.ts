@@ -21,6 +21,7 @@ function makeAnalysisResultRecord(
     retryCount: 0,
     errorMessage: null,
     extractedText: null,
+    suggestedGroups: [],
     ...overrides,
   };
 }

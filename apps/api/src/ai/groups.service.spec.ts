@@ -289,6 +289,7 @@ describe("GroupsService", () => {
             retryCount: 0,
             errorMessage: null,
             extractedText: null,
+            suggestedGroups: [],
           },
         ],
         entitiesByAnalysisResult: {

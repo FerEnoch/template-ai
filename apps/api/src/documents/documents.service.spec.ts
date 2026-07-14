@@ -50,6 +50,7 @@ function makeAnalysisResultRecord(overrides: Partial<AnalysisResultRecord> = {})
     retryCount: 0,
     errorMessage: null,
     extractedText: null,
+    suggestedGroups: [],
     ...overrides,
   };
 }
