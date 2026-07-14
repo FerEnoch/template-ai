@@ -501,7 +501,7 @@ describe("ReviewService", () => {
       expect(mockOpenRouter.classifySpan).toHaveBeenCalledTimes(2);
     });
 
-    it("should return GENERAL group result as a SIN_CLASIFICAR fallback", async () => {
+    it("should return GENERAL group result as-is (valid classification)", async () => {
       const mockPostgres = createMockPostgresService({
         manualEntityCount: 0,
       });
@@ -521,7 +521,7 @@ describe("ReviewService", () => {
       });
 
       expect(result).toEqual({
-        label: "SIN_CLASIFICAR",
+        label: "OTRO",
         group: "GENERAL",
         value: "fragmento ambiguo",
       });

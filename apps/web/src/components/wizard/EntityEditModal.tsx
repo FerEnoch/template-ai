@@ -6,7 +6,7 @@ import type { Entity } from "@template-ai/contracts";
 import { SEED_GROUPS } from "@template-ai/contracts";
 import { getGroupConfig } from "@/lib/case/groupConfig";
 
-type Confidence = "ALTA" | "BAJA";
+type Confidence = "ALTA" | "MEDIA" | "BAJA";
 
 interface EntityEditModalProps {
   entity: Entity | null;
@@ -22,6 +22,11 @@ const CONFIDENCE_OPTIONS: { value: Confidence; label: string; activeClass: strin
     value: "ALTA",
     label: "ALTA",
     activeClass: "border-success bg-success/10 text-success",
+  },
+  {
+    value: "MEDIA",
+    label: "MEDIA",
+    activeClass: "border-warning bg-warning/10 text-warning",
   },
   {
     value: "BAJA",
@@ -55,7 +60,7 @@ export function EntityEditModal({
       setValue(entity.value);
       setLabel(entity.label);
       setGroup(entity.group as Entity["group"]);
-      setConfidence(entity.confidence === "MEDIA" ? "ALTA" : (entity.confidence as Confidence));
+      setConfidence(entity.confidence as Confidence);
       setExcluded(entity.excluded ?? false);
       setError(null);
     }

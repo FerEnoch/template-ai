@@ -283,45 +283,10 @@ describe("DocumentAnalysisService", () => {
   });
 
   describe("callAiWithRetry", () => {
-    beforeEach(() => {
-      vi.useFakeTimers();
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-    });
-
-    it("should retry on RATE_LIMIT errors up to 3 attempts", async () => {
-      mockGetExamples.mockResolvedValue("");
-      mockResolveGroups.mockResolvedValue(["PARTES"]);
-      mockExtractEntities
-        .mockRejectedValueOnce(new OpenRouterError("rate limited", "RATE_LIMIT"))
-        .mockRejectedValueOnce(new OpenRouterError("rate limited again", "RATE_LIMIT"))
-        .mockResolvedValue({ entities: [], rawResponse: "[]" });
-
-      // Trigger analyze which calls callAiWithRetry internally
-      const pdfParse = (await import("pdf-parse")).default;
-      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
-        text: "test",
-        numpages: 1,
-      });
-
-      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
-
-      // Advance timers to skip backoff delays
-      await vi.runAllTimersAsync();
-      const result = await analyzePromise;
-
-      expect(result.success).toBe(true);
-      expect(mockExtractEntities).toHaveBeenCalledTimes(3);
-    });
-
-    it("should retry on NETWORK_ERROR", async () => {
-      mockGetExamples.mockResolvedValue("");
-      mockResolveGroups.mockResolvedValue(["PARTES"]);
-      mockExtractEntities
-        .mockRejectedValueOnce(new OpenRouterError("unreachable", "NETWORK_ERROR"))
-        .mockResolvedValue({ entities: [], rawResponse: "[]" });
+    it("should resolve fewShot and groups, then call extractEntities once", async () => {
+      mockGetExamples.mockResolvedValue("-- few-shot --");
+      mockResolveGroups.mockResolvedValue(["PARTES", "GENERAL"]);
+      mockExtractEntities.mockResolvedValue({ entities: [], rawResponse: "[]" });
 
       const pdfParse = (await import("pdf-parse")).default;
       (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -329,36 +294,21 @@ describe("DocumentAnalysisService", () => {
         numpages: 1,
       });
 
-      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
-      await vi.runAllTimersAsync();
-      const result = await analyzePromise;
+      const result = await service.analyze("/uploads/test.pdf", undefined, 1);
 
       expect(result.success).toBe(true);
-      expect(mockExtractEntities).toHaveBeenCalledTimes(2);
-    });
-
-    it("should retry on INVALID_RESPONSE", async () => {
-      mockGetExamples.mockResolvedValue("");
-      mockResolveGroups.mockResolvedValue(["PARTES"]);
-      mockExtractEntities
-        .mockRejectedValueOnce(new OpenRouterError("bad json", "INVALID_RESPONSE"))
-        .mockResolvedValue({ entities: [], rawResponse: "[]" });
-
-      const pdfParse = (await import("pdf-parse")).default;
-      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
-        text: "test",
-        numpages: 1,
+      expect(mockGetExamples).toHaveBeenCalledWith(1);
+      expect(mockResolveGroups).toHaveBeenCalledWith(undefined);
+      expect(mockExtractEntities).toHaveBeenCalledTimes(1);
+      expect(mockExtractEntities).toHaveBeenCalledWith({
+        documentText: "test",
+        userId: 1,
+        groups: ["PARTES", "GENERAL"],
+        fewShot: "-- few-shot --",
       });
-
-      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
-      await vi.runAllTimersAsync();
-      const result = await analyzePromise;
-
-      expect(result.success).toBe(true);
-      expect(mockExtractEntities).toHaveBeenCalledTimes(2);
     });
 
-    it("should NOT retry on CONFIG_ERROR (AUTH_ERROR)", async () => {
+    it("should propagate OpenRouterError without retrying", async () => {
       mockGetExamples.mockResolvedValue("");
       mockResolveGroups.mockResolvedValue(["PARTES"]);
       mockExtractEntities.mockRejectedValue(
@@ -375,29 +325,6 @@ describe("DocumentAnalysisService", () => {
 
       expect(result.success).toBe(false);
       expect(mockExtractEntities).toHaveBeenCalledTimes(1);
-    });
-
-    it("should fail permanently after 3 attempts", async () => {
-      mockGetExamples.mockResolvedValue("");
-      mockResolveGroups.mockResolvedValue(["PARTES"]);
-      mockExtractEntities
-        .mockRejectedValueOnce(new OpenRouterError("e1", "INVALID_RESPONSE"))
-        .mockRejectedValueOnce(new OpenRouterError("e2", "INVALID_RESPONSE"))
-        .mockRejectedValueOnce(new OpenRouterError("e3", "INVALID_RESPONSE"));
-
-      const pdfParse = (await import("pdf-parse")).default;
-      (pdfParse as ReturnType<typeof vi.fn>).mockResolvedValue({
-        text: "test",
-        numpages: 1,
-      });
-
-      const analyzePromise = service.analyze("/uploads/test.pdf", undefined, 1);
-      await vi.runAllTimersAsync();
-      const result = await analyzePromise;
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("e3");
-      expect(mockExtractEntities).toHaveBeenCalledTimes(3);
     });
   });
 

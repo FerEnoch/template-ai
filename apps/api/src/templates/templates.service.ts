@@ -3,6 +3,7 @@ import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { TemplatesRepository } from "../infrastructure/postgres/repositories/templates.repository";
 import { DocumentsRepository } from "../infrastructure/postgres/repositories/documents.repository";
 import { CasesRepository } from "../infrastructure/postgres/repositories/cases.repository";
+import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
 import type { CreateTemplateInput } from "../infrastructure/postgres/repositories/templates.repository";
 import { unlink as fsUnlink } from "fs/promises";
 
@@ -48,6 +49,7 @@ export interface CreateTemplateData {
   entities: unknown[];
   category: string;
   status?: string;
+  suggestedGroupsStatus?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +103,20 @@ export class TemplatesService {
     return this.postgres.withOwnerTransaction(userId, async ({ client }) => {
       const repo = new TemplatesRepository(client);
 
+      // Resolve suggested groups from the analysis result so model-suggested
+      // groups survive the analysis → template-creation gap.
+      let suggestedGroupsStatus = data.suggestedGroupsStatus ?? {};
+      if (Object.keys(suggestedGroupsStatus).length === 0) {
+        const analysisRepo = new AnalysisResultsRepository(client);
+        const results = await analysisRepo.findByDocumentId(data.documentId);
+        const latest = results[0];
+        if (latest?.suggestedGroups?.length) {
+          suggestedGroupsStatus = Object.fromEntries(
+            latest.suggestedGroups.map((g) => [g, "pending"]),
+          );
+        }
+      }
+
       const input: CreateTemplateInput = {
         userId,
         name: data.name,
@@ -109,6 +125,7 @@ export class TemplatesService {
         category: data.category,
         status: data.status,
         entities: data.entities,
+        suggestedGroupsStatus,
       };
 
       try {

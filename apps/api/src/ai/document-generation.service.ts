@@ -68,8 +68,6 @@ function buildGenerationVars(input: GenerateInput): Record<string, string> {
 // Service
 // ---------------------------------------------------------------------------
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 @Injectable()
 export class DocumentGenerationService {
   private readonly logger = new Logger(DocumentGenerationService.name);
@@ -118,40 +116,13 @@ export class DocumentGenerationService {
   }
 
   /**
-   * Call AI generation with exponential backoff on retryable errors.
-   * 3 attempts total with 1s, 3s backoff.
+   * Delegate to OpenRouterService.generateDocument.
+   * Retry is handled internally by callWithRetryChain (3 primary + 1 fallback).
    */
   private async callWithRetry(
     task: "generation" | "generation-no-base",
     vars: Record<string, string>,
   ): Promise<{ generatedText: string }> {
-    const retryableCodes = ["RATE_LIMIT", "NETWORK_ERROR", "INVALID_RESPONSE"];
-    const delays = [1_000, 3_000];
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt <= delays.length; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = delays[attempt - 1];
-          this.logger.warn(
-            `Generation call failed (attempt ${attempt}) — retrying in ${delay / 1000}s...`,
-          );
-          await sleep(delay);
-        }
-        return await this.openRouterService.generateDocument(task, vars);
-      } catch (error) {
-        lastError = error;
-        if (
-          error instanceof OpenRouterError &&
-          retryableCodes.includes(error.code) &&
-          attempt < delays.length
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    throw lastError;
+    return this.openRouterService.generateDocument(task, vars);
   }
 }

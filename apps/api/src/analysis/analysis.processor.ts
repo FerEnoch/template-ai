@@ -83,6 +83,10 @@ export class AnalysisProcessor extends WorkerHost {
         await analysisRepo.saveExtractedText(analysisResultId, analysisResult.extractedText);
       }
 
+      if (analysisResult.suggestedGroups && analysisResult.suggestedGroups.length > 0) {
+        await analysisRepo.saveSuggestedGroups(analysisResultId, analysisResult.suggestedGroups);
+      }
+
       await analysisRepo.updateStatus(analysisResultId, "completed");
     });
 

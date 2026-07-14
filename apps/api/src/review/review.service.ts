@@ -6,6 +6,7 @@ import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
 import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
 import { TemplatesRepository } from "../infrastructure/postgres/repositories/templates.repository";
+import { TemplatesRepository } from "../infrastructure/postgres/repositories/templates.repository";
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -127,9 +128,9 @@ export class ReviewService {
     documentId: string,
     input: ClassifySpanInput,
   ): Promise<{ label: string; group: string; value: string }> {
-    // Resolve the allowed groups before opening a transaction so we avoid
-    // nesting owner-scoped transactions.
-    const groups = await this.groupsService.resolve();
+    // Resolve templateId from document to include dynamic groups.
+    const templateId = await this.resolveTemplateId(documentId);
+    const groups = await this.groupsService.resolve(templateId);
 
     return this.postgres.withOwnerTransaction(0, async ({ client }) => {
       const entitiesRepo = new EntitiesRepository(client);
@@ -144,10 +145,10 @@ export class ReviewService {
           groups,
         );
 
-        // If the model returns GENERAL or proposes a group outside the allowed
-        // set, treat the span as unclassifiable.
+        // If the model returns a group outside the allowed set,
+        // treat the span as unclassifiable. GENERAL is a valid
+        // classification — keep the model's label.
         if (
-          result.group === "GENERAL" ||
           !groups.map((g) => g.toUpperCase()).includes(result.group.toUpperCase())
         ) {
           return this.buildUnclassifiedFallback(input.text);
@@ -162,6 +163,18 @@ export class ReviewService {
         }
         throw error;
       }
+    });
+  }
+
+  /**
+   * Look up the template associated with a document to include its
+   * approved dynamic groups during span classification.
+   */
+  private async resolveTemplateId(documentId: string): Promise<string | undefined> {
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const templatesRepo = new TemplatesRepository(client);
+      const template = await templatesRepo.findByDocumentId(documentId);
+      return template?.id;
     });
   }
 

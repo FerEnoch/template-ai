@@ -22,6 +22,7 @@ export interface CreateTemplateInput {
   category: string;
   status?: string;
   entities: unknown[];
+  suggestedGroupsStatus?: Record<string, string>;
 }
 
 function rowToTemplate(row: Record<string, unknown>): TemplateRecord {
@@ -46,8 +47,8 @@ export class TemplatesRepository {
   async create(input: CreateTemplateInput): Promise<TemplateRecord> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        INSERT INTO templates (user_id, name, description, document_id, category, status, entities)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO templates (user_id, name, description, document_id, category, status, entities, suggested_groups_status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
       `,
       [
@@ -58,6 +59,7 @@ export class TemplatesRepository {
         input.category,
         input.status ?? "draft",
         JSON.stringify(input.entities),
+        JSON.stringify(input.suggestedGroupsStatus ?? {}),
       ],
     );
 

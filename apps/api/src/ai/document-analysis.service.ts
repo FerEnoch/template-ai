@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
-import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
+import { OpenRouterService } from "./open-router.service.js";
 import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
 import { CACHE_CONFIG } from "../config/ai.js";
 import { FewShotProvider } from "./few-shot-provider.js";
@@ -75,8 +75,6 @@ export function validateAndCorrectSpans(
     return corrected;
   });
 }
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 @Injectable()
 export class DocumentAnalysisService {
@@ -200,56 +198,24 @@ export class DocumentAnalysisService {
   }
 
   /**
-   * Call AI extraction with exponential backoff on rate limits.
-   * Primary model → (rate limit?) → fallback model → (rate limit?) → wait → retry.
-   * Gives up after exhausting all attempts.
+   * Build context-aware prompt inputs and delegate to OpenRouterService.
+   * Retry is handled internally by callWithRetryChain (3 primary + 1 fallback).
    */
   private async callAiWithRetry(
     fileContent: string,
     userId: number,
     templateId?: string,
   ) {
-    // Build context-aware prompt inputs once.
     const [fewShot, groups] = await Promise.all([
       this.fewShotProvider.getExamples(userId),
       this.groupsService.resolve(templateId),
     ]);
 
-    // Retryable error codes — transient failures worth re-attempting.
-    // CONFIG_ERROR (bad API key, model not found) is NOT retried.
-    const retryableCodes = ["RATE_LIMIT", "NETWORK_ERROR", "INVALID_RESPONSE"];
-    // Exponential-ish backoff: 1s, 3s → 3 total attempts (initial + 2 retries)
-    const delays = [1_000, 3_000];
-    let lastError: unknown;
-
-    for (let attempt = 0; attempt <= delays.length; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = delays[attempt - 1];
-          this.logger.warn(
-            `AI call failed (attempt ${attempt}) — retrying in ${delay / 1000}s...`,
-          );
-          await sleep(delay);
-        }
-        return await this.openRouterService.extractEntities({
-          documentText: fileContent,
-          userId,
-          groups,
-          fewShot,
-        });
-      } catch (error) {
-        lastError = error;
-        if (
-          error instanceof OpenRouterError &&
-          retryableCodes.includes(error.code) &&
-          attempt < delays.length
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    throw lastError;
+    return this.openRouterService.extractEntities({
+      documentText: fileContent,
+      userId,
+      groups,
+      fewShot,
+    });
   }
 }
