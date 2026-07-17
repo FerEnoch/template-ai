@@ -1,24 +1,84 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EditableParagraph } from "./EditableParagraph";
 import { splitParagraphs } from "@/lib/export/splitParagraphs";
 import { updateCase } from "@/lib/api/cases";
 
+const BODY_TEXT_STARTERS = [
+  "El presente",
+  "En la ciudad",
+  "Entre los",
+  "Por medio de",
+];
+
+const SENTENCE_ENDING_PATTERN = /[.;:?!]$/;
+
+export function isTitleParagraph(text: string): boolean {
+  const trimmed = text.trim();
+
+  if (trimmed.length > 100) return false;
+  if (SENTENCE_ENDING_PATTERN.test(trimmed)) return false;
+
+  const lowerTrimmed = trimmed.toLowerCase();
+  if (
+    BODY_TEXT_STARTERS.some((starter) =>
+      lowerTrimmed.startsWith(starter.toLowerCase())
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export function deriveTitle(displayName: string): string {
+  return displayName
+    .trim()
+    .split(/[-\s]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function ensureTitleParagraphs(
+  generatedText: string,
+  displayName: string
+): string[] {
+  const paragraphs = splitParagraphs(generatedText);
+  const fallbackTitle = deriveTitle(displayName);
+
+  if (paragraphs.length === 0) {
+    return [fallbackTitle];
+  }
+
+  if (!isTitleParagraph(paragraphs[0])) {
+    return [fallbackTitle, ...paragraphs];
+  }
+
+  return paragraphs;
+}
+
 export interface DocumentViewerProps {
   readonly caseId: string;
+  readonly title: string;
   readonly generatedText: string;
   readonly onUpdate?: (text: string) => void;
 }
 
 export function DocumentViewer({
   caseId,
+  title,
   generatedText,
   onUpdate,
 }: DocumentViewerProps) {
   const [paragraphs, setParagraphs] = useState<string[]>(() =>
-    splitParagraphs(generatedText)
+    ensureTitleParagraphs(generatedText, title)
   );
+
+  useEffect(() => {
+    setParagraphs(ensureTitleParagraphs(generatedText, title));
+  }, [generatedText, title]);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 

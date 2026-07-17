@@ -189,6 +189,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
         <div className="flex-grow w-full md:w-2/3">
           <DocumentViewer
             caseId={caseItem.id}
+            title={displayName}
             generatedText={caseItem.generatedText}
             onUpdate={(text) =>
               setCaseItem((current) =>
