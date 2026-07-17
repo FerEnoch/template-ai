@@ -14,17 +14,21 @@ export async function generateDocx({
 
   const children: docx.Paragraph[] = [];
 
-  if (title) {
+  // First paragraph is the document title — render as HEADING_1.
+  // The filename (title param) is metadata and NOT rendered in the document body.
+  if (paragraphs.length > 0) {
     children.push(
       new docx.Paragraph({
-        text: title,
+        text: paragraphs[0],
         heading: docx.HeadingLevel.HEADING_1,
         alignment: docx.AlignmentType.CENTER,
       })
     );
   }
 
-  for (const paragraph of paragraphs) {
+  const bodyParagraphs = paragraphs.length > 0 ? paragraphs.slice(1) : [];
+
+  for (const paragraph of bodyParagraphs) {
     children.push(
       new docx.Paragraph({
         text: paragraph,
