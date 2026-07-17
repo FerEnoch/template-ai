@@ -168,12 +168,14 @@ export async function fetchCase(id: string): Promise<CaseWithTemplate> {
 
 export async function updateCase(
   id: string,
-  data: UpdateCaseFormData
+  data: UpdateCaseFormData,
+  signal?: AbortSignal
 ): Promise<Case> {
   const response = await safeFetch(`/api/cases/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
+    signal,
   });
   return handleResponse<Case>(response);
 }
