@@ -1,20 +1,69 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EditableParagraph } from "./EditableParagraph";
-import { EditableTitle } from "./EditableTitle";
 import { splitParagraphs } from "@/lib/export/splitParagraphs";
 import { updateCase } from "@/lib/api/cases";
+
+const BODY_TEXT_STARTERS = [
+  "El presente",
+  "En la ciudad",
+  "Entre los",
+  "Por medio de",
+];
+
+const SENTENCE_ENDING_PATTERN = /[.;:?!]$/;
+
+export function isTitleParagraph(text: string): boolean {
+  const trimmed = text.trim();
+
+  if (trimmed.length > 100) return false;
+  if (SENTENCE_ENDING_PATTERN.test(trimmed)) return false;
+
+  const lowerTrimmed = trimmed.toLowerCase();
+  if (
+    BODY_TEXT_STARTERS.some((starter) =>
+      lowerTrimmed.startsWith(starter.toLowerCase())
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export function deriveTitle(displayName: string): string {
+  return displayName
+    .trim()
+    .split(/[-\s]+/)
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function ensureTitleParagraphs(
+  generatedText: string,
+  displayName: string
+): string[] {
+  const paragraphs = splitParagraphs(generatedText);
+  const fallbackTitle = deriveTitle(displayName);
+
+  if (paragraphs.length === 0) {
+    return [fallbackTitle];
+  }
+
+  if (!isTitleParagraph(paragraphs[0])) {
+    return [fallbackTitle, ...paragraphs];
+  }
+
+  return paragraphs;
+}
 
 export interface DocumentViewerProps {
   readonly caseId: string;
   readonly title: string;
   readonly generatedText: string;
   readonly onUpdate?: (text: string) => void;
-  readonly onRenameTitle?: (
-    name: string,
-    signal?: AbortSignal
-  ) => Promise<void>;
 }
 
 export function DocumentViewer({
@@ -22,11 +71,14 @@ export function DocumentViewer({
   title,
   generatedText,
   onUpdate,
-  onRenameTitle,
 }: DocumentViewerProps) {
   const [paragraphs, setParagraphs] = useState<string[]>(() =>
-    splitParagraphs(generatedText)
+    ensureTitleParagraphs(generatedText, title)
   );
+
+  useEffect(() => {
+    setParagraphs(ensureTitleParagraphs(generatedText, title));
+  }, [generatedText, title]);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,25 +112,6 @@ export function DocumentViewer({
     <div className="bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] min-h-[1000px] p-12 md:p-20 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-stone-900" />
       <article className="max-w-prose mx-auto">
-        {onRenameTitle ? (
-          <div className="text-center mb-16">
-            <EditableTitle
-              value={title}
-              onSave={onRenameTitle}
-              className="inline-block"
-              inputClassName="w-full rounded-md border border-border bg-surface px-2 py-1 text-center font-headline text-3xl font-bold leading-tight text-text-primary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            >
-              <h1 className="font-headline text-3xl font-bold text-center tracking-tight text-stone-900">
-                {title}
-              </h1>
-            </EditableTitle>
-          </div>
-        ) : (
-          <h1 className="font-headline text-3xl font-bold text-center mb-16 tracking-tight text-stone-900">
-            {title}
-          </h1>
-        )}
-
         {error && (
           <p className="mb-6 text-sm font-label text-danger text-center">
             {error}
@@ -92,6 +125,7 @@ export function DocumentViewer({
             index={index}
             onSave={handleSave}
             isSaving={savingIndex === index}
+            asHeading={index === 0}
           />
         ))}
 

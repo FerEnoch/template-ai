@@ -21,18 +21,22 @@ export function generatePdf({ text, title }: GeneratePdfOptions): Blob {
   doc.setFont("times", "normal");
   doc.setFontSize(12);
 
-  if (title) {
+  const paragraphs = splitParagraphs(text);
+
+  // First paragraph is the document title — render as heading.
+  // The filename (title param) is metadata and NOT rendered in the document body.
+  if (paragraphs.length > 0) {
     doc.setFont("times", "bold");
     doc.setFontSize(16);
-    doc.text(title, pageWidth / 2, cursorY, { align: "center" });
+    doc.text(paragraphs[0], pageWidth / 2, cursorY, { align: "center" });
     cursorY += 12;
     doc.setFont("times", "normal");
     doc.setFontSize(12);
   }
 
-  const paragraphs = splitParagraphs(text);
+  const bodyParagraphs = paragraphs.length > 0 ? paragraphs.slice(1) : [];
 
-  for (const paragraph of paragraphs) {
+  for (const paragraph of bodyParagraphs) {
     const lines = doc.splitTextToSize(paragraph, maxWidth);
     const blockHeight = lines.length * 6;
 

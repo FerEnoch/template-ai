@@ -9,7 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import type { Template, Entity, Case } from "@template-ai/contracts";
+import type { Template, Entity, Case, UpdateCaseFormData } from "@template-ai/contracts";
 import { updateCase } from "@/lib/api/cases";
 import {
   loadCaseFormDraft,
@@ -24,6 +24,7 @@ export interface CaseState {
   caseId: string | null;
   caseStatus: Case["status"] | null;
   caseName: string | null;
+  nameError: string | null;
   status: "idle" | "saving" | "generating" | "exporting" | "error";
   saveStatus: "idle" | "saving" | "saved" | "error";
   progress: number;
@@ -40,6 +41,7 @@ export type CaseAction =
       payload: { caseId: string; caseStatus: Case["status"] };
     }
   | { type: "SET_CASE_NAME"; payload: string | null }
+  | { type: "SET_NAME_ERROR"; payload: string | null }
   | { type: "SET_STATUS"; payload: CaseState["status"] }
   | { type: "SET_SAVE_STATUS"; payload: CaseState["saveStatus"] }
   | { type: "SET_LOADING"; payload: boolean }
@@ -98,6 +100,8 @@ export function caseReducer(
       };
     case "SET_CASE_NAME":
       return { ...state, caseName: action.payload };
+    case "SET_NAME_ERROR":
+      return { ...state, nameError: action.payload };
     case "SET_STATUS":
       return { ...state, status: action.payload };
     case "SET_SAVE_STATUS":
@@ -148,6 +152,7 @@ export const initialCaseState: CaseState = {
   caseId: null,
   caseStatus: null,
   caseName: null,
+  nameError: null,
   status: "idle",
   saveStatus: "idle",
   progress: 0,
@@ -242,16 +247,29 @@ export function CaseProvider({
 
   const saveForm = useCallback(async () => {
     if (!state.caseId || state.caseStatus !== "borrador") return;
+
+    // Effective name: user input > template name > nothing.
+    // No minimum-length validation — the DB unique constraint is the only guard.
+    const effectiveName = (
+      state.caseName ?? state.template?.name ?? ""
+    ).trim();
+
+    dispatch({ type: "SET_NAME_ERROR", payload: null });
+
     dispatch({ type: "SET_SAVE_STATUS", payload: "saving" });
     try {
-      await updateCase(state.caseId, { formData: state.formData });
+      const body: Record<string, unknown> = { formData: state.formData };
+      if (effectiveName) {
+        body.name = effectiveName;
+      }
+      await updateCase(state.caseId, body as UpdateCaseFormData);
       lastSavedFormData.current = { ...state.formData };
       dispatch({ type: "SET_SAVE_STATUS", payload: "saved" });
     } catch (err) {
       dispatch({ type: "SET_SAVE_STATUS", payload: "error" });
       throw err;
     }
-  }, [state.caseId, state.caseStatus, state.formData]);
+  }, [state.caseId, state.caseStatus, state.formData, state.caseName, state.template?.name, dispatch]);
 
   // Auto-save trigger every 30s when the form is dirty and case is editable
   useEffect(() => {
@@ -263,11 +281,13 @@ export function CaseProvider({
     if (!isDirty) return;
 
     const timer = setInterval(() => {
+      const trimmedName = (state.caseName ?? "").trim();
+      if (trimmedName.length < 3) return;
       void saveForm();
     }, 30000);
 
     return () => clearInterval(timer);
-  }, [state.caseId, state.caseStatus, state.formData, saveForm]);
+  }, [state.caseId, state.caseStatus, state.formData, state.caseName, saveForm]);
 
   useEffect(() => {
     if (initialCase) {
