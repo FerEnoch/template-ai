@@ -7,14 +7,12 @@ import { updateCase } from "@/lib/api/cases";
 
 export interface DocumentViewerProps {
   readonly caseId: string;
-  readonly title: string;
   readonly generatedText: string;
   readonly onUpdate?: (text: string) => void;
 }
 
 export function DocumentViewer({
   caseId,
-  title,
   generatedText,
   onUpdate,
 }: DocumentViewerProps) {
@@ -54,13 +52,6 @@ export function DocumentViewer({
     <div className="bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] min-h-[1000px] p-12 md:p-20 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-stone-900" />
       <article className="max-w-prose mx-auto">
-        <p
-          className="text-sm font-label text-stone-500 mb-8"
-          data-testid="filename-label"
-        >
-          Documento: {title}
-        </p>
-
         {error && (
           <p className="mb-6 text-sm font-label text-danger text-center">
             {error}
@@ -74,6 +65,7 @@ export function DocumentViewer({
             index={index}
             onSave={handleSave}
             isSaving={savingIndex === index}
+            asHeading={index === 0}
           />
         ))}
 

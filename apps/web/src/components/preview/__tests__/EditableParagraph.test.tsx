@@ -47,4 +47,28 @@ describe("EditableParagraph", () => {
     expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByText("Original.")).toBeInTheDocument();
   });
+
+  it("renders as an h1 when asHeading is true", () => {
+    render(
+      <EditableParagraph
+        text="Heading"
+        index={0}
+        onSave={vi.fn()}
+        asHeading
+      />
+    );
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("Heading");
+    expect(heading).toHaveClass("font-headline");
+    expect(heading).toHaveClass("text-3xl");
+  });
+
+  it("renders as a paragraph when asHeading is false", () => {
+    render(
+      <EditableParagraph text="Paragraph" index={0} onSave={vi.fn()} />
+    );
+
+    expect(screen.getByText("Paragraph")).toHaveRole("paragraph");
+  });
 });

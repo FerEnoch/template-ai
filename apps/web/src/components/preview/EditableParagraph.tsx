@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { Edit2, Check, X, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface EditableParagraphProps {
   readonly text: string;
   readonly index: number;
   readonly onSave: (index: number, newText: string) => void;
   readonly isSaving?: boolean;
+  readonly asHeading?: boolean;
 }
 
 export function EditableParagraph({
@@ -15,6 +17,7 @@ export function EditableParagraph({
   index,
   onSave,
   isSaving = false,
+  asHeading = false,
 }: EditableParagraphProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -70,15 +73,24 @@ export function EditableParagraph({
     );
   }
 
+  const HeadingTag = asHeading ? "h1" : "p";
+
   return (
     <section className="group relative mb-8">
-      <p className="leading-relaxed text-justify text-stone-800 whitespace-pre-wrap">
+      <HeadingTag
+        className={cn(
+          "whitespace-pre-wrap",
+          asHeading
+            ? "text-center font-headline text-3xl font-bold text-stone-900 tracking-tight mb-10"
+            : "leading-relaxed text-justify text-stone-800"
+        )}
+      >
         {text}
-      </p>
+      </HeadingTag>
       <button
         type="button"
         onClick={handleEdit}
-        aria-label="Editar párrafo"
+        aria-label={asHeading ? "Editar título" : "Editar párrafo"}
         className="absolute -right-8 top-0 p-1 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity hover:text-stone-900"
       >
         <Edit2 className="h-4 w-4" />

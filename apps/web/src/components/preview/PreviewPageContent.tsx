@@ -10,7 +10,7 @@ import { ExportSpinner } from "@/components/preview/ExportSpinner";
 import { fetchCase, generateCase, updateCase, ApiError } from "@/lib/api/cases";
 import type { CaseWithTemplate } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw, FileText } from "lucide-react";
 
 const ERROR_TYPE_LABELS: Record<string, string> = {
   NETWORK_ERROR: "Error de red",
@@ -145,6 +145,16 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
         párrafo.
       </div>
 
+      <div className="w-full bg-stone-50/80 border-b border-stone-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-3">
+          <FileText className="h-5 w-5 text-stone-500" aria-hidden="true" />
+          <span className="text-sm font-label text-stone-500">Documento:</span>
+          <h1 className="text-base font-label font-semibold text-stone-700">
+            {displayName}
+          </h1>
+        </div>
+      </div>
+
       {regenError && (
         <div className="w-full bg-danger/10 border-b border-danger/20 px-6 py-3">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
@@ -179,7 +189,6 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
         <div className="flex-grow w-full md:w-2/3">
           <DocumentViewer
             caseId={caseItem.id}
-            title={caseItem.name ?? caseItem.template.name}
             generatedText={caseItem.generatedText}
             onUpdate={(text) =>
               setCaseItem((current) =>
