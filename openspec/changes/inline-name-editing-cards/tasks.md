@@ -25,18 +25,18 @@ Delivery: `force-chained` / `feature-branch-chain`. Tracker `feature/inline-name
 
 ## PR 2 — `EditableTitle`
 
-- [ ] 2.1 Create `components/preview/EditableTitle.tsx` (`{ value, onSave, children, className, inputClassName, minLength, maxLength }`). Consumes `useInlineEdit`. Non-editing = `children` + `Pencil` icon on `group-hover`; icon click → `startEdit`; wrapper stops propagation.
-- [ ] 2.2 Input: `font-headline`, focus ring, `aria-invalid`, `aria-describedby`; respect overrides. Error via `errorClassName`.
-- [ ] 2.3 Add `EditableTitle.test.tsx`: icon hidden default + visible on hover; icon click focuses pre-filled input; Enter saves, Escape reverts, blur saves, blur-unchanged skips; < 3 inline error; rejection reverts; icon click does not bubble.
-- [ ] 2.4 Export from `preview/index.ts`. Typecheck + tests pass.
+- [x] 2.1 Create `components/preview/EditableTitle.tsx` (`{ value, onSave, children, className, inputClassName, minLength, maxLength }`). Consumes `useInlineEdit`. Non-editing = `children` + `Pencil` icon on `group-hover`; icon click → `startEdit`; wrapper stops propagation.
+- [x] 2.2 Input: `font-headline`, focus ring, `aria-invalid`, `aria-describedby`; respect overrides. Error via `errorClassName`.
+- [x] 2.3 Add `EditableTitle.test.tsx`: icon hidden default + visible on hover; icon click focuses pre-filled input; Enter saves, Escape reverts, blur saves, blur-unchanged skips; < 3 inline error; rejection reverts; icon click does not bubble.
+- [x] 2.4 Export from `preview/index.ts`. Typecheck + tests pass.
 
 ## PR 3 — Wire `/biblioteca/[id]` + `/nuevo/[templateId]`
 
-- [ ] 3.1 `app/biblioteca/[id]/page.tsx`: `handleRenameTemplate(name, signal)` → `updateTemplateName(id, name, signal)` + `setTemplate`; wrap `<h1>` with `EditableName value={template.name} onSave={handleRenameTemplate}`.
-- [ ] 3.2 `components/case/CaseProgress.tsx`: add required `onRename` prop; wrap `<h1>` with `EditableName value={caseName ?? template.name} onSave={onRename}`.
-- [ ] 3.3 `components/case/NewCaseLayout.tsx`: accept `onRename`, forward to `CaseProgress`.
-- [ ] 3.4 `app/nuevo/[templateId]/page.tsx`: `handleRenameCase(name, signal)` → `updateCase(id, { name }, signal)` + `dispatch({ type: 'SET_CASE_NAME', payload: name })`; pass to `NewCaseLayout onRename={...}`. Add `SET_CASE_NAME` to `CaseContext` reducer if absent.
-- [ ] 3.5 Integration tests: mock API, click+change+Enter, assert PATCH + state; PATCH failure does NOT dispatch `SET_CASE_NAME` and reverts UI.
+- [x] 3.1 `app/biblioteca/[id]/page.tsx`: `handleRenameTemplate(name, signal)` → `updateTemplateName(id, name, signal)` + `setTemplate`; wrap `<h1>` with `EditableName value={template.name} onSave={handleRenameTemplate}`.
+- [x] 3.2 `components/case/CaseProgress.tsx`: add required `onRename` prop; wrap `<h1>` with `EditableName value={caseName ?? template.name} onSave={onRename}`.
+- [x] 3.3 `components/case/NewCaseLayout.tsx`: accept `onRename`, forward to `CaseProgress`.
+- [x] 3.4 `app/nuevo/[templateId]/page.tsx`: `handleRenameCase(name, signal)` → `updateCase(id, { name }, signal)` + `dispatch({ type: 'SET_CASE_NAME', payload: name })`; pass to `NewCaseLayout onRename={...}`. Add `SET_CASE_NAME` to `CaseContext` reducer if absent.
+- [x] 3.5 Integration tests: mock API, click+change+Enter, assert PATCH + state; PATCH failure does NOT dispatch `SET_CASE_NAME` and reverts UI.
 
 ## PR 4 — Wire `/preview/[caseId]` + E2E
 
