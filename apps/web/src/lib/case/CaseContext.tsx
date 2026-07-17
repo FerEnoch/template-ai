@@ -9,7 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
-import type { Template, Entity, Case } from "@template-ai/contracts";
+import type { Template, Entity, Case, UpdateCaseFormData } from "@template-ai/contracts";
 import { updateCase } from "@/lib/api/cases";
 import {
   loadCaseFormDraft,
@@ -247,16 +247,28 @@ export function CaseProvider({
 
   const saveForm = useCallback(async () => {
     if (!state.caseId || state.caseStatus !== "borrador") return;
+
+    const trimmedName = (state.caseName ?? "").trim();
+    if (trimmedName.length < 3) {
+      dispatch({ type: "SET_NAME_ERROR", payload: "Mínimo 3 caracteres" });
+      throw new Error("Mínimo 3 caracteres");
+    }
+    dispatch({ type: "SET_NAME_ERROR", payload: null });
+
     dispatch({ type: "SET_SAVE_STATUS", payload: "saving" });
     try {
-      await updateCase(state.caseId, { formData: state.formData });
+      const body: Record<string, unknown> = { formData: state.formData };
+      if (state.caseName !== null) {
+        body.name = state.caseName;
+      }
+      await updateCase(state.caseId, body as UpdateCaseFormData);
       lastSavedFormData.current = { ...state.formData };
       dispatch({ type: "SET_SAVE_STATUS", payload: "saved" });
     } catch (err) {
       dispatch({ type: "SET_SAVE_STATUS", payload: "error" });
       throw err;
     }
-  }, [state.caseId, state.caseStatus, state.formData]);
+  }, [state.caseId, state.caseStatus, state.formData, state.caseName, dispatch]);
 
   // Auto-save trigger every 30s when the form is dirty and case is editable
   useEffect(() => {
@@ -268,11 +280,13 @@ export function CaseProvider({
     if (!isDirty) return;
 
     const timer = setInterval(() => {
+      const trimmedName = (state.caseName ?? "").trim();
+      if (trimmedName.length < 3) return;
       void saveForm();
     }, 30000);
 
     return () => clearInterval(timer);
-  }, [state.caseId, state.caseStatus, state.formData, saveForm]);
+  }, [state.caseId, state.caseStatus, state.formData, state.caseName, saveForm]);
 
   useEffect(() => {
     if (initialCase) {
