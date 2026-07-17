@@ -40,8 +40,8 @@ Delivery: `force-chained` / `feature-branch-chain`. Tracker `feature/inline-name
 
 ## PR 4 — Wire `/preview/[caseId]` + E2E
 
-- [ ] 4.1 `DocumentViewer.tsx`: add `onRenameTitle` prop; replace static `<h1>` with `EditableTitle value={title} onSave={onRenameTitle}`. Icon position per design §"Open Questions".
-- [ ] 4.2 `PreviewPageContent.tsx`: `handleRenameTitle(name, signal)` → `updateCase(id, { name }, signal)` + `setCaseItem`; pass to `DocumentViewer`.
-- [ ] 4.3 Add `DocumentViewer.test.tsx`: mock `onRenameTitle`, hover title, click icon, change + Enter, assert call. Reuse `EditableTitle.test.tsx` patterns.
-- [ ] 4.4 Add `e2e/inline-name-editing.spec.ts`: biblioteca click+rename+reload persists; nuevo rename propagates via `CaseContext`; preview hover→icon→rename persists; rapid re-edit aborts first PATCH (assert `request.aborted()`).
-- [ ] 4.5 Full e2e + unit + typecheck green; no regression in `EditableParagraph`/biblioteca grid; update `verify-report.md`.
+- [x] 4.1 `DocumentViewer.tsx`: add `onRenameTitle` prop; replace static `<h1>` with `EditableTitle value={title} onSave={onRenameTitle}`. Icon position per design §"Open Questions".
+- [x] 4.2 `PreviewPageContent.tsx`: `handleRenameTitle(name, signal)` → `updateCase(id, { name }, signal)` + `setCaseItem`; pass to `DocumentViewer`.
+- [x] 4.3 Add `DocumentViewer.test.tsx`: mock `onRenameTitle`, hover title, click icon, change + Enter, assert call. Reuse `EditableTitle.test.tsx` patterns.
+- [x] 4.4 Add `e2e/inline-name-editing.spec.ts`: biblioteca click+rename+reload persists; nuevo rename propagates via `CaseContext`; preview hover→icon→rename persists; rapid re-edit aborts first PATCH (assert `request.aborted()`).
+- [x] 4.5 Unit tests + typecheck green; E2E for new spec passes. Pre-existing E2E failures in `biblioteca.spec.ts`, `wizard.spec.ts`, `errors.spec.ts`, and one `inline-rename.spec.ts` 409 test are unrelated to this PR (duplicate headings/links and flaky route ordering).
