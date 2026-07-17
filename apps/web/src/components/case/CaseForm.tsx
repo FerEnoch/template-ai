@@ -25,7 +25,7 @@ interface CaseFormProps {
 
 export function CaseForm({ onSubmit }: CaseFormProps) {
   const { state, dispatch, updateField, addEntity, removeEntity } = useCase();
-  const { template, entities, formData, caseName, nameError } = state;
+  const { template, entities, formData, caseName } = state;
 
   const schema = buildSchema(entities);
   const {
@@ -85,19 +85,10 @@ export function CaseForm({ onSubmit }: CaseFormProps) {
             value={caseName ?? template?.name ?? ""}
             onChange={(e) => {
               dispatch({ type: "SET_CASE_NAME", payload: e.target.value });
-              if (nameError) {
-                dispatch({ type: "SET_NAME_ERROR", payload: null });
-              }
             }}
             className="w-full rounded border border-border bg-surface p-3 font-body text-sm text-text-primary focus:border-text-primary focus:outline-none"
             placeholder="Ej: Contrato Alquiler Depto A"
           />
-          {nameError && (
-            <p className="mt-2 flex items-center gap-1 text-xs font-medium text-danger">
-              <span aria-hidden>!</span>
-              {nameError}
-            </p>
-          )}
         </div>
       </div>
       {grouped.map(([group, groupEntities]) =>
