@@ -24,8 +24,8 @@ interface CaseFormProps {
 }
 
 export function CaseForm({ onSubmit }: CaseFormProps) {
-  const { state, updateField, addEntity, removeEntity } = useCase();
-  const { entities, formData } = state;
+  const { state, dispatch, updateField, addEntity, removeEntity } = useCase();
+  const { template, entities, formData, caseName, nameError } = state;
 
   const schema = buildSchema(entities);
   const {
@@ -56,6 +56,12 @@ export function CaseForm({ onSubmit }: CaseFormProps) {
   };
 
   const submitHandler = handleSubmit(() => {
+    const trimmedName = (caseName ?? "").trim();
+    if (trimmedName.length < 3) {
+      dispatch({ type: "SET_NAME_ERROR", payload: "Mínimo 3 caracteres" });
+      return;
+    }
+    dispatch({ type: "SET_NAME_ERROR", payload: null });
     onSubmit?.();
   });
 
@@ -65,6 +71,35 @@ export function CaseForm({ onSubmit }: CaseFormProps) {
 
   return (
     <form onSubmit={submitHandler} className="bg-surface shadow-sm">
+      <div className="grid items-start gap-4 border-b border-border p-6 md:grid-cols-4">
+        <label
+          htmlFor="case-name"
+          className="font-label text-sm font-semibold text-text-primary md:col-span-1"
+        >
+          Nombre del documento <span className="text-danger">*</span>
+        </label>
+        <div className="md:col-span-2">
+          <input
+            id="case-name"
+            type="text"
+            value={caseName ?? template?.name ?? ""}
+            onChange={(e) => {
+              dispatch({ type: "SET_CASE_NAME", payload: e.target.value });
+              if (nameError) {
+                dispatch({ type: "SET_NAME_ERROR", payload: null });
+              }
+            }}
+            className="w-full rounded border border-border bg-surface p-3 font-body text-sm text-text-primary focus:border-text-primary focus:outline-none"
+            placeholder="Ej: Contrato Alquiler Depto A"
+          />
+          {nameError && (
+            <p className="mt-2 flex items-center gap-1 text-xs font-medium text-danger">
+              <span aria-hidden>!</span>
+              {nameError}
+            </p>
+          )}
+        </div>
+      </div>
       {grouped.map(([group, groupEntities]) =>
         groupEntities.length === 0 ? null : (
           <CaseFormSection

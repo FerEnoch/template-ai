@@ -24,6 +24,7 @@ export interface CaseState {
   caseId: string | null;
   caseStatus: Case["status"] | null;
   caseName: string | null;
+  nameError: string | null;
   status: "idle" | "saving" | "generating" | "exporting" | "error";
   saveStatus: "idle" | "saving" | "saved" | "error";
   progress: number;
@@ -40,6 +41,7 @@ export type CaseAction =
       payload: { caseId: string; caseStatus: Case["status"] };
     }
   | { type: "SET_CASE_NAME"; payload: string | null }
+  | { type: "SET_NAME_ERROR"; payload: string | null }
   | { type: "SET_STATUS"; payload: CaseState["status"] }
   | { type: "SET_SAVE_STATUS"; payload: CaseState["saveStatus"] }
   | { type: "SET_LOADING"; payload: boolean }
@@ -98,6 +100,8 @@ export function caseReducer(
       };
     case "SET_CASE_NAME":
       return { ...state, caseName: action.payload };
+    case "SET_NAME_ERROR":
+      return { ...state, nameError: action.payload };
     case "SET_STATUS":
       return { ...state, status: action.payload };
     case "SET_SAVE_STATUS":
@@ -148,6 +152,7 @@ export const initialCaseState: CaseState = {
   caseId: null,
   caseStatus: null,
   caseName: null,
+  nameError: null,
   status: "idle",
   saveStatus: "idle",
   progress: 0,
