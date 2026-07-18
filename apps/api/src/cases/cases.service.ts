@@ -38,6 +38,7 @@ export interface UpdateCaseData {
   formData?: Record<string, string>;
   status?: string;
   name?: string | null;
+  generatedText?: string;
 }
 
 /**
@@ -204,6 +205,15 @@ export class CasesService {
 
       if (!updated) {
         throw new NotFoundException(`Case with id "${id}" not found`);
+      }
+
+      // If generatedText is provided, persist the edited document text
+      // without changing the case status.
+      if (data.generatedText !== undefined) {
+        const withText = await repo.saveGeneratedText(id, data.generatedText);
+        if (withText) {
+          return this.mapToResponse(withText);
+        }
       }
 
       return this.mapToResponse(updated);

@@ -90,20 +90,37 @@ export function DocumentViewer({
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync paragraphs from prop when generatedText changes externally
+  // (e.g., after regeneration or page reload)
+  const [propVersion, setPropVersion] = useState(generatedText);
+  useEffect(() => {
+    if (generatedText !== propVersion) {
+      setParagraphs(splitParagraphs(generatedText));
+      setPropVersion(generatedText);
+    }
+  }, [generatedText, propVersion]);
+
   const handleSave = useCallback(
     async (index: number, newText: string) => {
+      const prevParagraphs = paragraphs;
       const nextParagraphs = paragraphs.map((paragraph, i) =>
         i === index ? newText : paragraph
       );
       const fullText = nextParagraphs.join("\n\n");
+      const prevFullText = prevParagraphs.join("\n\n");
 
       setSavingIndex(index);
       setError(null);
+      // Optimistically update local state and notify parent BEFORE the
+      // network call so the export panel and preview reflect the edit
+      // immediately. If the save fails, we revert both.
+      setParagraphs(nextParagraphs);
+      onUpdate?.(fullText);
       try {
-        await updateCase(caseId, { formData: { generatedText: fullText } });
-        setParagraphs(nextParagraphs);
-        onUpdate?.(fullText);
+        await updateCase(caseId, { generatedText: fullText });
       } catch (err) {
+        setParagraphs(prevParagraphs);
+        onUpdate?.(prevFullText);
         setError(
           err instanceof Error
             ? err.message
@@ -128,7 +145,7 @@ export function DocumentViewer({
 
         {paragraphs.map((paragraph, index) => (
           <EditableParagraph
-            key={`${index}-${paragraph.slice(0, 20)}`}
+            key={index}
             text={paragraph}
             index={index}
             onSave={handleSave}

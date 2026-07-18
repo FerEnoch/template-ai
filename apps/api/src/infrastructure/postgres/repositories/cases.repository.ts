@@ -294,6 +294,32 @@ export class CasesRepository {
     return rowToCase(result.rows[0]);
   }
 
+  async saveGeneratedText(
+    id: string,
+    generatedText: string,
+  ): Promise<CaseRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        WITH updated AS (
+          UPDATE casos
+          SET generated_text = $1, updated_at = now()
+          WHERE id = $2
+          RETURNING *
+        )
+        SELECT ${CASE_SELECT}
+        FROM updated c
+        ${CASE_JOIN}
+      `,
+      [generatedText, id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToCase(result.rows[0]);
+  }
+
   /**
    * Archive all cases linked to a template.
    */

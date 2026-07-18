@@ -210,7 +210,10 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
             onExportStart={() => setIsExporting(true)}
             onExportComplete={() => {
               setIsExporting(false);
-              void loadCase();
+              // Do NOT reload the case from the backend here: that would
+              // overwrite any unsaved edits in the local state. The export
+              // status is persisted by ExportPanel via updateCase; the UI
+              // status badge is not critical during the preview session.
             }}
             onExportError={() => setIsExporting(false)}
           />
