@@ -99,12 +99,14 @@ describe("DocumentViewer", () => {
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
-      expect(mockedUpdateCase).toHaveBeenCalledWith(CASE_ID, {
-        formData: {
+      expect(mockedUpdateCase).toHaveBeenCalledWith(
+        CASE_ID,
+        {
           generatedText:
             "Nuevo Título\n\nEntre el COMPRADOR y la VENDEDORA se celebra el presente contrato.\n\nPrimera — Objeto.",
         },
-      });
+        expect.any(AbortSignal)
+      );
     });
 
     expect(onUpdate).toHaveBeenCalledWith(
@@ -132,12 +134,14 @@ describe("DocumentViewer", () => {
     fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
-      expect(mockedUpdateCase).toHaveBeenCalledWith(CASE_ID, {
-        formData: {
+      expect(mockedUpdateCase).toHaveBeenCalledWith(
+        CASE_ID,
+        {
           generatedText:
             "Compraventa\n\nTexto modificado del primer párrafo.\n\nPrimera — Objeto.",
         },
-      });
+        expect.any(AbortSignal)
+      );
     });
 
     expect(onUpdate).toHaveBeenCalledWith(
