@@ -41,7 +41,8 @@ export function deriveTitle(displayName: string): string {
     .join(" ");
 }
 
-function ensureTitleParagraphs(
+/** Shared by preview and export so both paths use the same title contract. */
+export function ensureTitleParagraphs(
   generatedText: string,
   displayName: string
 ): string[] {
@@ -57,6 +58,13 @@ function ensureTitleParagraphs(
   }
 
   return paragraphs;
+}
+
+export function ensureTitleText(
+  generatedText: string,
+  displayName: string
+): string {
+  return ensureTitleParagraphs(generatedText, displayName).join("\n\n");
 }
 
 export interface DocumentViewerProps {

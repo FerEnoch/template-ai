@@ -7,7 +7,12 @@ import {
   waitFor,
   cleanup,
 } from "@testing-library/react";
-import { DocumentViewer, isTitleParagraph, deriveTitle } from "../DocumentViewer";
+import {
+  DocumentViewer,
+  isTitleParagraph,
+  deriveTitle,
+  ensureTitleText,
+} from "../DocumentViewer";
 import { updateCase } from "@/lib/api/cases";
 
 vi.mock("@/lib/api/cases", () => ({
@@ -200,6 +205,13 @@ describe("DocumentViewer", () => {
 
     it("capitalizes each word in a spaced display name", () => {
       expect(deriveTitle("contrato de locación")).toBe("Contrato De Locación");
+    });
+
+    it("ensureTitleText matches preview/export join contract for body-leading text", () => {
+      const body = "El presente documento es un contrato.";
+      expect(ensureTitleText(body, TITLE)).toBe(
+        `${DERIVED_TITLE}\n\n${body}`
+      );
     });
   });
 

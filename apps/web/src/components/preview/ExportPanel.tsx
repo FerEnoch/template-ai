@@ -6,6 +6,7 @@ import { generatePdf } from "@/lib/export/pdf";
 import { generateDocx } from "@/lib/export/docx";
 import { buildFilename, triggerDownload, type ExportFormat } from "@/lib/export/exporters";
 import { updateCase } from "@/lib/api/cases";
+import { ensureTitleText } from "./DocumentViewer";
 
 export interface ExportPanelProps {
   readonly caseId: string;
@@ -36,10 +37,13 @@ export function ExportPanel({
       onExportStart?.(format);
       try {
         const filename = buildFilename(filenameSlug, caseId, format);
+        // Match DocumentViewer: body-leading AI text gets the same synthetic title
+        // prepended before PDF/DOCX treat paragraphs[0] as the document heading.
+        const exportText = ensureTitleText(generatedText, displayTitle);
         const blob =
           format === "pdf"
-            ? generatePdf({ text: generatedText, title: displayTitle })
-            : await generateDocx({ text: generatedText, title: displayTitle });
+            ? generatePdf({ text: exportText, title: displayTitle })
+            : await generateDocx({ text: exportText, title: displayTitle });
 
         triggerDownload(blob, filename);
         await updateCase(caseId, { status: "exportado" });
