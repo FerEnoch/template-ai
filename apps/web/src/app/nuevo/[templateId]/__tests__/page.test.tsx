@@ -165,6 +165,10 @@ describe("NuevoCasoPage", () => {
       fireEvent.change(screen.getByLabelText(new RegExp(label)), { target: { value: "x" } });
     }
 
+    fireEvent.change(screen.getByLabelText(/Nombre del documento/i), {
+      target: { value: "Contrato de prueba" },
+    });
+
     const generateButton = screen.getByRole("button", { name: /Generar documento/i });
     fireEvent.click(generateButton);
     fireEvent.click(generateButton);
@@ -204,6 +208,10 @@ describe("NuevoCasoPage", () => {
     for (const label of ["Locador", "Locatario", "Garante", "Dirección"]) {
       fireEvent.change(screen.getByLabelText(new RegExp(label)), { target: { value: "x" } });
     }
+
+    fireEvent.change(screen.getByLabelText(/Nombre del documento/i), {
+      target: { value: "Contrato de prueba" },
+    });
 
     const generateButton = screen.getByRole("button", { name: /Generar documento/i });
     fireEvent.click(generateButton);

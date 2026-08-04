@@ -8,9 +8,10 @@ import { useCase } from "@/lib/case/CaseContext";
 interface NewCaseLayoutProps {
   readonly onSave: () => void;
   readonly onGenerate: () => void;
+  readonly onRename: (name: string, signal?: AbortSignal) => Promise<void>;
 }
 
-export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
+export function NewCaseLayout({ onSave, onGenerate, onRename }: NewCaseLayoutProps) {
   const { state } = useCase();
   const { template, entities, formData, progress, saveStatus, status, generationError, caseName } = state;
 
@@ -41,6 +42,7 @@ export function NewCaseLayout({ onSave, onGenerate }: NewCaseLayoutProps) {
           filled={filled}
           total={total}
           progress={progress}
+          onRename={onRename}
         />
       </aside>
 

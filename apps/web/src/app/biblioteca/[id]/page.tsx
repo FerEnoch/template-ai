@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/shell/app-shell";
 import { ConfirmDeleteDialog } from "@/components/biblioteca/ConfirmDeleteDialog";
+import { EditableName } from "@/components/biblioteca/EditableName";
+import { updateTemplateName } from "@/lib/api/templates";
 import type { Template, Entity } from "@template-ai/contracts";
 
 // ---------------------------------------------------------------------------
@@ -326,6 +328,15 @@ export default function TemplateDetailPage({
     }
   }, [id, router]);
 
+  const handleRenameTemplate = useCallback(
+    async (name: string, signal?: AbortSignal) => {
+      if (!id) return;
+      const updated = await updateTemplateName(id, name, signal);
+      setTemplate(updated);
+    },
+    [id]
+  );
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -358,9 +369,15 @@ export default function TemplateDetailPage({
               <FileText className="h-6 w-6 text-accent" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="font-headline text-2xl font-bold text-text-primary">
-                {template.name}
-              </h1>
+              <EditableName
+                value={template.name}
+                onSave={handleRenameTemplate}
+                inputClassName="font-headline text-2xl font-bold text-text-primary w-full rounded-md border border-border bg-surface px-2 py-1 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <h1 className="font-headline text-2xl font-bold text-text-primary">
+                  {template.name}
+                </h1>
+              </EditableName>
               {template.description && (
                 <p className="mt-1 font-body text-sm text-text-secondary">
                   {template.description}
