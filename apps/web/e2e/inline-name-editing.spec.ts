@@ -36,6 +36,9 @@ async function setupPreviewRoutes(
   page: Page,
   options?: { patchDelay?: number; patchStatus?: number }
 ) {
+  let currentName: string | null = null;
+  let currentGeneratedText = GENERATED_TEXT;
+
   await page.route("**/api/templates**", async (route) => {
     if (route.request().url().includes(`/api/templates/${TEMPLATE_ID}`)) {
       await route.fulfill({
@@ -56,7 +59,9 @@ async function setupPreviewRoutes(
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([mockCase()]),
+        body: JSON.stringify([
+          mockCase({ name: currentName, generatedText: currentGeneratedText }),
+        ]),
       });
       return;
     }
@@ -76,7 +81,13 @@ async function setupPreviewRoutes(
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ ...mockCase(), template: mockTemplate }),
+        body: JSON.stringify({
+          ...mockCase({
+            name: currentName,
+            generatedText: currentGeneratedText,
+          }),
+          template: mockTemplate,
+        }),
       });
       return;
     }
@@ -92,16 +103,27 @@ async function setupPreviewRoutes(
         await route.fulfill({
           status: options.patchStatus,
           contentType: "application/json",
-          body: JSON.stringify({ error: "No se pudo guardar el nombre" }),
+          body: JSON.stringify({ error: "No se pudo guardar el párrafo" }),
         });
         return;
+      }
+
+      if (typeof body.name === "string") {
+        currentName = body.name;
+      }
+      const nextText = body.formData?.generatedText ?? body.generatedText;
+      if (typeof nextText === "string") {
+        currentGeneratedText = nextText;
       }
 
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          ...mockCase({ name: body.name }),
+          ...mockCase({
+            name: currentName,
+            generatedText: currentGeneratedText,
+          }),
           template: mockTemplate,
         }),
       });
@@ -249,8 +271,13 @@ test.describe("Inline name editing — /nuevo/[templateId]", () => {
 });
 
 test.describe("Inline name editing — /preview/[caseId]", () => {
-  test("hover reveals icon, rename persists, and reload keeps the new name", async ({ page }) => {
-    let savedName: string | null = null;
+  // Final design: filename is read-only in the banner; the document title is the
+  // first content paragraph (EditableParagraph asHeading), not EditableTitle.
+
+  test("banner shows read-only filename and first paragraph is an editable h1", async ({
+    page,
+  }) => {
+    let savedGeneratedText = GENERATED_TEXT;
 
     await page.route("**/api/templates**", async (route) => {
       if (route.request().url().includes(`/api/templates/${TEMPLATE_ID}`)) {
@@ -272,7 +299,12 @@ test.describe("Inline name editing — /preview/[caseId]", () => {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify([mockCase({ name: savedName })]),
+          body: JSON.stringify([
+            mockCase({
+              name: "Contrato Locacion",
+              generatedText: savedGeneratedText,
+            }),
+          ]),
         });
         return;
       }
@@ -291,7 +323,10 @@ test.describe("Inline name editing — /preview/[caseId]", () => {
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
-            ...mockCase({ name: savedName }),
+            ...mockCase({
+              name: "Contrato Locacion",
+              generatedText: savedGeneratedText,
+            }),
             template: mockTemplate,
           }),
         });
@@ -299,12 +334,19 @@ test.describe("Inline name editing — /preview/[caseId]", () => {
       }
       if (route.request().method() === "PATCH") {
         const body = await route.request().postDataJSON();
-        savedName = body.name;
+        const nextText =
+          body.formData?.generatedText ??
+          body.generatedText ??
+          savedGeneratedText;
+        savedGeneratedText = nextText;
         await route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
-            ...mockCase({ name: body.name }),
+            ...mockCase({
+              name: "Contrato Locacion",
+              generatedText: nextText,
+            }),
             template: mockTemplate,
           }),
         });
@@ -315,120 +357,88 @@ test.describe("Inline name editing — /preview/[caseId]", () => {
 
     await page.goto(`/preview/${CASE_ID}`);
 
-    const wrapper = page.getByTestId("editable-title-wrapper").first();
-    const icon = page.getByTestId("editable-title-icon").first();
+    // Filename banner is metadata, not editable.
+    const banner = page.locator("div").filter({ hasText: "Documento:" }).first();
+    await expect(banner.getByRole("heading", { name: "Contrato Locacion" })).toBeVisible();
+    await expect(page.getByTestId("editable-title-wrapper")).toHaveCount(0);
+    await expect(page.getByTestId("editable-title-icon")).toHaveCount(0);
 
-    await expect(wrapper).toHaveText(mockTemplate.name);
-    await wrapper.hover();
-    await expect(icon).toBeVisible();
-    await icon.click();
+    // Document content title lives inside the article (EditableParagraph asHeading).
+    const contentHeading = page.locator("article").getByRole("heading", { level: 1 });
+    await expect(contentHeading).toBeVisible({ timeout: 10000 });
 
-    const input = page.getByTestId("editable-title-input").first();
-    await expect(input).toHaveValue(mockTemplate.name);
-    await input.fill("Título Modificado");
-    await input.press("Enter");
+    await contentHeading.hover();
+    await page.getByRole("button", { name: "Editar título" }).click();
+
+    const editor = page.locator("textarea").first();
+    await expect(editor).toBeVisible();
+    await editor.fill("Titulo Del Documento");
+    await page.getByRole("button", { name: "Guardar" }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Título Modificado" })
+      page.locator("article").getByRole("heading", { name: "Titulo Del Documento" })
     ).toBeVisible();
+
+    // Filename banner stays unchanged after content-title edit.
+    await expect(banner.getByRole("heading", { name: "Contrato Locacion" })).toBeVisible();
 
     await page.reload();
     await expect(
-      page.getByRole("heading", { name: "Título Modificado" })
+      page.locator("article").getByRole("heading", { name: "Titulo Del Documento" })
     ).toBeVisible();
   });
 
-  test("rapid re-edit aborts the first PATCH request", async ({ page }) => {
-    let firstPatchReceived = false;
-
-    await page.route("**/api/templates**", async (route) => {
-      if (route.request().url().includes(`/api/templates/${TEMPLATE_ID}`)) {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify(mockTemplate),
-        });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.route("**/api/cases/**", async (route) => {
-      const url = route.request().url();
-      const isCurrentCase = url.includes(`/api/cases/${CASE_ID}`);
-      if (!isCurrentCase) {
-        await route.continue();
-        return;
-      }
-
-      if (route.request().method() === "GET") {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({ ...mockCase(), template: mockTemplate }),
-        });
-        return;
-      }
-
-      if (route.request().method() !== "PATCH") {
-        await route.continue();
-        return;
-      }
-
-      const body = await route.request().postDataJSON();
-
-      if (body.name === "Primer Título") {
-        firstPatchReceived = true;
-        return;
-      }
-
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          ...mockCase({ name: body.name }),
-          template: mockTemplate,
-        }),
-      });
-    });
+  test("content title edit survives cancel and can be saved again", async ({
+    page,
+  }) => {
+    await setupPreviewRoutes(page);
 
     await page.goto(`/preview/${CASE_ID}`);
 
-    const wrapper = page.getByTestId("editable-title-wrapper").first();
-    const icon = page.getByTestId("editable-title-icon").first();
-    await wrapper.hover();
-    await icon.click();
+    const contentHeading = page.locator("article").getByRole("heading", { level: 1 });
+    await expect(contentHeading).toBeVisible({ timeout: 10000 });
+    const originalTitle = (await contentHeading.textContent())?.trim() ?? "";
 
-    const input = page.getByTestId("editable-title-input").first();
-    await input.fill("Primer Título");
-    await input.press("Enter");
+    await contentHeading.hover();
+    await page.getByRole("button", { name: "Editar título" }).click();
 
-    await expect.poll(() => firstPatchReceived).toBe(true);
-
-    await icon.click();
-    await input.fill("Segundo Título");
-    await input.press("Enter");
+    const editor = page.locator("textarea").first();
+    await editor.fill("Borrador Descartable");
+    await page.getByRole("button", { name: "Cancelar" }).click();
 
     await expect(
-      page.getByRole("heading", { name: "Segundo Título" })
+      page.locator("article").getByRole("heading", { name: originalTitle })
+    ).toBeVisible();
+
+    await page.locator("article").getByRole("heading", { name: originalTitle }).hover();
+    await page.getByRole("button", { name: "Editar título" }).click();
+    await page.locator("textarea").first().fill("Titulo Guardado");
+    await page.getByRole("button", { name: "Guardar" }).click();
+
+    await expect(
+      page.locator("article").getByRole("heading", { name: "Titulo Guardado" })
     ).toBeVisible();
   });
 
-  test("API error shows inline error and reverts the title", async ({ page }) => {
+  test("API error while saving content title shows error and keeps prior text", async ({
+    page,
+  }) => {
     await setupPreviewRoutes(page, { patchStatus: 409 });
 
     await page.goto(`/preview/${CASE_ID}`);
 
-    const originalName = mockTemplate.name;
-    const wrapper = page.getByTestId("editable-title-wrapper").first();
-    await wrapper.hover();
-    await page.getByTestId("editable-title-icon").first().click();
+    const contentHeading = page.locator("article").getByRole("heading", { level: 1 });
+    await expect(contentHeading).toBeVisible({ timeout: 10000 });
+    const originalTitle = (await contentHeading.textContent())?.trim() ?? "";
 
-    const input = page.getByTestId("editable-title-input").first();
-    await input.fill("Título Conflicto");
-    await input.press("Enter");
+    await contentHeading.hover();
+    await page.getByRole("button", { name: "Editar título" }).click();
+    await page.locator("textarea").first().fill("Titulo Conflicto");
+    await page.getByRole("button", { name: "Guardar" }).click();
 
-    await expect(page.getByTestId("editable-title-error")).toBeVisible();
-    await expect(input).toHaveValue(originalName);
+    await expect(page.getByText("No se pudo guardar el párrafo")).toBeVisible();
+    await expect(
+      page.locator("article").getByRole("heading", { name: originalTitle })
+    ).toBeVisible();
   });
 });
