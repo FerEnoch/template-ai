@@ -236,6 +236,7 @@ function createMockPostgresService(setup: {
             template_id: updateRecord.templateId,
             status: updateRecord.status,
             name: updateRecord.name,
+            content_title: updateRecord.contentTitle,
             form_data: updateRecord.formData,
             generated_text: updateRecord.generatedText,
             created_at: updateRecord.createdAt,

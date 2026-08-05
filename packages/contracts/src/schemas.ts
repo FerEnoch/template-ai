@@ -148,6 +148,7 @@ export const CaseSchema = z.object({
   status: CaseStatus,
   name: z.string().min(1).max(200).nullable().optional(),
   contentTitle: z.string().nullable().optional(),
+  effectiveTitle: z.string(),
   formData: z.record(z.string(), z.string()),
   generatedText: z.string().nullable(),
   createdAt: z.string().datetime(),

@@ -7,9 +7,10 @@ import { DocumentViewer } from "@/components/preview/DocumentViewer";
 import { VerificationChecklist } from "@/components/preview/VerificationChecklist";
 import { ExportPanel } from "@/components/preview/ExportPanel";
 import { ExportSpinner } from "@/components/preview/ExportSpinner";
-import { fetchCase, generateCase, ApiError } from "@/lib/api/cases";
+import { fetchCase, updateCase, generateCase, ApiError } from "@/lib/api/cases";
 import type { CaseWithTemplate } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
+import { EditableTitle } from "@/components/preview/EditableTitle";
 import { ArrowLeft, RefreshCw, FileText } from "lucide-react";
 
 const ERROR_TYPE_LABELS: Record<string, string> = {
@@ -91,6 +92,17 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     }
   }, [caseId, isDocumentSaving]);
 
+  const handleContentTitleSave = useCallback(
+    async (newValue: string, signal?: AbortSignal) => {
+      const contentTitle = newValue.trim() || null;
+      await updateCase(caseId, { contentTitle }, signal);
+      setCaseItem((current) =>
+        current ? { ...current, contentTitle } : current
+      );
+    },
+    [caseId]
+  );
+
   const handleReturnToForm = useCallback(() => {
     if (!caseItem) return;
     router.push(`/nuevo/${caseItem.template.id}`);
@@ -132,7 +144,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
     return null;
   }
 
-  const displayName = caseItem.name ?? caseItem.template.name;
+  const effectiveTitle = caseItem.contentTitle ?? caseItem.name ?? caseItem.template.name;
   const generatedAt = new Date(caseItem.updatedAt).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "long",
@@ -152,9 +164,15 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
         <div className="max-w-7xl mx-auto flex items-center gap-3">
           <FileText className="h-5 w-5 text-stone-500" aria-hidden="true" />
           <span className="text-sm font-label text-stone-500">Documento:</span>
-          <h1 className="text-base font-label font-semibold text-stone-700">
-            {displayName}
-          </h1>
+          <EditableTitle
+            value={caseItem.contentTitle ?? ""}
+            onSave={handleContentTitleSave}
+            minLength={0}
+          >
+            <h1 className="text-base font-label font-semibold text-stone-700">
+              {effectiveTitle}
+            </h1>
+          </EditableTitle>
         </div>
       </div>
 
@@ -192,7 +210,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
         <div className="flex-grow w-full md:w-2/3">
           <DocumentViewer
             caseId={caseItem.id}
-            title={displayName}
+            title={effectiveTitle}
             generatedText={caseItem.generatedText}
             onUpdate={(text) =>
               setCaseItem((current) =>
@@ -208,8 +226,8 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
 
           <ExportPanel
             caseId={caseItem.id}
-            displayTitle={displayName}
-            filenameSlug={slugify(displayName)}
+            displayTitle={effectiveTitle}
+            filenameSlug={slugify(effectiveTitle)}
             generatedText={caseItem.generatedText}
             onExportStart={() => setIsExporting(true)}
             onExportComplete={() => {
