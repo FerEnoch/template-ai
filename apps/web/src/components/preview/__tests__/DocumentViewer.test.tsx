@@ -170,6 +170,88 @@ describe("DocumentViewer", () => {
     });
   });
 
+  it("does not abort the in-flight save when parent echoes optimistic generatedText", async () => {
+    let resolveSave: (value: unknown) => void = () => undefined;
+    const savePromise = new Promise((resolve) => {
+      resolveSave = resolve;
+    });
+    mockedUpdateCase.mockImplementation(
+      (_id, _data, signal) =>
+        new Promise((resolve, reject) => {
+          const onAbort = () => {
+            const err = new Error("Aborted");
+            err.name = "AbortError";
+            reject(err);
+          };
+          if (signal?.aborted) {
+            onAbort();
+            return;
+          }
+          signal?.addEventListener("abort", onAbort, { once: true });
+          void savePromise.then((value) => {
+            signal?.removeEventListener("abort", onAbort);
+            resolve(value as never);
+          });
+        })
+    );
+
+    let generatedText = GENERATED_TEXT;
+    const onUpdate = vi.fn((text: string) => {
+      generatedText = text;
+      rerender(
+        <DocumentViewer
+          caseId={CASE_ID}
+          title={TITLE}
+          generatedText={generatedText}
+          onUpdate={onUpdate}
+        />
+      );
+    });
+
+    const { rerender } = render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={generatedText}
+        onUpdate={onUpdate}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /editar título/i }));
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "Titulo Persistido" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateCase).toHaveBeenCalled();
+    });
+
+    // Parent already echoed optimistic text; save must still complete.
+    resolveSave({
+      id: CASE_ID,
+      name: null,
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      templateId: "template-1",
+      userId: "user-1",
+      formData: {},
+      generatedText:
+        "Titulo Persistido\n\nEntre el COMPRADOR y la VENDEDORA se celebra el presente contrato.\n\nPrimera — Objeto.",
+    });
+
+    await waitFor(() => {
+      expect(mockedUpdateCase).toHaveBeenCalledTimes(1);
+    });
+    // If the echo aborted the request, updateCase would reject and we would
+    // not keep the optimistic title without an error banner.
+    expect(screen.queryByText("Save failed")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Titulo Persistido" })
+    ).toBeInTheDocument();
+  });
+
   describe("title detection", () => {
     it("returns true for a short title-like paragraph", () => {
       expect(isTitleParagraph("Compraventa")).toBe(true);

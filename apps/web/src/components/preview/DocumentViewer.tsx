@@ -100,9 +100,16 @@ export function DocumentViewer({
   // Monotonic token: external prop changes and newer saves invalidate older ones.
   const contentEpochRef = useRef(0);
   const saveAbortRef = useRef<AbortController | null>(null);
+  // Skip one prop sync after our own optimistic onUpdate so the echo does not
+  // abort the in-flight PATCH that just produced that text.
+  const skipNextPropSyncRef = useRef(false);
 
-  // Single sync path for external generatedText/title (regen, reload).
+  // Sync path for EXTERNAL generatedText/title only (regen, reload).
   useEffect(() => {
+    if (skipNextPropSyncRef.current) {
+      skipNextPropSyncRef.current = false;
+      return;
+    }
     contentEpochRef.current += 1;
     saveAbortRef.current?.abort();
     saveAbortRef.current = null;
@@ -135,8 +142,10 @@ export function DocumentViewer({
     setSavingIndex(index);
     onSavingChangeRef.current?.(true);
     setError(null);
-    // Optimistic UI so export sees the edit immediately.
+    // Optimistic UI so export sees the edit immediately. Mark the next prop
+    // echo from the parent so it does not abort this save.
     setParagraphs(nextParagraphs);
+    skipNextPropSyncRef.current = true;
     onUpdateRef.current?.(fullText);
 
     try {
@@ -148,6 +157,7 @@ export function DocumentViewer({
       // Only revert if this save is still the active content epoch.
       if (saveEpoch === contentEpochRef.current) {
         setParagraphs(prevParagraphs);
+        skipNextPropSyncRef.current = true;
         onUpdateRef.current?.(prevFullText);
         setError(
           err instanceof Error ? err.message : "No se pudo guardar el párrafo"
