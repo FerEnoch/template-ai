@@ -100,16 +100,24 @@ export function DocumentViewer({
   // Monotonic token: external prop changes and newer saves invalidate older ones.
   const contentEpochRef = useRef(0);
   const saveAbortRef = useRef<AbortController | null>(null);
-  // Skip one prop sync after our own optimistic onUpdate so the echo does not
-  // abort the in-flight PATCH that just produced that text.
-  const skipNextPropSyncRef = useRef(false);
+  // Last text we pushed optimistically to the parent. Prop echoes equal to this
+  // value are ignored (do not abort). A different generatedText is external
+  // (regen/reload) and must abort + resync. Content-based, not a one-shot flag.
+  const lastOptimisticTextRef = useRef<string | null>(null);
 
-  // Sync path for EXTERNAL generatedText/title only (regen, reload).
+  // Sync path for EXTERNAL generatedText/title (regen, reload).
   useEffect(() => {
-    if (skipNextPropSyncRef.current) {
-      skipNextPropSyncRef.current = false;
+    if (
+      lastOptimisticTextRef.current !== null &&
+      generatedText === lastOptimisticTextRef.current
+    ) {
+      // Parent echoed our optimistic write (or title-only change with same text).
+      // Refresh title derivation without aborting an in-flight save.
+      setParagraphs(ensureTitleParagraphs(generatedText, title));
       return;
     }
+
+    lastOptimisticTextRef.current = null;
     contentEpochRef.current += 1;
     saveAbortRef.current?.abort();
     saveAbortRef.current = null;
@@ -142,10 +150,9 @@ export function DocumentViewer({
     setSavingIndex(index);
     onSavingChangeRef.current?.(true);
     setError(null);
-    // Optimistic UI so export sees the edit immediately. Mark the next prop
-    // echo from the parent so it does not abort this save.
+    // Optimistic UI so export sees the edit immediately.
     setParagraphs(nextParagraphs);
-    skipNextPropSyncRef.current = true;
+    lastOptimisticTextRef.current = fullText;
     onUpdateRef.current?.(fullText);
 
     try {
@@ -157,7 +164,7 @@ export function DocumentViewer({
       // Only revert if this save is still the active content epoch.
       if (saveEpoch === contentEpochRef.current) {
         setParagraphs(prevParagraphs);
-        skipNextPropSyncRef.current = true;
+        lastOptimisticTextRef.current = prevFullText;
         onUpdateRef.current?.(prevFullText);
         setError(
           err instanceof Error ? err.message : "No se pudo guardar el párrafo"

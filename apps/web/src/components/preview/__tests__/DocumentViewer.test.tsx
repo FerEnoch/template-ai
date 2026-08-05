@@ -172,6 +172,7 @@ describe("DocumentViewer", () => {
 
   it("does not abort the in-flight save when parent echoes optimistic generatedText", async () => {
     let resolveSave: (value: unknown) => void = () => undefined;
+    let aborted = false;
     const savePromise = new Promise((resolve) => {
       resolveSave = resolve;
     });
@@ -179,6 +180,7 @@ describe("DocumentViewer", () => {
       (_id, _data, signal) =>
         new Promise((resolve, reject) => {
           const onAbort = () => {
+            aborted = true;
             const err = new Error("Aborted");
             err.name = "AbortError";
             reject(err);
@@ -190,7 +192,9 @@ describe("DocumentViewer", () => {
           signal?.addEventListener("abort", onAbort, { once: true });
           void savePromise.then((value) => {
             signal?.removeEventListener("abort", onAbort);
-            resolve(value as never);
+            if (!signal?.aborted) {
+              resolve(value as never);
+            }
           });
         })
     );
@@ -244,12 +248,73 @@ describe("DocumentViewer", () => {
     await waitFor(() => {
       expect(mockedUpdateCase).toHaveBeenCalledTimes(1);
     });
-    // If the echo aborted the request, updateCase would reject and we would
-    // not keep the optimistic title without an error banner.
-    expect(screen.queryByText("Save failed")).not.toBeInTheDocument();
+    expect(aborted).toBe(false);
     expect(
       screen.getByRole("heading", { name: "Titulo Persistido" })
     ).toBeInTheDocument();
+  });
+
+  it("applies a later external generatedText change after a no-op save", async () => {
+    mockedUpdateCase.mockResolvedValue({
+      id: CASE_ID,
+      name: null,
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      templateId: "template-1",
+      userId: "user-1",
+      formData: {},
+      generatedText: GENERATED_TEXT,
+    } as never);
+
+    let generatedText = GENERATED_TEXT;
+    const onUpdate = vi.fn((text: string) => {
+      generatedText = text;
+      rerender(
+        <DocumentViewer
+          caseId={CASE_ID}
+          title={TITLE}
+          generatedText={generatedText}
+          onUpdate={onUpdate}
+        />
+      );
+    });
+
+    const { rerender } = render(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={generatedText}
+        onUpdate={onUpdate}
+      />
+    );
+
+    // Save without changing text (no-op edit).
+    fireEvent.click(screen.getByRole("button", { name: /editar título/i }));
+    fireEvent.click(screen.getByRole("button", { name: /guardar/i }));
+
+    await waitFor(() => {
+      expect(mockedUpdateCase).toHaveBeenCalled();
+    });
+
+    // External regeneration replaces the document.
+    const regenerated =
+      "Documento Regenerado\n\nNuevo cuerpo del contrato regenerado.";
+    generatedText = regenerated;
+    rerender(
+      <DocumentViewer
+        caseId={CASE_ID}
+        title={TITLE}
+        generatedText={generatedText}
+        onUpdate={onUpdate}
+      />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Documento Regenerado" })
+      ).toBeInTheDocument();
+    });
   });
 
   describe("title detection", () => {
