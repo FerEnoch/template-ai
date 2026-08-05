@@ -8,7 +8,7 @@ import {
 describe("fallbackMessageForStatus", () => {
   it("returns a latency-aware Spanish message for 502", () => {
     expect(fallbackMessageForStatus(502)).toBe(
-      "El servidor está procesando tu solicitud. Esto puede tardar hasta 2 minutos. Esperá un momento e intentá nuevamente.",
+      "El servidor está procesando tu solicitud. La generación puede tardar varios minutos. Esperá un momento e intentá nuevamente.",
     );
   });
 
@@ -41,7 +41,7 @@ describe("parseErrorResponse", () => {
     const result = await parseErrorResponse(response);
 
     expect(result.message).toBe(
-      "El servidor está procesando tu solicitud. Esto puede tardar hasta 2 minutos. Esperá un momento e intentá nuevamente.",
+      "El servidor está procesando tu solicitud. La generación puede tardar varios minutos. Esperá un momento e intentá nuevamente.",
     );
     expect(result.errorType).toBe("NETWORK_ERROR");
   });
@@ -54,7 +54,7 @@ describe("parseErrorResponse", () => {
     const result = await parseErrorResponse(response);
 
     expect(result.message).toBe(
-      "El servidor está procesando tu solicitud. Esto puede tardar hasta 2 minutos. Esperá un momento e intentá nuevamente.",
+      "El servidor está procesando tu solicitud. La generación puede tardar varios minutos. Esperá un momento e intentá nuevamente.",
     );
     expect(result.errorType).toBeUndefined();
   });

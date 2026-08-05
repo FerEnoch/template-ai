@@ -34,7 +34,7 @@ export function CaseStickyBar({
             <>
               <Loader2 className="h-5 w-5 animate-spin text-accent" />
               <p className="font-label text-sm font-medium text-text-secondary">
-                Generando documento... Esto puede tomar hasta 2 minutos.
+                Generando documento... Esto puede tardar varios minutos.
               </p>
             </>
           ) : error ? (

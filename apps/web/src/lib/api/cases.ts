@@ -52,7 +52,7 @@ export function fallbackMessageForStatus(status: number): string {
     case 500:
       return "Hubo un problema interno en el servidor. Si el problema persiste, contactá a soporte.";
     case 502:
-      return "El servidor está procesando tu solicitud. Esto puede tardar hasta 2 minutos. Esperá un momento e intentá nuevamente.";
+      return "El servidor está procesando tu solicitud. La generación puede tardar varios minutos. Esperá un momento e intentá nuevamente.";
     case 503:
       return "El servicio no está disponible temporalmente. Intentá nuevamente en unos momentos.";
     case 504:
