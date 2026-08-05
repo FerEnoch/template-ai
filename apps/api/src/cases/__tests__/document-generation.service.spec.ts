@@ -24,6 +24,7 @@ vi.mock("../../config/ai.js", () => ({
 
 import { DocumentGenerationService } from "../../ai/document-generation.service";
 import { OpenRouterService, OpenRouterError } from "../../ai/open-router.service";
+import { VerificationService } from "../../ai/verification.service.js";
 import type { CachePort } from "../../infrastructure/redis/index.js";
 
 // ---------------------------------------------------------------------------
@@ -31,11 +32,18 @@ import type { CachePort } from "../../infrastructure/redis/index.js";
 // ---------------------------------------------------------------------------
 
 const mockGenerateDocument = vi.fn();
+const mockVerify = vi.fn();
 
 function createMockOpenRouterService(): OpenRouterService {
   return {
     generateDocument: mockGenerateDocument,
   } as unknown as OpenRouterService;
+}
+
+function createMockVerificationService(): VerificationService {
+  return {
+    verify: mockVerify,
+  } as unknown as VerificationService;
 }
 
 // ---------------------------------------------------------------------------
@@ -61,11 +69,18 @@ const sampleBaseText = "Contrato de compraventa que celebran las partes...";
 describe("DocumentGenerationService", () => {
   let service: DocumentGenerationService;
   let mockOpenRouter: OpenRouterService;
+  let mockVerification: VerificationService;
 
   beforeEach(() => {
     vi.resetAllMocks();
     mockOpenRouter = createMockOpenRouterService();
-    service = new DocumentGenerationService(mockOpenRouter);
+    mockVerification = createMockVerificationService();
+    mockVerify.mockResolvedValue({
+      passed: true,
+      completarCount: 0,
+      warnings: [],
+    });
+    service = new DocumentGenerationService(mockOpenRouter, mockVerification);
   });
 
   describe("generate", () => {
@@ -82,6 +97,14 @@ describe("DocumentGenerationService", () => {
       expect(result.success).toBe(true);
       expect(result.generatedText).toBe(generatedText);
       expect(mockGenerateDocument).toHaveBeenCalledOnce();
+      expect(mockGenerateDocument).toHaveBeenCalledWith(
+        "generation",
+        expect.objectContaining({
+          entities: expect.stringContaining("COMPRADOR"),
+          formData: expect.stringContaining("Juan Pérez"),
+          baseText: sampleBaseText,
+        }),
+      );
     });
 
     it("should succeed with NULL base text (graceful degradation)", async () => {
@@ -97,87 +120,56 @@ describe("DocumentGenerationService", () => {
       expect(result.success).toBe(true);
       expect(result.generatedText).toBe(generatedText);
       expect(result.baseTextMissing).toBe(true);
+      expect(mockGenerateDocument).toHaveBeenCalledWith(
+        "generation-no-base",
+        expect.objectContaining({
+          entities: expect.any(String),
+          formData: expect.any(String),
+        }),
+      );
+      expect(mockGenerateDocument).not.toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ baseText: expect.any(String) }),
+      );
     });
 
-    it("should retry on RATE_LIMIT up to 3 attempts", async () => {
-      vi.useFakeTimers();
+    it("should delegate to OpenRouterService.generateDocument once (retry handled internally)", async () => {
+      const generatedText = "Generated document.";
+      mockGenerateDocument.mockResolvedValue({ generatedText });
 
-      const generatedText = "Generated after retries.";
-      mockGenerateDocument
-        .mockRejectedValueOnce(new OpenRouterError("rate limited", "RATE_LIMIT"))
-        .mockRejectedValueOnce(new OpenRouterError("rate limited again", "RATE_LIMIT"))
-        .mockResolvedValue({ generatedText });
-
-      const generatePromise = service.generate({
+      const result = await service.generate({
         entities: sampleEntities,
         formData: sampleFormData,
         baseText: sampleBaseText,
       });
-
-      await vi.runAllTimersAsync();
-      const result = await generatePromise;
 
       expect(result.success).toBe(true);
       expect(result.generatedText).toBe(generatedText);
-      expect(mockGenerateDocument).toHaveBeenCalledTimes(3);
-
-      vi.useRealTimers();
+      expect(mockGenerateDocument).toHaveBeenCalledTimes(1);
     });
 
-    it("should retry on NETWORK_ERROR", async () => {
-      vi.useFakeTimers();
+    it("should propagate OpenRouterError without retrying", async () => {
+      mockGenerateDocument.mockRejectedValue(
+        new OpenRouterError("rate limited", "RATE_LIMIT"),
+      );
 
-      const generatedText = "Generated after network retry.";
-      mockGenerateDocument
-        .mockRejectedValueOnce(new OpenRouterError("unreachable", "NETWORK_ERROR"))
-        .mockResolvedValue({ generatedText });
-
-      const generatePromise = service.generate({
+      const result = await service.generate({
         entities: sampleEntities,
         formData: sampleFormData,
         baseText: sampleBaseText,
       });
-
-      await vi.runAllTimersAsync();
-      const result = await generatePromise;
-
-      expect(result.success).toBe(true);
-      expect(mockGenerateDocument).toHaveBeenCalledTimes(2);
-
-      vi.useRealTimers();
-    });
-
-    it("should return failure after exhausting all retries", async () => {
-      vi.useFakeTimers();
-
-      mockGenerateDocument
-        .mockRejectedValue(new OpenRouterError("e1", "INVALID_RESPONSE"))
-        .mockRejectedValue(new OpenRouterError("e2", "INVALID_RESPONSE"))
-        .mockRejectedValue(new OpenRouterError("e3", "INVALID_RESPONSE"));
-
-      const generatePromise = service.generate({
-        entities: sampleEntities,
-        formData: sampleFormData,
-        baseText: sampleBaseText,
-      });
-
-      await vi.runAllTimersAsync();
-      const result = await generatePromise;
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("e3");
-      expect(mockGenerateDocument).toHaveBeenCalledTimes(3);
-
-      vi.useRealTimers();
+      expect(mockGenerateDocument).toHaveBeenCalledTimes(1);
     });
 
     it("should return 502-equivalent error on persistent NETWORK_ERROR", async () => {
       vi.useFakeTimers();
 
       mockGenerateDocument
-        .mockRejectedValue(new OpenRouterError("net1", "NETWORK_ERROR"))
-        .mockRejectedValue(new OpenRouterError("net2", "NETWORK_ERROR"))
-        .mockRejectedValue(new OpenRouterError("net3", "NETWORK_ERROR"));
+        .mockRejectedValueOnce(new OpenRouterError("net1", "NETWORK_ERROR"))
+        .mockRejectedValueOnce(new OpenRouterError("net2", "NETWORK_ERROR"))
+        .mockRejectedValueOnce(new OpenRouterError("net3", "NETWORK_ERROR"));
 
       const generatePromise = service.generate({
         entities: sampleEntities,
@@ -208,38 +200,95 @@ describe("DocumentGenerationService", () => {
       expect(result.success).toBe(false);
       expect(mockGenerateDocument).toHaveBeenCalledTimes(1);
     });
-  });
 
-  describe("error logging", () => {
-    it("logs the full error stack after exhausting INVALID_RESPONSE retries", async () => {
-      vi.useFakeTimers();
-      const loggerErrorSpy = vi
-        .spyOn(Logger.prototype, "error")
-        .mockImplementation(() => {});
+    it("should include verification data in a successful result", async () => {
+      const generatedText = "Contrato de compraventa entre Juan Pérez.";
+      const verification = {
+        passed: true,
+        completarCount: 0,
+        warnings: [],
+      };
+      mockGenerateDocument.mockResolvedValue({ generatedText });
+      mockVerify.mockResolvedValue(verification);
 
-      mockGenerateDocument
-        .mockRejectedValueOnce(new OpenRouterError("e1", "INVALID_RESPONSE"))
-        .mockRejectedValueOnce(new OpenRouterError("e2", "INVALID_RESPONSE"))
-        .mockRejectedValueOnce(new OpenRouterError("e3", "INVALID_RESPONSE"));
-
-      const generatePromise = service.generate({
+      const result = await service.generate({
         entities: sampleEntities,
         formData: sampleFormData,
         baseText: sampleBaseText,
       });
 
-      await vi.runAllTimersAsync();
-      const result = await generatePromise;
+      expect(result.success).toBe(true);
+      expect(result.verification).toEqual(verification);
+      expect(mockVerify).toHaveBeenCalledTimes(1);
+      expect(mockVerify).toHaveBeenCalledWith(generatedText);
+    });
+
+    it("should NOT block generation when verification finds [COMPLETAR]", async () => {
+      const generatedText = "El Sr. [COMPLETAR] domiciliado en.";
+      const verification = {
+        passed: false,
+        completarCount: 1,
+        warnings: ["Falta nombre del arrendador"],
+      };
+      mockGenerateDocument.mockResolvedValue({ generatedText });
+      mockVerify.mockResolvedValue(verification);
+
+      const result = await service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.verification).toEqual(verification);
+    });
+
+    it("should NOT block generation when verification is degraded", async () => {
+      const generatedText = "Documento.";
+      const verification = {
+        passed: true,
+        completarCount: 0,
+        warnings: ["Verification model failed: timeout"],
+        degraded: true,
+      };
+      mockGenerateDocument.mockResolvedValue({ generatedText });
+      mockVerify.mockResolvedValue(verification);
+
+      const result = await service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.verification).toEqual(verification);
+    });
+  });
+
+  describe("error logging", () => {
+    it("logs the error after generateDocument fails", async () => {
+      const loggerErrorSpy = vi
+        .spyOn(Logger.prototype, "error")
+        .mockImplementation(() => {});
+
+      mockGenerateDocument.mockRejectedValue(
+        new OpenRouterError("e1", "INVALID_RESPONSE"),
+      );
+
+      const result = await service.generate({
+        entities: sampleEntities,
+        formData: sampleFormData,
+        baseText: sampleBaseText,
+      });
 
       expect(result.success).toBe(false);
       expect(loggerErrorSpy).toHaveBeenCalledTimes(1);
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         "Document generation failed",
-        expect.stringContaining("e3"),
+        expect.stringContaining("e1"),
       );
 
       loggerErrorSpy.mockRestore();
-      vi.useRealTimers();
     });
   });
 });

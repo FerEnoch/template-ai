@@ -52,9 +52,9 @@ The system MUST define a `Document` schema with fields: `id` (uuid string), `fil
 
 ### Requirement: Entity schema
 
-The system MUST define an `Entity` schema with fields: `id` (uuid string), `label` (non-empty string), `value` (string), `group` (non-empty string), `confidence` (enum: alta, media, baja), `sourceSpan` (object with `start` and `end` positive integers, **optional/nullable** — an entity whose value cannot be located in the extracted text is still valid, just not highlightable), `reviewed` (boolean, default false), `excluded` (boolean, default false).
+The system MUST define an `Entity` schema with fields: `id` (uuid string), `label` (non-empty string), `value` (string), `group` (non-empty string — accepts any non-empty string, not just seed enum), `confidence` (enum: alta, media, baja), `sourceSpan` (object with `start` and `end` positive integers, **optional/nullable** — an entity whose value cannot be located in the extracted text is still valid, just not highlightable), `reviewed` (boolean, default false), `reviewedAt` (ISO datetime, optional/nullable), `excluded` (boolean, default false).
 
-(Previously: `sourceSpan` was required — analysis responses with no exact match failed validation. The `excluded` field did not exist.)
+(Previously: `group` was `z.enum(["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"])` in code, restricting groups to 4 real-estate categories. The spec said "non-empty string" but the code enum was narrower.)
 
 #### Scenario: Valid entity passes validation
 
@@ -85,6 +85,36 @@ The system MUST define an `Entity` schema with fields: `id` (uuid string), `labe
 - GIVEN an entity with `excluded: true`
 - WHEN parsed by the Entity schema
 - THEN validation succeeds
+
+#### Scenario: Valid entity with seed group passes
+
+- GIVEN an entity with `group: "PARTES"`
+- WHEN parsed by EntitySchema
+- THEN validation succeeds
+
+#### Scenario: Valid entity with GENERAL group passes
+
+- GIVEN an entity with `group: "GENERAL"`
+- WHEN parsed by EntitySchema
+- THEN validation succeeds
+
+#### Scenario: Valid entity with dynamic group passes
+
+- GIVEN an entity with `group: "JORNADA"` (user-approved dynamic group)
+- WHEN parsed by EntitySchema
+- THEN validation succeeds
+
+#### Scenario: Empty group rejected
+
+- GIVEN an entity with `group: ""`
+- WHEN parsed by EntitySchema
+- THEN validation fails
+
+#### Scenario: Entity without reviewedAt validates
+
+- GIVEN an entity without `reviewedAt`
+- WHEN parsed by EntitySchema
+- THEN validation succeeds with `reviewedAt: undefined`
 
 ### Requirement: AnalysisResult schema
 
@@ -119,7 +149,9 @@ The system MUST define an `AnalysisResult` schema with fields: `documentId` (uui
 
 ### Requirement: Template schema
 
-The system MUST define a `Template` schema with fields: `id` (uuid string), `name` (non-empty string, max 200 chars), `description` (string, max 1000 chars, optional), `documentId` (uuid string), `entities` (array of Entity), `category` (non-empty string), `createdAt` (ISO datetime), `status` (enum: draft, saved).
+The system MUST define a `Template` schema with fields: `id` (uuid string), `name` (non-empty string, max 200 chars), `description` (string, max 1000 chars, optional), `documentId` (uuid string), `entities` (array of Entity), `category` (non-empty string), `createdAt` (ISO datetime), `status` (enum: draft, saved), and an optional `suggestedGroupsStatus` (record of `{ groupName: "pending" | "approved" | "rejected" }`).
+
+(Previously: Template had no dynamic-group tracking field.)
 
 #### Scenario: Valid template passes validation
 
@@ -132,6 +164,18 @@ The system MUST define a `Template` schema with fields: `id` (uuid string), `nam
 - GIVEN a template with `name: ""`
 - WHEN parsed by the Template schema
 - THEN validation fails with a min-length error
+
+#### Scenario: Template with suggested groups validates
+
+- GIVEN a template with `suggestedGroupsStatus: { JORNADA: "pending" }`
+- WHEN parsed by TemplateSchema
+- THEN validation succeeds
+
+#### Scenario: Template without suggested groups validates
+
+- GIVEN a legacy template without `suggestedGroupsStatus`
+- WHEN parsed by TemplateSchema
+- THEN validation succeeds (field is optional)
 
 ### Requirement: Schema exports
 
@@ -191,11 +235,25 @@ The system MUST define a `ClassifySpanRequest` Zod schema with fields: `text` (n
 
 ### Requirement: ClassifySpanResponse schema
 
-The system MUST define a `ClassifySpanResponse` Zod schema with fields: `label` (non-empty string), `group` (non-empty string), `value` (string — mirrors the input text). The schema MUST be exported from `@template-ai/contracts`.
+The system MUST define a `ClassifySpanResponse` Zod schema with fields: `label` (non-empty string), `group` (non-empty string — accepts any non-empty string, not just seed enum), `value` (string — mirrors the input text). The schema MUST be exported from `@template-ai/contracts`.
+
+(Previously: `group` was `z.enum(["PARTES", "INMUEBLE", "FECHAS", "ANEXOS"])` — only 4 seed groups.)
 
 #### Scenario: Valid response passes validation
 
 - GIVEN `{ label: "Arrendatario", group: "PARTES", value: "Juan Pérez" }`
+- WHEN parsed by `ClassifySpanResponse`
+- THEN validation succeeds
+
+#### Scenario: Valid response with GENERAL passes
+
+- GIVEN `{ label: "Lugar", group: "GENERAL", value: "Av. Central 123" }`
+- WHEN parsed by `ClassifySpanResponse`
+- THEN validation succeeds
+
+#### Scenario: Valid response with dynamic group passes
+
+- GIVEN `{ label: "Jornada", group: "JORNADA", value: "8 horas" }`
 - WHEN parsed by `ClassifySpanResponse`
 - THEN validation succeeds
 
@@ -208,6 +266,38 @@ The contracts package MUST export `MANUAL_ENTITY_LIMIT = 5` as a constant. Both 
 - GIVEN `@template-ai/contracts` is installed
 - WHEN `MANUAL_ENTITY_LIMIT` is imported
 - THEN the value is `5`
+
+### Requirement: Entity `reviewedAt` timestamp
+
+The `EntitySchema` SHALL include `reviewedAt` (optional ISO datetime string, nullable). This field records when the user marked an entity as reviewed and serves as the sort key for FewShotProvider.
+
+#### Scenario: Entity with reviewedAt validates
+
+- GIVEN an entity with `reviewed: true` and `reviewedAt: "2026-01-15T10:30:00Z"`
+- WHEN parsed by EntitySchema
+- THEN validation succeeds and `reviewedAt` is accessible
+
+#### Scenario: Entity without reviewedAt validates (backward compat)
+
+- GIVEN a legacy entity without `reviewedAt`
+- WHEN parsed by EntitySchema
+- THEN validation succeeds (field is optional/nullable)
+
+### Requirement: Dynamic group acceptance
+
+The `ClassifySpanResponseSchema.group` field SHALL accept any non-empty string, enabling `GENERAL`/`OTROS` and model-suggested dynamic groups beyond the seed enum.
+
+#### Scenario: classify-span returns GENERAL group
+
+- GIVEN the AI classifies a span into `GENERAL`
+- WHEN `ClassifySpanResponse` is validated
+- THEN `group: "GENERAL"` passes validation
+
+#### Scenario: classify-span returns dynamic group
+
+- GIVEN the AI classifies a span as `JORNADA` (user-approved dynamic group)
+- WHEN `ClassifySpanResponse` is validated
+- THEN `group: "JORNADA"` passes validation
 
 ## Notes
 

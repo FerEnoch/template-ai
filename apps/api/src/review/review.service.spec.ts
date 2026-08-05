@@ -26,6 +26,7 @@ vi.mock("../config/env.js", () => ({
 import { ReviewService } from "./review.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { OpenRouterService, OpenRouterError } from "../ai/open-router.service";
+import { GroupsService, SEED_GROUPS } from "../ai/groups.service";
 import type { EntityRecord } from "../infrastructure/postgres/repositories/entities.repository";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ function makeEntityRecord(overrides: Partial<EntityRecord> = {}): EntityRecord {
     confidence: "ALTA",
     sourceSpan: { start: 142, end: 163 },
     reviewed: false,
+    reviewedAt: null,
     excluded: false,
     userCreated: false,
     ...overrides,
@@ -193,11 +195,16 @@ function createMockPostgresService(setup: {
 
 describe("ReviewService", () => {
   let mockOpenRouter: OpenRouterService;
+  let mockGroups: GroupsService;
 
   beforeEach(() => {
     mockOpenRouter = {
       classifySpan: vi.fn(),
     } as unknown as OpenRouterService;
+
+    mockGroups = {
+      resolve: vi.fn().mockResolvedValue([...SEED_GROUPS]),
+    } as unknown as GroupsService;
   });
 
   describe("updateEntity", () => {
@@ -221,7 +228,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.updateEntity("doc-1", "entity-1", {
         reviewed: true,
@@ -238,7 +245,7 @@ describe("ReviewService", () => {
       const mockPostgres = createMockPostgresService({
         entityRecord: null,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       await expect(
         service.updateEntity("doc-1", "nonexistent-id", { reviewed: true }),
@@ -265,7 +272,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.updateEntity("doc-2", "entity-2", {
         excluded: true,
@@ -296,7 +303,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.updateEntity("doc-3", "entity-3", {
         reviewed: true,
@@ -326,7 +333,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.updateEntity("doc-4", "entity-4", {
         reviewed: true,
@@ -353,7 +360,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       // Attacker tries to update entity-1 via a different documentId
       await expect(
@@ -381,7 +388,7 @@ describe("ReviewService", () => {
         entityRecord: existingRecord,
         updatedRecord,
       });
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.updateEntity("doc-1", "entity-1", { reviewed: true });
 
@@ -402,7 +409,7 @@ describe("ReviewService", () => {
         value: "Juan Pérez",
       });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.classifySpan("doc-1", {
         text: "Juan Pérez",
@@ -416,6 +423,7 @@ describe("ReviewService", () => {
       expect(mockOpenRouter.classifySpan).toHaveBeenCalledWith(
         "Juan Pérez",
         "...entre Juan Pérez y María López...",
+        [...SEED_GROUPS],
       );
     });
 
@@ -424,7 +432,7 @@ describe("ReviewService", () => {
         manualEntityCount: 5,
       });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       await expect(
         service.classifySpan("doc-1", {
@@ -456,7 +464,7 @@ describe("ReviewService", () => {
           value: "Juan Pérez",
         });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.classifySpan("doc-1", {
         text: "Juan Pérez",
@@ -481,7 +489,7 @@ describe("ReviewService", () => {
           value: "María López",
         });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.classifySpan("doc-1", {
         text: "María López",
@@ -491,6 +499,116 @@ describe("ReviewService", () => {
 
       expect(result.label).toBe("VENDEDOR");
       expect(mockOpenRouter.classifySpan).toHaveBeenCalledTimes(2);
+    });
+
+    it("should return GENERAL group result as-is (valid classification)", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      vi.spyOn(mockOpenRouter, "classifySpan").mockResolvedValue({
+        label: "OTRO",
+        group: "GENERAL",
+        value: "fragmento ambiguo",
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "fragmento ambiguo",
+        sourceSpan: { start: 0, end: 17 },
+        context: "context",
+      });
+
+      expect(result).toEqual({
+        label: "OTRO",
+        group: "GENERAL",
+        value: "fragmento ambiguo",
+      });
+    });
+
+    it("should accept a model-suggested dynamic group when it is in the resolved group list", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      mockGroups.resolve = vi.fn().mockResolvedValue([...SEED_GROUPS, "GARANTIA"]);
+
+      vi.spyOn(mockOpenRouter, "classifySpan").mockResolvedValue({
+        label: "GARANTE",
+        group: "GARANTIA",
+        value: "Juan Garante",
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "Juan Garante",
+        sourceSpan: { start: 0, end: 12 },
+        context: "context",
+      });
+
+      expect(result).toEqual({
+        label: "GARANTE",
+        group: "GARANTIA",
+        value: "Juan Garante",
+      });
+      expect(mockOpenRouter.classifySpan).toHaveBeenCalledWith(
+        "Juan Garante",
+        "context",
+        [...SEED_GROUPS, "GARANTIA"],
+      );
+    });
+
+    it("should fall back to SIN_CLASIFICAR for a group outside the resolved group list", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      vi.spyOn(mockOpenRouter, "classifySpan").mockResolvedValue({
+        label: "DESCONOCIDO",
+        group: "NO_EXISTE",
+        value: "texto raro",
+      });
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "texto raro",
+        sourceSpan: { start: 0, end: 10 },
+        context: "context",
+      });
+
+      expect(result).toEqual({
+        label: "SIN_CLASIFICAR",
+        group: "GENERAL",
+        value: "texto raro",
+      });
+    });
+
+    it("should fall back to SIN_CLASIFICAR when AI classification fails with OpenRouterError", async () => {
+      const mockPostgres = createMockPostgresService({
+        manualEntityCount: 0,
+      });
+
+      vi.spyOn(mockOpenRouter, "classifySpan").mockRejectedValue(
+        new OpenRouterError("Auth failure", "AUTH_ERROR"),
+      );
+
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
+
+      const result = await service.classifySpan("doc-1", {
+        text: "span fallido",
+        sourceSpan: { start: 0, end: 12 },
+        context: "context",
+      });
+
+      expect(result).toEqual({
+        label: "SIN_CLASIFICAR",
+        group: "GENERAL",
+        value: "span fallido",
+      });
+      expect(mockOpenRouter.classifySpan).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -511,7 +629,7 @@ describe("ReviewService", () => {
         createdRecord,
       });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.createEntity("doc-1", {
         label: "CAMPO_CUSTOM",
@@ -528,7 +646,7 @@ describe("ReviewService", () => {
         manualEntityCount: 5,
       });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       await expect(
         service.createEntity("doc-1", {
@@ -546,7 +664,7 @@ describe("ReviewService", () => {
         manualEntityCount: 3,
       });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.countManualEntities("doc-1");
 
@@ -560,7 +678,7 @@ describe("ReviewService", () => {
         manualEntityCount: 5,
       });
 
-      const service = new ReviewService(mockPostgres, mockOpenRouter);
+      const service = new ReviewService(mockPostgres, mockOpenRouter, mockGroups);
 
       const result = await service.countManualEntities("doc-1");
 

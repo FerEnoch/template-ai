@@ -33,6 +33,7 @@ const sampleRow: Record<string, unknown> = {
   entities: [
     { id: "e1", label: "Parte", value: "Juan", group: "PARTES", confidence: "ALTA", reviewed: false, excluded: false },
   ],
+  suggested_groups_status: {},
   created_at: new Date("2025-01-01T00:00:00Z"),
 };
 
@@ -66,6 +67,7 @@ describe("TemplatesRepository", () => {
         category: "legal",
         status: "draft",
         entities: expect.any(Array),
+        suggestedGroupsStatus: {},
         createdAt: new Date("2025-01-01T00:00:00Z"),
         deletedAt: null,
       } satisfies TemplateRecord);
@@ -206,6 +208,70 @@ describe("TemplatesRepository", () => {
 
       const result = await repo.delete("00000000-0000-0000-0000-000000000000");
       expect(result).toBe(false);
+    });
+  });
+
+  describe("suggestedGroupsStatus mapping", () => {
+    it("maps suggested_groups_status from the row", async () => {
+      const rowWithStatus = {
+        ...sampleRow,
+        suggested_groups_status: { JORNADA: "pending" },
+      };
+      const { client } = mockPoolClient([rowWithStatus]);
+      repo = new TemplatesRepository(client);
+
+      const result = await repo.findById("550e8400-e29b-41d4-a716-446655440000");
+      expect(result).toEqual(
+        expect.objectContaining({
+          suggestedGroupsStatus: { JORNADA: "pending" },
+        }),
+      );
+    });
+
+    it("defaults suggested_groups_status to empty object", async () => {
+      const { client } = mockPoolClient([sampleRow]);
+      repo = new TemplatesRepository(client);
+
+      const result = await repo.findById("550e8400-e29b-41d4-a716-446655440000");
+      expect(result).toEqual(expect.objectContaining({ suggestedGroupsStatus: {} }));
+    });
+  });
+
+  describe("updateSuggestedGroups", () => {
+    it("updates suggested_groups_status and returns updated record", async () => {
+      const updatedRow = {
+        ...sampleRow,
+        suggested_groups_status: { JORNADA: "approved" },
+      };
+      const { client, querySpy } = mockPoolClient([updatedRow]);
+      repo = new TemplatesRepository(client);
+
+      const result = await repo.updateSuggestedGroups(
+        "550e8400-e29b-41d4-a716-446655440000",
+        { JORNADA: "approved" },
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({ suggestedGroupsStatus: { JORNADA: "approved" } }),
+      );
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE templates"),
+        expect.arrayContaining([
+          JSON.stringify({ JORNADA: "approved" }),
+          "550e8400-e29b-41d4-a716-446655440000",
+        ]),
+      );
+    });
+
+    it("returns null when template not found", async () => {
+      const { client } = mockPoolClient([]);
+      repo = new TemplatesRepository(client);
+
+      const result = await repo.updateSuggestedGroups(
+        "00000000-0000-0000-0000-000000000000",
+        { JORNADA: "rejected" },
+      );
+      expect(result).toBeNull();
     });
   });
 });

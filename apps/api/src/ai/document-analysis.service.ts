@@ -1,9 +1,11 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
-import { OpenRouterService, OpenRouterError } from "./open-router.service.js";
+import { OpenRouterService } from "./open-router.service.js";
 import { CACHE_PORT, type CachePort } from "../infrastructure/redis/index.js";
 import { CACHE_CONFIG } from "../config/ai.js";
+import { FewShotProvider } from "./few-shot-provider.js";
+import { GroupsService } from "./groups.service.js";
 import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
@@ -17,6 +19,7 @@ export interface AnalyzeResult {
     confidence: string;
     sourceSpan?: { start: number; end: number };
   }>;
+  suggestedGroups?: string[];
   error?: string;
 }
 
@@ -73,8 +76,6 @@ export function validateAndCorrectSpans(
   });
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 @Injectable()
 export class DocumentAnalysisService {
   private readonly logger = new Logger(DocumentAnalysisService.name);
@@ -82,6 +83,8 @@ export class DocumentAnalysisService {
   constructor(
     private readonly openRouterService: OpenRouterService,
     @Inject(CACHE_PORT) private readonly cachePort: CachePort,
+    private readonly fewShotProvider: FewShotProvider,
+    private readonly groupsService: GroupsService,
   ) {}
 
   /**
@@ -145,6 +148,8 @@ export class DocumentAnalysisService {
   async analyze(
     filePath: string | null,
     contentHash?: string,
+    userId?: number,
+    templateId?: string,
   ): Promise<AnalyzeResult> {
     if (!filePath) {
       return { success: false, error: "File not found" };
@@ -163,7 +168,11 @@ export class DocumentAnalysisService {
 
     // Call AI with retry on rate limit
     try {
-      const aiResult = await this.callAiWithRetry(fileContent);
+      const aiResult = await this.callAiWithRetry(
+        fileContent,
+        userId ?? 0,
+        templateId,
+      );
       const entities = aiResult.entities.map((e) => ({
         label: e.label,
         value: e.value,
@@ -178,6 +187,7 @@ export class DocumentAnalysisService {
         success: true,
         extractedText: fileContent,
         entities: correctedEntities,
+        suggestedGroups: aiResult.suggestedGroups,
       };
     } catch (error) {
       const message =
@@ -188,41 +198,24 @@ export class DocumentAnalysisService {
   }
 
   /**
-   * Call AI extraction with exponential backoff on rate limits.
-   * Primary model → (rate limit?) → fallback model → (rate limit?) → wait → retry.
-   * Gives up after exhausting all attempts.
+   * Build context-aware prompt inputs and delegate to OpenRouterService.
+   * Retry is handled internally by callWithRetryChain (3 primary + 1 fallback).
    */
-  private async callAiWithRetry(fileContent: string) {
-    // Retryable error codes — transient failures worth re-attempting.
-    // CONFIG_ERROR (bad API key, model not found) is NOT retried.
-    const retryableCodes = ["RATE_LIMIT", "NETWORK_ERROR", "INVALID_RESPONSE"];
-    // Exponential-ish backoff: 1s, 3s → 3 total attempts (initial + 2 retries)
-    const delays = [1_000, 3_000];
-    let lastError: unknown;
+  private async callAiWithRetry(
+    fileContent: string,
+    userId: number,
+    templateId?: string,
+  ) {
+    const [fewShot, groups] = await Promise.all([
+      this.fewShotProvider.getExamples(userId),
+      this.groupsService.resolve(templateId),
+    ]);
 
-    for (let attempt = 0; attempt <= delays.length; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = delays[attempt - 1];
-          this.logger.warn(
-            `AI call failed (attempt ${attempt}) — retrying in ${delay / 1000}s...`,
-          );
-          await sleep(delay);
-        }
-        return await this.openRouterService.extractEntities(fileContent);
-      } catch (error) {
-        lastError = error;
-        if (
-          error instanceof OpenRouterError &&
-          retryableCodes.includes(error.code) &&
-          attempt < delays.length
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-
-    throw lastError;
+    return this.openRouterService.extractEntities({
+      documentText: fileContent,
+      userId,
+      groups,
+      fewShot,
+    });
   }
 }

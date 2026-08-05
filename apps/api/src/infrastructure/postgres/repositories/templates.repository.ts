@@ -9,6 +9,7 @@ export interface TemplateRecord {
   category: string;
   status: string;
   entities: unknown[];
+  suggestedGroupsStatus: Record<string, string>;
   createdAt: Date;
   deletedAt: Date | null;
 }
@@ -21,6 +22,7 @@ export interface CreateTemplateInput {
   category: string;
   status?: string;
   entities: unknown[];
+  suggestedGroupsStatus?: Record<string, string>;
 }
 
 function rowToTemplate(row: Record<string, unknown>): TemplateRecord {
@@ -33,6 +35,7 @@ function rowToTemplate(row: Record<string, unknown>): TemplateRecord {
     category: row["category"] as string,
     status: row["status"] as string,
     entities: row["entities"] as unknown[],
+    suggestedGroupsStatus: (row["suggested_groups_status"] as Record<string, string> | undefined) ?? {},
     createdAt: row["created_at"] as Date,
     deletedAt: (row["deleted_at"] as Date | null | undefined) ?? null,
   };
@@ -44,9 +47,9 @@ export class TemplatesRepository {
   async create(input: CreateTemplateInput): Promise<TemplateRecord> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        INSERT INTO templates (user_id, name, description, document_id, category, status, entities)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        INSERT INTO templates (user_id, name, description, document_id, category, status, entities, suggested_groups_status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
       `,
       [
         input.userId,
@@ -56,6 +59,7 @@ export class TemplatesRepository {
         input.category,
         input.status ?? "draft",
         JSON.stringify(input.entities),
+        JSON.stringify(input.suggestedGroupsStatus ?? {}),
       ],
     );
 
@@ -69,7 +73,7 @@ export class TemplatesRepository {
   async findById(id: string): Promise<TemplateRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        SELECT id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
         FROM templates
         WHERE id = $1
       `,
@@ -90,7 +94,7 @@ export class TemplatesRepository {
     const archivedFilter = includeArchived ? "" : "AND status != 'archived'";
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        SELECT id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
         FROM templates
         WHERE user_id = $1 ${archivedFilter}
         ORDER BY created_at DESC
@@ -104,10 +108,29 @@ export class TemplatesRepository {
   /**
    * Find a template by name and userId — used for 409 uniqueness check.
    */
+  async findByDocumentId(documentId: string): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
+        FROM templates
+        WHERE document_id = $1 AND status != 'archived'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [documentId],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
+  }
+
   async findByNameAndUserId(name: string, userId: number): Promise<TemplateRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        SELECT id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
         FROM templates
         WHERE name = $1 AND user_id = $2
       `,
@@ -127,7 +150,7 @@ export class TemplatesRepository {
         UPDATE templates
         SET name = $1
         WHERE id = $2
-        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        RETURNING id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
       `,
       [name, id],
     );
@@ -145,7 +168,7 @@ export class TemplatesRepository {
         UPDATE templates
         SET status = $1
         WHERE id = $2
-        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        RETURNING id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
       `,
       [status, id],
     );
@@ -167,7 +190,7 @@ export class TemplatesRepository {
         UPDATE templates
         SET status = 'archived', deleted_at = NOW()
         WHERE id = $1 AND status <> 'archived'
-        RETURNING id, user_id, name, description, document_id, category, status, entities, created_at, deleted_at
+        RETURNING id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
       `,
       [id],
     );
@@ -186,5 +209,30 @@ export class TemplatesRepository {
     );
 
     return (result.rowCount ?? 0) > 0;
+  }
+
+  /**
+   * Update the suggested groups status map for a template.
+   * Used to persist pending/approved/rejected dynamic group suggestions.
+   */
+  async updateSuggestedGroups(
+    id: string,
+    status: Record<string, string>,
+  ): Promise<TemplateRecord | null> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        UPDATE templates
+        SET suggested_groups_status = $1
+        WHERE id = $2
+        RETURNING id, user_id, name, description, document_id, category, status, entities, suggested_groups_status, created_at, deleted_at
+      `,
+      [JSON.stringify(status), id],
+    );
+
+    if (result.rowCount === 0 || result.rows.length === 0) {
+      return null;
+    }
+
+    return rowToTemplate(result.rows[0]);
   }
 }

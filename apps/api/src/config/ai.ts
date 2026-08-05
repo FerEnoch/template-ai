@@ -1,7 +1,29 @@
 import { join } from "node:path";
 import { getApiEnv } from "./env.js";
+import {
+  validateRouterConfig,
+  type AiTask,
+  type RouterConfig,
+} from "../ai/model-router.js";
 
 const env = getApiEnv();
+
+export type { AiTask };
+
+// ---------------------------------------------------------------------------
+// Model router: per-task model selection gated by AI_MODEL_ROUTER_ENABLED.
+// Dev/test keep the legacy single-model behavior (router = null).
+// ---------------------------------------------------------------------------
+const isRouterEnabled = process.env.AI_MODEL_ROUTER_ENABLED === "true";
+
+const router: RouterConfig["router"] = isRouterEnabled
+  ? {
+      extraction: process.env.AI_MODEL_EXTRACTION,
+      classification: process.env.AI_MODEL_CLASSIFICATION,
+      generation: process.env.AI_MODEL_GENERATION,
+      fallback: process.env.AI_MODEL_FALLBACK,
+    }
+  : null;
 
 // ---------------------------------------------------------------------------
 // Token budget: prevent JSON truncation on large documents.
@@ -27,7 +49,10 @@ export const AI_CONFIG = {
   apiKey: env.OPENROUTER_API_KEY,
   maxTokens: maxTokensEnv,
   temperature: 0.1,
+  router,
 } as const;
+
+validateRouterConfig(AI_CONFIG);
 
 // ---------------------------------------------------------------------------
 // Document generation config: higher token budget and temperature for

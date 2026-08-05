@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from "@nestjs/common";
 import { MANUAL_ENTITY_LIMIT } from "@template-ai/contracts";
 import { OpenRouterService, OpenRouterError } from "../ai/open-router.service";
+import { GroupsService } from "../ai/groups.service";
 import { PostgresService } from "../infrastructure/postgres/postgres.service";
 import { EntitiesRepository } from "../infrastructure/postgres/repositories/entities.repository";
 import { AnalysisResultsRepository } from "../infrastructure/postgres/repositories/analysis-results.repository";
+import { TemplatesRepository } from "../infrastructure/postgres/repositories/templates.repository";
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -64,6 +66,7 @@ export class ReviewService {
   public constructor(
     private readonly postgres: PostgresService,
     private readonly openRouter: OpenRouterService,
+    private readonly groupsService: GroupsService,
   ) {}
 
   /**
@@ -124,14 +127,53 @@ export class ReviewService {
     documentId: string,
     input: ClassifySpanInput,
   ): Promise<{ label: string; group: string; value: string }> {
+    // Resolve templateId from document to include dynamic groups.
+    const templateId = await this.resolveTemplateId(documentId);
+    const groups = await this.groupsService.resolve(templateId);
+
     return this.postgres.withOwnerTransaction(0, async ({ client }) => {
       const entitiesRepo = new EntitiesRepository(client);
 
       // Enforce manual entity cap
       await this.enforceManualEntityLimit(entitiesRepo, documentId);
 
-      // Call AI to classify the span (with retry)
-      return this.callClassifyWithRetry(input.text, input.context);
+      try {
+        const result = await this.callClassifyWithRetry(
+          input.text,
+          input.context,
+          groups,
+        );
+
+        // If the model returns a group outside the allowed set,
+        // treat the span as unclassifiable. GENERAL is a valid
+        // classification — keep the model's label.
+        if (
+          !groups.map((g) => g.toUpperCase()).includes(result.group.toUpperCase())
+        ) {
+          return this.buildUnclassifiedFallback(input.text);
+        }
+
+        return result;
+      } catch (error) {
+        // Classification failures from the AI layer should not break the UX;
+        // return a fallback the user can correct manually.
+        if (error instanceof OpenRouterError) {
+          return this.buildUnclassifiedFallback(input.text);
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Look up the template associated with a document to include its
+   * approved dynamic groups during span classification.
+   */
+  private async resolveTemplateId(documentId: string): Promise<string | undefined> {
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const templatesRepo = new TemplatesRepository(client);
+      const template = await templatesRepo.findByDocumentId(documentId);
+      return template?.id;
     });
   }
 
@@ -189,6 +231,85 @@ export class ReviewService {
   }
 
   /**
+   * Find the template associated with a document and return its suggested
+   * groups status map. Returns an empty object when no template exists.
+   */
+  async getSuggestedGroupsStatus(
+    documentId: string,
+  ): Promise<Record<string, string>> {
+    return this.postgres.withOwnerTransaction(0, async ({ client }) => {
+      const templatesRepo = new TemplatesRepository(client);
+      const template = await templatesRepo.findByDocumentId(documentId);
+      if (template?.suggestedGroupsStatus) {
+        const status = template.suggestedGroupsStatus;
+        if (Object.keys(status).length > 0) {
+          return status;
+        }
+      }
+
+      // Before a template exists (review flow), surface analysis-suggested
+      // groups as pending so the UI can display them. Approve/reject still
+      // requires a template (created at save).
+      const analysisRepo = new AnalysisResultsRepository(client);
+      const results = await analysisRepo.findByDocumentId(documentId);
+      const latest = results[0];
+      if (latest?.suggestedGroups?.length) {
+        return Object.fromEntries(
+          latest.suggestedGroups.map((group) => [group, "pending"]),
+        );
+      }
+
+      return {};
+    });
+  }
+
+  /**
+   * Approve a suggested dynamic group for the template associated with the
+   * given document. When no template exists yet (review-before-create flow),
+   * the call succeeds — the client owns the optimistic state, and
+   * TemplatesService.create will persist it when the template is saved.
+   */
+  async approveGroup(documentId: string, group: string): Promise<void> {
+    const template = await this.postgres.withOwnerTransaction(
+      0,
+      async ({ client }) => {
+        const templatesRepo = new TemplatesRepository(client);
+        return templatesRepo.findByDocumentId(documentId);
+      },
+    );
+
+    if (!template) {
+      // No template yet; client state is authoritative.
+      return;
+    }
+
+    await this.groupsService.approve(template.id, group);
+  }
+
+  /**
+   * Reject a suggested dynamic group for the template associated with the
+   * given document. When no template exists yet (review-before-create flow),
+   * the call succeeds — the client owns the optimistic state, and
+   * TemplatesService.create will persist it when the template is saved.
+   */
+  async rejectGroup(documentId: string, group: string): Promise<void> {
+    const template = await this.postgres.withOwnerTransaction(
+      0,
+      async ({ client }) => {
+        const templatesRepo = new TemplatesRepository(client);
+        return templatesRepo.findByDocumentId(documentId);
+      },
+    );
+
+    if (!template) {
+      // No template yet; client state is authoritative.
+      return;
+    }
+
+    await this.groupsService.reject(template.id, group);
+  }
+
+  /**
    * Enforce the manual entity limit. Throws ForbiddenException if cap is reached.
    */
   private async enforceManualEntityLimit(
@@ -208,9 +329,10 @@ export class ReviewService {
   private async callClassifyWithRetry(
     text: string,
     context: string,
+    groups: string[],
   ): Promise<{ label: string; group: string; value: string }> {
     try {
-      return await this.openRouter.classifySpan(text, context);
+      return await this.openRouter.classifySpan(text, context, groups);
     } catch (error) {
       if (error instanceof OpenRouterError) {
         // Retry once on NETWORK_ERROR, API_ERROR, or INVALID_RESPONSE (transient / malformed-output retry)
@@ -219,7 +341,7 @@ export class ReviewService {
             `classifySpan failed (${error.code}), retrying once...`,
           );
           try {
-            return await this.openRouter.classifySpan(text, context);
+            return await this.openRouter.classifySpan(text, context, groups);
           } catch (retryError) {
             if (retryError instanceof OpenRouterError) {
               throw retryError;
@@ -233,6 +355,21 @@ export class ReviewService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Fallback result for spans the model could not classify reliably.
+   * The caller can present this to the user with the message:
+   * "El fragmento no pudo clasificarse automáticamente. Podés clasificarlo manualmente."
+   */
+  private buildUnclassifiedFallback(
+    text: string,
+  ): { label: string; group: string; value: string } {
+    return {
+      label: "SIN_CLASIFICAR",
+      group: "GENERAL",
+      value: text,
+    };
   }
 
   private mapToReviewEntity(

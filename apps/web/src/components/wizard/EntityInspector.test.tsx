@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { EntityInspector } from "./EntityInspector";
 import type { Entity } from "@template-ai/contracts";
@@ -234,11 +234,90 @@ describe("EntityInspector", () => {
     });
   });
 
+  it("renders dynamic group headers with a model-suggested badge", () => {
+    const dynamicEntities: Entity[] = [
+      {
+        id: "entity-jornada",
+        label: "JORNADA",
+        value: "Lunes a viernes",
+        group: "JORNADA",
+        confidence: "ALTA",
+        reviewed: false,
+        excluded: false,
+        userCreated: false,
+      },
+    ];
+
+    render(<EntityInspector entities={dynamicEntities} onEntityUpdate={vi.fn()} />);
+
+    expect(screen.getByText("Jornada")).toBeInTheDocument();
+    expect(screen.getByText("Sugerido por IA")).toBeInTheDocument();
+  });
+
+  it("renders + AGREGAR CAMPO in dynamic group headers", () => {
+    const onAddEntity = vi.fn();
+    const dynamicEntities: Entity[] = [
+      {
+        id: "entity-jornada",
+        label: "JORNADA",
+        value: "Lunes a viernes",
+        group: "JORNADA",
+        confidence: "ALTA",
+        reviewed: false,
+        excluded: false,
+        userCreated: false,
+      },
+    ];
+
+    render(
+      <EntityInspector
+        entities={dynamicEntities}
+        onEntityUpdate={vi.fn()}
+        onAddEntity={onAddEntity}
+        manualEntityCount={0}
+      />
+    );
+
+    const groupHeader = screen.getByText("Sugerido por IA").closest("div")?.parentElement;
+    const addButton = groupHeader?.querySelector("button");
+    expect(addButton).toBeInTheDocument();
+    fireEvent.click(addButton!);
+    expect(onAddEntity).toHaveBeenCalledOnce();
+  });
+
   it("shows 'Con traza' badge for entities with sourceSpan", () => {
     render(<EntityInspector {...defaultProps} />);
 
     const trazaBadges = screen.getAllByText("Con traza");
     expect(trazaBadges.length).toBeGreaterThan(0);
+  });
+
+  it("renders suggested group approval chips when status has pending groups", async () => {
+    const onApprove = vi.fn();
+    const onReject = vi.fn();
+
+    render(
+      <EntityInspector
+        {...defaultProps}
+        suggestedGroupsStatus={{ JORNADA: "pending" }}
+        onApproveGroup={onApprove}
+        onRejectGroup={onReject}
+      />
+    );
+
+    expect(screen.getByText("JORNADA")).toBeInTheDocument();
+
+    const approveButton = screen.getByLabelText(/aprobar grupo jornada/i);
+    fireEvent.click(approveButton);
+    await waitFor(() => {
+      expect(onApprove).toHaveBeenCalledWith("JORNADA");
+    });
+
+    const rejectButton = screen.getByLabelText(/rechazar grupo jornada/i);
+    fireEvent.click(rejectButton);
+    await waitFor(() => {
+      expect(onReject).toHaveBeenCalledWith("JORNADA");
+    });
   });
 
   it("opens edit modal when entity row is clicked", () => {

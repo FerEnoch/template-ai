@@ -55,6 +55,7 @@ function rowToEntity(row: Record<string, unknown>): EntityRecord {
     confidence: row["confidence"] as string,
     sourceSpan: row["source_span"] as { start: number; end: number } | null,
     reviewed: row["reviewed"] as boolean,
+    reviewedAt: (row["reviewed_at"] as Date | null | undefined) ?? null,
     excluded: row["excluded"] as boolean,
     userCreated: (row["user_created"] as boolean) ?? false,
   };
@@ -174,7 +175,7 @@ export class DocumentsRepository {
     const entitiesResult = await this.client.query<Record<string, unknown>>(
       `
         SELECT id, analysis_result_id, document_id, label, value, "group",
-               confidence, source_span, reviewed, excluded, user_created
+               confidence, source_span, reviewed, reviewed_at, excluded, user_created
         FROM entities
         WHERE analysis_result_id = $1
         ORDER BY label

@@ -21,6 +21,7 @@ function makeAnalysisResultRecord(
     retryCount: 0,
     errorMessage: null,
     extractedText: null,
+    suggestedGroups: [],
     ...overrides,
   };
 }
@@ -36,6 +37,7 @@ function makeEntityRecord(overrides: Partial<EntityRecord> = {}): EntityRecord {
     confidence: "ALTA",
     sourceSpan: { start: 142, end: 163 },
     reviewed: false,
+    reviewedAt: null,
     excluded: false,
     userCreated: false,
     ...overrides,

@@ -38,6 +38,9 @@ describe("ReviewController", () => {
       classifySpan: vi.fn(),
       createEntity: vi.fn(),
       countManualEntities: vi.fn(),
+      getSuggestedGroupsStatus: vi.fn(),
+      approveGroup: vi.fn(),
+      rejectGroup: vi.fn(),
     } as unknown as ReviewService;
     controller = new ReviewController(service);
   });
@@ -231,6 +234,55 @@ describe("ReviewController", () => {
       const result = await controller.getManualEntityCount("doc-uuid-1");
 
       expect(result.canAddMore).toBe(false);
+    });
+  });
+
+  describe("GET /:documentId/suggested-groups", () => {
+    it("should return the suggested groups status for a document", async () => {
+      vi.spyOn(service, "getSuggestedGroupsStatus").mockResolvedValue({
+        JORNADA: "pending",
+        GARANTES: "approved",
+      });
+
+      const result = await controller.getSuggestedGroups("doc-uuid-1");
+
+      expect(result).toEqual({
+        suggestedGroupsStatus: {
+          JORNADA: "pending",
+          GARANTES: "approved",
+        },
+      });
+      expect(service.getSuggestedGroupsStatus).toHaveBeenCalledWith("doc-uuid-1");
+    });
+  });
+
+  describe("POST /:documentId/groups/:group/approve", () => {
+    it("should approve a suggested group", async () => {
+      vi.spyOn(service, "approveGroup").mockResolvedValue(undefined);
+
+      await controller.approveGroup("doc-uuid-1", "JORNADA");
+
+      expect(service.approveGroup).toHaveBeenCalledWith("doc-uuid-1", "JORNADA");
+    });
+
+    it("should propagate NotFoundException when no template exists", async () => {
+      vi.spyOn(service, "approveGroup").mockRejectedValue(
+        new NotFoundException("No template found"),
+      );
+
+      await expect(controller.approveGroup("doc-uuid-1", "JORNADA")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe("POST /:documentId/groups/:group/reject", () => {
+    it("should reject a suggested group", async () => {
+      vi.spyOn(service, "rejectGroup").mockResolvedValue(undefined);
+
+      await controller.rejectGroup("doc-uuid-1", "JORNADA");
+
+      expect(service.rejectGroup).toHaveBeenCalledWith("doc-uuid-1", "JORNADA");
     });
   });
 });

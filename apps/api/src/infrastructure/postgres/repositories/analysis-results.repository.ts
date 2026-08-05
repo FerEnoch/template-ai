@@ -10,6 +10,7 @@ export interface AnalysisResultRecord {
   retryCount: number;
   errorMessage: string | null;
   extractedText: string | null;
+  suggestedGroups: string[];
 }
 
 export interface CreateAnalysisResultInput {
@@ -28,6 +29,7 @@ function rowToAnalysisResult(row: Record<string, unknown>): AnalysisResultRecord
     retryCount: (row["retry_count"] as number) ?? 0,
     errorMessage: (row["error_message"] as string | null) ?? null,
     extractedText: (row["extracted_text"] as string | null) ?? null,
+    suggestedGroups: (row["suggested_groups"] as string[]) ?? [],
   };
 }
 
@@ -39,7 +41,7 @@ export class AnalysisResultsRepository {
       `
         INSERT INTO analysis_results (document_id, status)
         VALUES ($1, $2)
-        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
       `,
       [input.documentId, input.status],
     );
@@ -54,7 +56,7 @@ export class AnalysisResultsRepository {
   async findById(id: string): Promise<AnalysisResultRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        SELECT id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
         FROM analysis_results
         WHERE id = $1
       `,
@@ -71,7 +73,7 @@ export class AnalysisResultsRepository {
   async findByDocumentId(documentId: string): Promise<AnalysisResultRecord[]> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        SELECT id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
         FROM analysis_results
         WHERE document_id = $1
         ORDER BY started_at DESC
@@ -92,7 +94,7 @@ export class AnalysisResultsRepository {
         UPDATE analysis_results
         SET progress = LEAST(progress + 25, 100)
         WHERE id = $1
-        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
       `,
       [id],
     );
@@ -115,7 +117,7 @@ export class AnalysisResultsRepository {
         UPDATE analysis_results
         SET status = 'analyzing'
         WHERE id = $1 AND status = 'processing'
-        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
       `,
       [id],
     );
@@ -134,7 +136,7 @@ export class AnalysisResultsRepository {
         SET status = $1,
             completed_at = CASE WHEN $1 = 'completed' THEN now() ELSE completed_at END
         WHERE id = $2
-        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
       `,
       [status, id],
     );
@@ -169,7 +171,7 @@ export class AnalysisResultsRepository {
         SET retry_count = retry_count + 1,
             error_message = $2
         WHERE id = $1 AND retry_count < 3
-        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text
+        RETURNING id, document_id, status, progress, started_at, completed_at, retry_count, error_message, extracted_text, suggested_groups
       `,
       [id, errorMessage],
     );
@@ -179,5 +181,16 @@ export class AnalysisResultsRepository {
     }
 
     return rowToAnalysisResult(result.rows[0]);
+  }
+
+  /**
+   * Save model-suggested groups so they survive between analysis
+   * and template creation.
+   */
+  async saveSuggestedGroups(id: string, suggestedGroups: string[]): Promise<void> {
+    await this.client.query(
+      `UPDATE analysis_results SET suggested_groups = $2 WHERE id = $1`,
+      [id, JSON.stringify(suggestedGroups)],
+    );
   }
 }

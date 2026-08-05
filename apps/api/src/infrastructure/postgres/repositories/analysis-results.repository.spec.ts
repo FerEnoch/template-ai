@@ -32,6 +32,7 @@ const sampleRow: Record<string, unknown> = {
   retry_count: 0,
   error_message: null,
   extracted_text: null,
+  suggested_groups: [],
 };
 
 const sampleInput: CreateAnalysisResultInput = {
@@ -59,6 +60,7 @@ describe("AnalysisResultsRepository", () => {
         retryCount: 0,
         errorMessage: null,
         extractedText: null,
+        suggestedGroups: [],
       } satisfies AnalysisResultRecord);
 
       expect(querySpy).toHaveBeenCalledWith(

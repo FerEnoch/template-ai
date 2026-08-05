@@ -10,6 +10,7 @@ export interface EntityRecord {
   confidence: string;
   sourceSpan: { start: number; end: number } | null;
   reviewed: boolean;
+  reviewedAt: Date | null;
   excluded: boolean;
   userCreated: boolean;
 }
@@ -46,6 +47,7 @@ function rowToEntity(row: Record<string, unknown>): EntityRecord {
     confidence: row["confidence"] as string,
     sourceSpan: row["source_span"] as { start: number; end: number } | null,
     reviewed: row["reviewed"] as boolean,
+    reviewedAt: (row["reviewed_at"] as Date | null | undefined) ?? null,
     excluded: row["excluded"] as boolean,
     userCreated: (row["user_created"] as boolean) ?? false,
   };
@@ -59,7 +61,7 @@ export class EntitiesRepository {
       `
         INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence, source_span, user_created)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
+        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, reviewed_at, excluded, user_created
       `,
       [
         input.analysisResultId,
@@ -105,7 +107,7 @@ export class EntitiesRepository {
       `
         INSERT INTO entities (analysis_result_id, document_id, label, value, "group", confidence, source_span, user_created)
         VALUES ${placeholders.join(", ")}
-        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
+        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, reviewed_at, excluded, user_created
       `,
       values,
     );
@@ -116,7 +118,7 @@ export class EntitiesRepository {
   async findById(id: string): Promise<EntityRecord | null> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
+        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, reviewed_at, excluded, user_created
         FROM entities
         WHERE id = $1
       `,
@@ -133,7 +135,7 @@ export class EntitiesRepository {
   async findByAnalysisResultId(analysisResultId: string): Promise<EntityRecord[]> {
     const result = await this.client.query<Record<string, unknown>>(
       `
-        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
+        SELECT id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, reviewed_at, excluded, user_created
         FROM entities
         WHERE analysis_result_id = $1
         ORDER BY label
@@ -172,6 +174,7 @@ export class EntitiesRepository {
     if (input.reviewed !== undefined) {
       setClauses.push(`reviewed = $${paramIdx++}`);
       values.push(input.reviewed);
+      setClauses.push(`reviewed_at = ${input.reviewed ? "NOW()" : "NULL"}`);
     }
     if (input.excluded !== undefined) {
       setClauses.push(`excluded = $${paramIdx++}`);
@@ -189,7 +192,7 @@ export class EntitiesRepository {
         UPDATE entities
         SET ${setClauses.join(", ")}
         WHERE id = $${paramIdx}
-        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, excluded, user_created
+        RETURNING id, analysis_result_id, document_id, label, value, "group", confidence, source_span, reviewed, reviewed_at, excluded, user_created
       `,
       values,
     );
@@ -221,5 +224,29 @@ export class EntitiesRepository {
     );
 
     return Number(result.rows[0]?.count ?? 0);
+  }
+
+  /**
+   * Return the most recent reviewed, non-excluded entities for a user
+   * across all documents, ordered by reviewed_at DESC, up to 3.
+   * Used as few-shot examples for extraction prompts.
+   */
+  async findReviewedForFewShot(userId: number): Promise<EntityRecord[]> {
+    const result = await this.client.query<Record<string, unknown>>(
+      `
+        SELECT e.id, e.analysis_result_id, e.document_id, e.label, e.value, e."group", e.confidence, e.source_span, e.reviewed, e.reviewed_at, e.excluded, e.user_created
+        FROM entities e
+        JOIN documents d ON d.id = e.document_id
+        WHERE d.user_id = $1
+          AND e.reviewed = true
+          AND e.excluded = false
+          AND e.reviewed_at IS NOT NULL
+        ORDER BY e.reviewed_at DESC
+        LIMIT 3
+      `,
+      [userId],
+    );
+
+    return result.rows.map(rowToEntity);
   }
 }

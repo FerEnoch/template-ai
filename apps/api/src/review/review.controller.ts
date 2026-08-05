@@ -6,6 +6,7 @@ import {
   Body,
   NotFoundException,
   BadRequestException,
+  HttpCode,
 } from "@nestjs/common";
 import { ClassifySpanRequestSchema } from "@template-ai/contracts";
 import {
@@ -20,6 +21,45 @@ import {
 @Controller("review")
 export class ReviewController {
   public constructor(private readonly reviewService: ReviewService) {}
+
+  /**
+   * GET /:documentId/suggested-groups
+   * Return the suggested-groups status map for the template associated with
+   * the document. Returns an empty object when no template exists.
+   */
+  @Get(":documentId/suggested-groups")
+  public async getSuggestedGroups(
+    @Param("documentId") documentId: string,
+  ): Promise<{ suggestedGroupsStatus: Record<string, string> }> {
+    const status = await this.reviewService.getSuggestedGroupsStatus(documentId);
+    return { suggestedGroupsStatus: status };
+  }
+
+  /**
+   * POST /:documentId/groups/:group/approve
+   * Approve a suggested dynamic group for the associated template.
+   */
+  @Post(":documentId/groups/:group/approve")
+  @HttpCode(204)
+  public async approveGroup(
+    @Param("documentId") documentId: string,
+    @Param("group") group: string,
+  ): Promise<void> {
+    await this.reviewService.approveGroup(documentId, group);
+  }
+
+  /**
+   * POST /:documentId/groups/:group/reject
+   * Reject a suggested dynamic group for the associated template.
+   */
+  @Post(":documentId/groups/:group/reject")
+  @HttpCode(204)
+  public async rejectGroup(
+    @Param("documentId") documentId: string,
+    @Param("group") group: string,
+  ): Promise<void> {
+    await this.reviewService.rejectGroup(documentId, group);
+  }
 
   /**
    * POST /:documentId/entities/classify-span

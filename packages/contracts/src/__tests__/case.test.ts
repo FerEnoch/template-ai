@@ -205,6 +205,31 @@ describe("GenerateDocumentResponseSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("parses a response with verification data", () => {
+    const result = GenerateDocumentResponseSchema.safeParse({
+      generatedText: "Full legal document content...",
+      verification: {
+        passed: true,
+        completarCount: 0,
+        warnings: [],
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("parses a degraded verification response", () => {
+    const result = GenerateDocumentResponseSchema.safeParse({
+      generatedText: "Full legal document content...",
+      verification: {
+        passed: true,
+        completarCount: 1,
+        warnings: ["Verification model failed"],
+        degraded: true,
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
   it("rejects empty generatedText", () => {
     const result = GenerateDocumentResponseSchema.safeParse({
       generatedText: "",
