@@ -28,6 +28,9 @@ describe("prompt content", () => {
       expect(content).toContain("BAJA");
       expect(content).toContain("No inventes");
       expect(content).toContain("sourceSpan");
+      expect(content).toContain('"start"');
+      expect(content).toContain('"end"');
+      expect(content).not.toMatch(/"sourceSpan":\s*"string"/);
       expect(content).toContain("entities");
     });
   });

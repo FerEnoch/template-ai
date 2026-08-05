@@ -42,7 +42,7 @@ Respondé ÚNICAMENTE con un objeto JSON que contenga la propiedad `entities`, u
       "value": "string",
       "group": "string",
       "confidence": "ALTA|MEDIA|BAJA",
-      "sourceSpan": "string"
+      "sourceSpan": { "start": 0, "end": 10 }
     }
   ]
 }
@@ -52,4 +52,4 @@ Respondé ÚNICAMENTE con un objeto JSON que contenga la propiedad `entities`, u
 - `value`: texto extraído o inferido.
 - `group`: uno de los grupos permitidos listados arriba.
 - `confidence`: ALTA, MEDIA o BAJA según los criterios.
-- `sourceSpan`: fragmento exacto del documento que respalda la extracción.
+- `sourceSpan` (opcional): objeto con índices de carácter `{ "start": number, "end": number }` del fragmento exacto del documento que respalda la extracción. No uses un string; si no podés ubicar el span, omití el campo.

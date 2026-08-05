@@ -240,13 +240,34 @@ export class ReviewService {
     return this.postgres.withOwnerTransaction(0, async ({ client }) => {
       const templatesRepo = new TemplatesRepository(client);
       const template = await templatesRepo.findByDocumentId(documentId);
-      return template?.suggestedGroupsStatus ?? {};
+      if (template?.suggestedGroupsStatus) {
+        const status = template.suggestedGroupsStatus;
+        if (Object.keys(status).length > 0) {
+          return status;
+        }
+      }
+
+      // Before a template exists (review flow), surface analysis-suggested
+      // groups as pending so the UI can display them. Approve/reject still
+      // requires a template (created at save).
+      const analysisRepo = new AnalysisResultsRepository(client);
+      const results = await analysisRepo.findByDocumentId(documentId);
+      const latest = results[0];
+      if (latest?.suggestedGroups?.length) {
+        return Object.fromEntries(
+          latest.suggestedGroups.map((group) => [group, "pending"]),
+        );
+      }
+
+      return {};
     });
   }
 
   /**
    * Approve a suggested dynamic group for the template associated with the
-   * given document. Throws NotFoundException if no template exists.
+   * given document. When no template exists yet (review-before-create flow),
+   * the call succeeds — the client owns the optimistic state, and
+   * TemplatesService.create will persist it when the template is saved.
    */
   async approveGroup(documentId: string, group: string): Promise<void> {
     const template = await this.postgres.withOwnerTransaction(
@@ -258,9 +279,8 @@ export class ReviewService {
     );
 
     if (!template) {
-      throw new NotFoundException(
-        `No template found for document "${documentId}"`,
-      );
+      // No template yet; client state is authoritative.
+      return;
     }
 
     await this.groupsService.approve(template.id, group);
@@ -268,7 +288,9 @@ export class ReviewService {
 
   /**
    * Reject a suggested dynamic group for the template associated with the
-   * given document. Throws NotFoundException if no template exists.
+   * given document. When no template exists yet (review-before-create flow),
+   * the call succeeds — the client owns the optimistic state, and
+   * TemplatesService.create will persist it when the template is saved.
    */
   async rejectGroup(documentId: string, group: string): Promise<void> {
     const template = await this.postgres.withOwnerTransaction(
@@ -280,9 +302,8 @@ export class ReviewService {
     );
 
     if (!template) {
-      throw new NotFoundException(
-        `No template found for document "${documentId}"`,
-      );
+      // No template yet; client state is authoritative.
+      return;
     }
 
     await this.groupsService.reject(template.id, group);

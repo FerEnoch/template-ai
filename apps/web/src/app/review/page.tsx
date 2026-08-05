@@ -216,7 +216,7 @@ function ReviewInner() {
 
       try {
         const response = await fetch(
-          `/api/review/${state.analysisResultId}/groups/${group}/approve`,
+          `/api/review/${state.analysisResultId}/groups/${encodeURIComponent(group)}/approve`,
           { method: "POST" }
         );
         if (!response.ok) {
@@ -254,7 +254,7 @@ function ReviewInner() {
 
       try {
         const response = await fetch(
-          `/api/review/${state.analysisResultId}/groups/${group}/reject`,
+          `/api/review/${state.analysisResultId}/groups/${encodeURIComponent(group)}/reject`,
           { method: "POST" }
         );
         if (!response.ok) {
