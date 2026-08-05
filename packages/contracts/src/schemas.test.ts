@@ -432,6 +432,7 @@ describe("CaseSchema name field", () => {
     status: "borrador" as const,
     formData: { ent_1: "Juan Pérez" },
     generatedText: null,
+    effectiveTitle: "Test Case",
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-01T00:00:00.000Z",
   };
