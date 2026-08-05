@@ -97,8 +97,9 @@ export function DocumentViewer({
   const onSavingChangeRef = useRef(onSavingChange);
   onSavingChangeRef.current = onSavingChange;
 
-  // Monotonic token: external prop changes and newer saves invalidate older ones.
+  // contentEpoch bumps on external prop changes; saveGen bumps on each save start.
   const contentEpochRef = useRef(0);
+  const saveGenRef = useRef(0);
   const saveAbortRef = useRef<AbortController | null>(null);
   // Last text we pushed optimistically to the parent. Prop echoes equal to this
   // value are ignored (do not abort). A different generatedText is external
@@ -119,6 +120,7 @@ export function DocumentViewer({
 
     lastOptimisticTextRef.current = null;
     contentEpochRef.current += 1;
+    saveGenRef.current += 1;
     saveAbortRef.current?.abort();
     saveAbortRef.current = null;
     setSavingIndex(null);
@@ -146,6 +148,8 @@ export function DocumentViewer({
     const controller = new AbortController();
     saveAbortRef.current = controller;
     const saveEpoch = contentEpochRef.current;
+    saveGenRef.current += 1;
+    const mySaveGen = saveGenRef.current;
 
     setSavingIndex(index);
     onSavingChangeRef.current?.(true);
@@ -161,8 +165,11 @@ export function DocumentViewer({
       if (err instanceof Error && err.name === "AbortError") {
         return;
       }
-      // Only revert if this save is still the active content epoch.
-      if (saveEpoch === contentEpochRef.current) {
+      // Only revert if this save is still the active content epoch + generation.
+      if (
+        saveEpoch === contentEpochRef.current &&
+        mySaveGen === saveGenRef.current
+      ) {
         setParagraphs(prevParagraphs);
         lastOptimisticTextRef.current = prevFullText;
         onUpdateRef.current?.(prevFullText);
@@ -174,7 +181,11 @@ export function DocumentViewer({
       if (saveAbortRef.current === controller) {
         saveAbortRef.current = null;
       }
-      if (saveEpoch === contentEpochRef.current) {
+      // Only the latest save generation may clear the saving indicator.
+      if (
+        saveEpoch === contentEpochRef.current &&
+        mySaveGen === saveGenRef.current
+      ) {
         setSavingIndex(null);
         onSavingChangeRef.current?.(false);
       }
