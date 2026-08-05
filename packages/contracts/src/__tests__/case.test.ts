@@ -185,6 +185,16 @@ describe("UpdateCaseFormDataSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts optional generatedText for saving edits", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      generatedText: "Edited document text...",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.generatedText).toBe("Edited document text...");
+    }
+  });
 });
 
 describe("GenerateDocumentResponseSchema", () => {

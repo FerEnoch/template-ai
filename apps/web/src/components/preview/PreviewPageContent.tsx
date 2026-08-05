@@ -7,7 +7,7 @@ import { DocumentViewer } from "@/components/preview/DocumentViewer";
 import { VerificationChecklist } from "@/components/preview/VerificationChecklist";
 import { ExportPanel } from "@/components/preview/ExportPanel";
 import { ExportSpinner } from "@/components/preview/ExportSpinner";
-import { fetchCase, generateCase, updateCase, ApiError } from "@/lib/api/cases";
+import { fetchCase, generateCase, ApiError } from "@/lib/api/cases";
 import type { CaseWithTemplate } from "@/lib/api/cases";
 import { slugify } from "@/lib/export/exporters";
 import { ArrowLeft, RefreshCw, FileText } from "lucide-react";
@@ -40,6 +40,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
   } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isDocumentSaving, setIsDocumentSaving] = useState(false);
   const regenerateInFlight = useRef(false);
   const regenerateControllerRef = useRef<AbortController | null>(null);
 
@@ -64,7 +65,9 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
   }, [loadCase]);
 
   const handleRegenerate = useCallback(async () => {
-    if (regenerateInFlight.current) return;
+    // Do not start regen while a paragraph save is in flight — avoids last-write
+    // races between edited text and freshly generated text.
+    if (regenerateInFlight.current || isDocumentSaving) return;
     regenerateInFlight.current = true;
     const regenerateController = new AbortController();
     regenerateControllerRef.current = regenerateController;
@@ -86,7 +89,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
       regenerateInFlight.current = false;
       setIsRegenerating(false);
     }
-  }, [caseId]);
+  }, [caseId, isDocumentSaving]);
 
   const handleReturnToForm = useCallback(() => {
     if (!caseItem) return;
@@ -196,6 +199,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
                 current ? { ...current, generatedText: text } : current
               )
             }
+            onSavingChange={setIsDocumentSaving}
           />
         </div>
 
@@ -210,7 +214,9 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
             onExportStart={() => setIsExporting(true)}
             onExportComplete={() => {
               setIsExporting(false);
-              void loadCase();
+              // Do NOT reload the case from the backend here: that would
+              // overwrite local edited generatedText. ExportPanel still calls
+              // updateCase for status; status column writes are out of scope.
             }}
             onExportError={() => setIsExporting(false)}
           />
@@ -227,7 +233,7 @@ export function PreviewPageContent({ caseId, router }: PreviewPageContentProps) 
             <button
               type="button"
               onClick={handleRegenerate}
-              disabled={isRegenerating}
+              disabled={isRegenerating || isDocumentSaving}
               className="w-full bg-white border border-stone-200 text-stone-700 font-label font-bold py-3 px-4 flex items-center justify-center gap-3 hover:bg-stone-50 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               <RefreshCw

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EditableParagraph } from "./EditableParagraph";
 import { splitParagraphs } from "@/lib/export/splitParagraphs";
 import { updateCase } from "@/lib/api/cases";
@@ -72,6 +72,8 @@ export interface DocumentViewerProps {
   readonly title: string;
   readonly generatedText: string;
   readonly onUpdate?: (text: string) => void;
+  /** True while a paragraph save is in flight (parent can block regen). */
+  readonly onSavingChange?: (saving: boolean) => void;
 }
 
 export function DocumentViewer({
@@ -79,42 +81,116 @@ export function DocumentViewer({
   title,
   generatedText,
   onUpdate,
+  onSavingChange,
 }: DocumentViewerProps) {
   const [paragraphs, setParagraphs] = useState<string[]>(() =>
     ensureTitleParagraphs(generatedText, title)
   );
-
-  useEffect(() => {
-    setParagraphs(ensureTitleParagraphs(generatedText, title));
-  }, [generatedText, title]);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSave = useCallback(
-    async (index: number, newText: string) => {
-      const nextParagraphs = paragraphs.map((paragraph, i) =>
-        i === index ? newText : paragraph
-      );
-      const fullText = nextParagraphs.join("\n\n");
+  const paragraphsRef = useRef(paragraphs);
+  paragraphsRef.current = paragraphs;
 
-      setSavingIndex(index);
-      setError(null);
-      try {
-        await updateCase(caseId, { formData: { generatedText: fullText } });
-        setParagraphs(nextParagraphs);
-        onUpdate?.(fullText);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "No se pudo guardar el párrafo"
-        );
-      } finally {
-        setSavingIndex(null);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const onSavingChangeRef = useRef(onSavingChange);
+  onSavingChangeRef.current = onSavingChange;
+
+  // contentEpoch bumps on external prop changes; saveGen bumps on each save start.
+  const contentEpochRef = useRef(0);
+  const saveGenRef = useRef(0);
+  const saveAbortRef = useRef<AbortController | null>(null);
+  // Last text we pushed optimistically to the parent. Prop echoes equal to this
+  // value are ignored (do not abort). A different generatedText is external
+  // (regen/reload) and must abort + resync. Content-based, not a one-shot flag.
+  const lastOptimisticTextRef = useRef<string | null>(null);
+
+  // Sync path for EXTERNAL generatedText/title (regen, reload).
+  useEffect(() => {
+    if (
+      lastOptimisticTextRef.current !== null &&
+      generatedText === lastOptimisticTextRef.current
+    ) {
+      // Parent echoed our optimistic write (or title-only change with same text).
+      // Refresh title derivation without aborting an in-flight save.
+      setParagraphs(ensureTitleParagraphs(generatedText, title));
+      return;
+    }
+
+    lastOptimisticTextRef.current = null;
+    contentEpochRef.current += 1;
+    saveGenRef.current += 1;
+    saveAbortRef.current?.abort();
+    saveAbortRef.current = null;
+    setSavingIndex(null);
+    onSavingChangeRef.current?.(false);
+    setError(null);
+    setParagraphs(ensureTitleParagraphs(generatedText, title));
+  }, [generatedText, title]);
+
+  useEffect(() => {
+    return () => {
+      saveAbortRef.current?.abort();
+    };
+  }, []);
+
+  const handleSave = useCallback(async (index: number, newText: string) => {
+    const prevParagraphs = paragraphsRef.current;
+    const nextParagraphs = prevParagraphs.map((paragraph, i) =>
+      i === index ? newText : paragraph
+    );
+    const fullText = nextParagraphs.join("\n\n");
+    const prevFullText = prevParagraphs.join("\n\n");
+
+    // Abort any in-flight save so a stale PATCH cannot overwrite newer text.
+    saveAbortRef.current?.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+    const saveEpoch = contentEpochRef.current;
+    saveGenRef.current += 1;
+    const mySaveGen = saveGenRef.current;
+
+    setSavingIndex(index);
+    onSavingChangeRef.current?.(true);
+    setError(null);
+    // Optimistic UI so export sees the edit immediately.
+    setParagraphs(nextParagraphs);
+    lastOptimisticTextRef.current = fullText;
+    onUpdateRef.current?.(fullText);
+
+    try {
+      await updateCase(caseId, { generatedText: fullText }, controller.signal);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
       }
-    },
-    [caseId, paragraphs, onUpdate]
-  );
+      // Only revert if this save is still the active content epoch + generation.
+      if (
+        saveEpoch === contentEpochRef.current &&
+        mySaveGen === saveGenRef.current
+      ) {
+        setParagraphs(prevParagraphs);
+        lastOptimisticTextRef.current = prevFullText;
+        onUpdateRef.current?.(prevFullText);
+        setError(
+          err instanceof Error ? err.message : "No se pudo guardar el párrafo"
+        );
+      }
+    } finally {
+      if (saveAbortRef.current === controller) {
+        saveAbortRef.current = null;
+      }
+      // Only the latest save generation may clear the saving indicator.
+      if (
+        saveEpoch === contentEpochRef.current &&
+        mySaveGen === saveGenRef.current
+      ) {
+        setSavingIndex(null);
+        onSavingChangeRef.current?.(false);
+      }
+    }
+  }, [caseId]);
 
   return (
     <div className="bg-white shadow-[0_4px_20px_-2px_rgba(0,0,0,0.05)] min-h-[1000px] p-12 md:p-20 relative overflow-hidden">
@@ -128,7 +204,7 @@ export function DocumentViewer({
 
         {paragraphs.map((paragraph, index) => (
           <EditableParagraph
-            key={`${index}-${paragraph.slice(0, 20)}`}
+            key={index}
             text={paragraph}
             index={index}
             onSave={handleSave}

@@ -130,10 +130,15 @@ export class CasesController {
     // If only status is provided and it's 'archivado', archive the case
     if (parsed.data.status === "archivado" && !parsed.data.formData) {
       result = await this.casesService.archive(0, id);
-    } else if (parsed.data.formData !== undefined || parsed.data.status !== undefined) {
+    } else if (
+      parsed.data.formData !== undefined ||
+      parsed.data.status !== undefined ||
+      parsed.data.generatedText !== undefined
+    ) {
       result = await this.casesService.updateFormData(0, id, {
         formData: parsed.data.formData,
         status: parsed.data.status,
+        generatedText: parsed.data.generatedText,
       });
     }
 
