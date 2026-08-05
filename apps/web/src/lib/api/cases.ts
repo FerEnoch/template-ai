@@ -33,7 +33,7 @@ export class ApiError extends Error {
  * Used when the backend response body is empty, not JSON, or lacks an
  * explicit error field.
  */
-function fallbackMessageForStatus(status: number): string {
+export function fallbackMessageForStatus(status: number): string {
   switch (status) {
     case 400:
       return "Los datos enviados no son válidos. Revisá los campos e intentá nuevamente.";
@@ -49,6 +49,10 @@ function fallbackMessageForStatus(status: number): string {
       return "Los datos no pasaron la validación. Revisá los campos.";
     case 429:
       return "Demasiadas solicitudes. Esperá unos segundos e intentá nuevamente.";
+    case 500:
+      return "Hubo un problema interno en el servidor. Si el problema persiste, contactá a soporte.";
+    case 502:
+      return "El servidor está procesando tu solicitud. La generación puede tardar varios minutos. Esperá un momento e intentá nuevamente.";
     case 503:
       return "El servicio no está disponible temporalmente. Intentá nuevamente en unos momentos.";
     case 504:

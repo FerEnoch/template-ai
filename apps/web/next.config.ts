@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import path from "path";
 
 const nextConfig: NextConfig = {
+  // Phase 1: long proxy timeout for AI document generation. Revert in Phase 2 when /generate becomes async.
+  experimental: { proxyTimeout: 300_000 },
   outputFileTracingRoot: path.join(__dirname, "../../"),
   async rewrites() {
     // Default to same-origin (empty string) for production behind reverse proxy.
