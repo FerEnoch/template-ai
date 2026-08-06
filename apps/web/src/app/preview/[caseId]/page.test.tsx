@@ -13,6 +13,7 @@ const mockCase: CaseWithTemplate = {
   status: "generado",
   formData: {},
   generatedText: "Texto generado",
+  effectiveTitle: "Plantilla de prueba",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   template: {

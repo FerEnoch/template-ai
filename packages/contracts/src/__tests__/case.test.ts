@@ -37,6 +37,7 @@ describe("CaseSchema", () => {
     status: "borrador" as const,
     formData: { ent_1: "Juan Pérez" },
     generatedText: null,
+    effectiveTitle: "Test Case",
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-01T00:00:00.000Z",
   };
@@ -104,6 +105,36 @@ describe("CaseSchema", () => {
       createdAt: "not-a-date",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts contentTitle as a string", () => {
+    const result = CaseSchema.safeParse({
+      ...validCase,
+      contentTitle: "Compraventa",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBe("Compraventa");
+    }
+  });
+
+  it("accepts contentTitle as null", () => {
+    const result = CaseSchema.safeParse({
+      ...validCase,
+      contentTitle: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBeNull();
+    }
+  });
+
+  it("accepts missing contentTitle", () => {
+    const result = CaseSchema.safeParse(validCase);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBeUndefined();
+    }
   });
 });
 
@@ -193,6 +224,36 @@ describe("UpdateCaseFormDataSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.generatedText).toBe("Edited document text...");
+    }
+  });
+
+  it("accepts optional contentTitle for renaming", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      contentTitle: "Compraventa",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBe("Compraventa");
+    }
+  });
+
+  it("accepts contentTitle as null", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      contentTitle: null,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBeNull();
+    }
+  });
+
+  it("accepts PATCH with contentTitle", () => {
+    const result = UpdateCaseFormDataSchema.safeParse({
+      contentTitle: "X",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.contentTitle).toBe("X");
     }
   });
 });

@@ -103,6 +103,7 @@ const mockCase: Case = {
   status: "borrador",
   formData: {},
   generatedText: null,
+  effectiveTitle: "Contrato de locación",
   createdAt: "2024-05-15T00:00:00Z",
   updatedAt: "2024-05-15T00:00:00Z",
 };

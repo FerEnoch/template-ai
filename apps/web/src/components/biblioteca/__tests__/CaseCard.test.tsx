@@ -26,6 +26,7 @@ function makeCase(overrides: Partial<Case> = {}): Case {
     status: "borrador",
     formData: {},
     generatedText: null,
+    effectiveTitle: "Test Case",
     createdAt: "2025-06-01T10:00:00Z",
     updatedAt: "2025-06-01T10:00:00Z",
     ...overrides,
